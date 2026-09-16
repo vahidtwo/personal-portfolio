@@ -6,7 +6,6 @@
   document.addEventListener("DOMContentLoaded", function () {
     const el = document.getElementById("timeline-data");
     const canvas = document.getElementById("timeline-chart");
-    const empty = document.getElementById("chart-empty");
     if (!el || !canvas || typeof Chart === "undefined") return;
 
     let points = [];
@@ -19,10 +18,16 @@
       canvas.classList.add("hidden");
       return;
     }
-    if (empty) empty.classList.add("hidden");
 
     const labels = points.map((p) => p.t);
     const values = points.map((p) => p.v);
+    const accent = cssVar("--accent") || "#5b9dff";
+    const line = cssVar("--chart-line") || accent;
+    const pointRadius = points.map((p, i) => {
+      if (p.live) return 6;
+      return points.length > 49 ? 0 : 3;
+    });
+    const pointBg = points.map((p) => (p.live ? accent : line));
 
     new Chart(canvas, {
       type: "line",
@@ -32,12 +37,14 @@
           {
             label: "ارزش پرتفوی (تومان)",
             data: values,
-            borderColor: cssVar("--chart-line") || "#5b9dff",
+            borderColor: line,
             backgroundColor: cssVar("--chart-fill") || "rgba(91, 157, 255, 0.12)",
             fill: true,
             tension: 0.25,
-            pointRadius: points.length > 48 ? 0 : 3,
-            pointHoverRadius: 5,
+            pointRadius,
+            pointBackgroundColor: pointBg,
+            pointBorderColor: pointBg,
+            pointHoverRadius: 6,
             borderWidth: 2,
           },
         ],

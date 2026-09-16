@@ -255,6 +255,43 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   font-size: 12px;
   text-transform: none;
   white-space: nowrap;
+  padding: 0;
+}
+
+.th-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: right;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.th-sort:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.th-sort::after {
+  content: "↕";
+  font-size: 11px;
+  opacity: 0.35;
+}
+.th-sort.is-sorted::after {
+  opacity: 1;
+  color: var(--accent);
+}
+.th-sort.is-sorted:not(.is-desc)::after {
+  content: "↑";
+}
+.th-sort.is-sorted.is-desc::after {
+  content: "↓";
 }
 
 .data-table tbody tr:hover { background: var(--surface-hover); }
@@ -297,6 +334,7 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 .asset-dot-doge { background: #eab308; }
 .asset-dot-matic { background: #a855f7; }
 .asset-dot-usd { background: #22c55e; }
+.asset-dot-cash { background: #38bdf8; }
 .asset-dot-car { background: #94a3b8; }
 
 .btn {

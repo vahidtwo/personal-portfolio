@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
 
-ASSET_ORDER = ("gold", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "car")
+ASSET_ORDER = ("gold", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash", "car")
 
 ASSET_LABEL_FA = {
     "gold": "طلا ۱۸ عیار",
@@ -20,6 +20,7 @@ ASSET_LABEL_FA = {
     "doge": "دوج‌کوین",
     "matic": "پالیگان",
     "usd": "دلار",
+    "cash": "نقد",
     "car": "خودرو",
 }
 
@@ -88,6 +89,14 @@ ASSET_META = {
         "qty_attr": "usd",
         "qty_places": 2,
     },
+    "cash": {
+        "name_fa": "نقد",
+        "name_en": "Cash",
+        "unit_fa": "تومان",
+        "unit_en": "Toman",
+        "qty_attr": "cash_toman",
+        "qty_places": 0,
+    },
     "car": {
         "name_fa": "خودرو",
         "name_en": "Car",
@@ -97,6 +106,8 @@ ASSET_META = {
         "qty_places": 0,
     },
 }
+
+MANUAL_TOman_KEYS = frozenset({"cash", "car"})
 
 
 @dataclass
@@ -136,9 +147,15 @@ def build_portfolio(user: User, prices: dict[str, MarketPrice]) -> PortfolioView
     fetched_at = None
     for key in ASSET_ORDER:
         meta = ASSET_META[key]
-        if key == "car":
-            amount = Decimal(user.car_toman or 0).quantize(Decimal("1"))
-            quantity = Decimal("1") if amount > 0 else Decimal("0")
+        if key in MANUAL_TOman_KEYS:
+            attr = meta["qty_attr"]
+            amount = Decimal(getattr(user, attr) or 0).quantize(Decimal("1"))
+            if key == "car":
+                quantity = Decimal("1") if amount > 0 else Decimal("0")
+                unit_price = amount if amount > 0 else None
+            else:
+                quantity = amount
+                unit_price = None
             value = amount
             rows.append(
                 AssetRow(
@@ -148,7 +165,7 @@ def build_portfolio(user: User, prices: dict[str, MarketPrice]) -> PortfolioView
                     quantity=quantity,
                     unit_fa=meta["unit_fa"],
                     unit_en=meta["unit_en"],
-                    unit_price=amount if amount > 0 else None,
+                    unit_price=unit_price,
                     value_toman=value,
                     manual=True,
                 )

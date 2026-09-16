@@ -20,7 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import DATA_DIR, HTTPS_ONLY, PRICE_REFRESH_HOURS, SECRET_KEY
 from app.db import get_db, init_db
-from app.jobs import run_hourly_job
+from app.jobs import refresh_prices_and_snapshot_user, run_hourly_job
 from app.models import PortfolioSnapshot, User
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices
 from app.security import (
@@ -102,6 +102,15 @@ def load_timeline(db: Session, user_id: int, limit: int = 720) -> list[dict[str,
         }
         for row in rows
     ]
+
+
+def build_chart_timeline(db: Session, user_id: int, current_total: Decimal) -> list[dict]:
+    """Chart series: live portfolio value first, then historical snapshots (oldest → newest)."""
+    history = load_timeline(db, user_id)
+    current = {"t": "وضعیت فعلی", "v": float(current_total), "live": True}
+    if not history:
+        return [current]
+    return [current] + history
 
 
 templates.env.filters["toman"] = format_toman
@@ -257,16 +266,23 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             {
                 "key": row.key,
                 "name_fa": row.name_fa,
-                "quantity_label": format_qty(row.quantity, places if row.key != "car" else 0),
+                "quantity_label": format_qty(
+                    row.quantity,
+                    places if row.key not in ("car", "cash") else 0,
+                ),
                 "unit_fa": row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
                 "value_label": format_toman(row.value_toman),
                 "share_label": format(share, "f").rstrip("0").rstrip("."),
                 "manual": row.manual,
+                "sort_qty": str(row.quantity),
+                "sort_unit_price": str(row.unit_price) if row.unit_price is not None else "",
+                "sort_value": str(row.value_toman),
+                "sort_share": str(share),
             }
         )
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
-    timeline = load_timeline(db, user.id)
+    timeline = build_chart_timeline(db, user.id, view.total_toman)
     timeline_json = json.dumps(timeline, ensure_ascii=False)
     return render(
         request,
@@ -302,6 +318,7 @@ async def profile_save(
     doge: str = Form("0"),
     matic: str = Form("0"),
     usd: str = Form("0"),
+    cash_toman: str = Form("0"),
     car_toman: str = Form("0"),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
@@ -319,6 +336,7 @@ async def profile_save(
         "doge": doge,
         "matic": matic,
         "usd": usd,
+        "cash_toman": cash_toman,
         "car_toman": car_toman,
     }
     try:
@@ -330,6 +348,7 @@ async def profile_save(
         user.doge = parse_decimal(doge, field="doge")
         user.matic = parse_decimal(matic, field="matic")
         user.usd = parse_decimal(usd, field="usd")
+        user.cash_toman = parse_decimal(cash_toman, field="cash")
         user.car_toman = parse_decimal(car_toman, field="car")
     except Exception:
         return render(
@@ -341,6 +360,7 @@ async def profile_save(
             form=form,
         )
     db.commit()
+    await refresh_prices_and_snapshot_user(user.id)
     flash(request, "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -355,5 +375,6 @@ def _holdings_form(user: User) -> dict[str, str]:
         "doge": format_qty(Decimal(user.doge or 0), 4),
         "matic": format_qty(Decimal(user.matic or 0), 4),
         "usd": format_qty(Decimal(user.usd or 0), 2),
+        "cash_toman": format_qty(Decimal(user.cash_toman or 0), 0),
         "car_toman": format_qty(Decimal(user.car_toman or 0), 0),
     }

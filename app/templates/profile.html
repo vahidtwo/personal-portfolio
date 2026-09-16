@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}پروفایل / Profile{% endblock %}
+{% block content %}
+<section class="card auth wide">
+  <h1>موجودی من <small>My holdings</small></h1>
+  {% if flash %}<p class="notice">{{ flash }}</p>{% endif %}
+  {% if error %}<p class="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/profile" class="grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>
+      طلا ۱۸ عیار (گرم) / 18k gold (grams)
+      <input name="gold_grams" value="{{ form.gold_grams }}" inputmode="decimal">
+    </label>
+    <label>
+      بیت‌کوین / Bitcoin (BTC)
+      <input name="btc" value="{{ form.btc }}" inputmode="decimal">
+    </label>
+    <label>
+      کاردانو / Cardano (ADA)
+      <input name="ada" value="{{ form.ada }}" inputmode="decimal">
+    </label>
+    <label>
+      اتریوم / Ethereum (ETH)
+      <input name="eth" value="{{ form.eth }}" inputmode="decimal">
+    </label>
+    <label>
+      دلار نقد / US dollars (USD)
+      <input name="usd" value="{{ form.usd }}" inputmode="decimal">
+    </label>
+    <label>
+      قیمت خودرو (تومان، دستی) / Car price (Toman, manual)
+      <input name="car_toman" value="{{ form.car_toman }}" inputmode="numeric">
+    </label>
+    <button type="submit">ذخیره / Save</button>
+  </form>
+</section>
+{% endblock %}

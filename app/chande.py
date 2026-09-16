@@ -9,6 +9,9 @@ import httpx
 from app.config import CHANDE_URL
 from app.models import utcnow
 
+# chande.net SILVER priceToman is per troy ounce; portfolio silver is held in grams.
+TROY_OUNCE_GRAMS = Decimal("31.1034768")
+
 CHANDE_SYMBOLS = {
     "gold": "GOLD_18K",
     "silver": "SILVER",
@@ -29,6 +32,12 @@ class FetchedPrice:
     price_toman: Decimal
     source_updated_at: str | None
     fetched_at: datetime
+
+
+def normalize_price_toman(key: str, raw: Decimal) -> Decimal:
+    if key == "silver":
+        return (raw / TROY_OUNCE_GRAMS).quantize(Decimal("1"))
+    return raw
 
 
 async def fetch_chande_prices() -> list[FetchedPrice]:
@@ -58,11 +67,12 @@ async def fetch_chande_prices() -> list[FetchedPrice]:
         if raw is None:
             missing.append(symbol)
             continue
+        price = normalize_price_toman(key, Decimal(str(raw)))
         result.append(
             FetchedPrice(
                 key=key,
                 symbol=symbol,
-                price_toman=Decimal(str(raw)),
+                price_toman=price,
                 source_updated_at=str(row.get("updatedAt") or "") or None,
                 fetched_at=fetched_at,
             )

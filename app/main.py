@@ -77,11 +77,19 @@ def _secret_key() -> str:
     return generated
 
 
+_PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def persian_digits(text: str) -> str:
+    return str(text).translate(_PERSIAN_DIGITS)
+
+
 def format_toman(value: Decimal | None) -> str:
     if value is None:
         return "—"
     quantized = Decimal(value).quantize(Decimal("1"))
-    return f"{int(quantized):,}"
+    formatted = f"{int(quantized):,}".replace(",", "٬")
+    return persian_digits(formatted)
 
 
 def format_qty(value: Decimal, places: int) -> str:
@@ -95,12 +103,7 @@ def format_qty(value: Decimal, places: int) -> str:
 def format_when(value: datetime | None) -> str:
     if value is None:
         return "—"
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(TEHRAN).strftime("%Y-%m-%d %H:%M")
-
-
-_PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+    return format_chart_jalali(value)
 
 
 def _to_tehran(value: datetime) -> datetime:
@@ -110,7 +113,7 @@ def _to_tehran(value: datetime) -> datetime:
 
 
 def format_chart_jalali(value: datetime) -> str:
-    """Jalali date-time label for chart x-axis (Tehran), Persian digits."""
+    """Jalali date-time (Tehran) with Persian digits."""
     local = _to_tehran(value)
     j = jdatetime.datetime.fromgregorian(
         year=local.year,
@@ -119,8 +122,7 @@ def format_chart_jalali(value: datetime) -> str:
         hour=local.hour,
         minute=local.minute,
     )
-    text = j.strftime("%Y/%m/%d %H:%M")
-    return text.translate(_PERSIAN_DIGITS)
+    return persian_digits(j.strftime("%Y/%m/%d %H:%M"))
 
 
 def build_chart_data(db: Session, user_id: int, view) -> dict:
@@ -268,7 +270,7 @@ async def register(
             error="این نام کاربری قبلاً ثبت شده است",
             form={"username": username},
         )
-    user = User(username=username, password_hash=hash_password(password))
+    user = User(username=username, password_hash=hash_password(password), last_login_at=utcnow())
     db.add(user)
     db.commit()
     request.session["user_id"] = user.id
@@ -302,6 +304,8 @@ async def login(
             error="نام کاربری یا رمز عبور نادرست است",
             form={"username": username},
         )
+    user.last_login_at = utcnow()
+    db.commit()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -417,7 +421,9 @@ async def dashboard_refresh_prices(
     return RedirectResponse("/dashboard", status_code=303)
 
 
-def _build_admin_user_rows(db: Session, users: list[User], prices) -> list[dict]:
+def _build_admin_user_rows(
+    db: Session, users: list[User], prices, *, current_user_id: int
+) -> list[dict]:
     snapshot_counts = dict(
         db.query(PortfolioSnapshot.user_id, func.count(PortfolioSnapshot.id))
         .group_by(PortfolioSnapshot.user_id)
@@ -432,12 +438,15 @@ def _build_admin_user_rows(db: Session, users: list[User], prices) -> list[dict]
                 "id": account.id,
                 "username": account.username,
                 "created_label": format_when(account.created_at),
+                "last_login_label": format_when(account.last_login_at),
                 "total_label": format_toman(view.total_toman),
-                "snapshot_count": snapshot_counts.get(account.id, 0),
+                "snapshot_count": persian_digits(str(snapshot_counts.get(account.id, 0))),
                 "sanjeh_label": "بله" if account.sanjeh_token else "—",
+                "can_delete": account.id != current_user_id,
                 "assets": {key: format_toman(values.get(key, Decimal("0"))) for key in ASSET_ORDER},
                 "sort_user": account.username,
                 "sort_created": account.created_at.isoformat() if account.created_at else "",
+                "sort_last_login": account.last_login_at.isoformat() if account.last_login_at else "",
                 "sort_total": str(view.total_toman),
                 "sort_snapshots": str(snapshot_counts.get(account.id, 0)),
                 "sort_sanjeh": "1" if account.sanjeh_token else "0",
@@ -458,7 +467,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
 
     prices = load_prices(db)
     users = db.query(User).order_by(User.id.asc()).all()
-    user_rows = _build_admin_user_rows(db, users, prices)
+    user_rows = _build_admin_user_rows(db, users, prices, current_user_id=user.id)
     total_aum = sum(Decimal(r["sort_total"]) for r in user_rows)
 
     price_rows = []
@@ -487,12 +496,45 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         user_rows=user_rows,
         price_rows=price_rows,
         asset_columns=asset_columns,
-        user_count=len(users),
+        user_count=persian_digits(str(len(users))),
         total_aum_label=format_toman(total_aum),
         prices_fetched_label=format_when(latest_market_prices_fetched_at(prices)),
         flash=flash_message,
         flash_error=flash_error,
     )
+
+
+@app.post("/admin/users/{user_id}/delete")
+async def admin_delete_user(
+    user_id: int,
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    admin = get_current_user(request, db)
+    if admin is None:
+        return RedirectResponse("/login", status_code=303)
+    if not is_admin(admin):
+        flash(request, "دسترسی مدیریت ندارید.", error=True)
+        return RedirectResponse("/dashboard", status_code=303)
+    if user_id == admin.id:
+        flash(request, "نمی‌توانید حساب خودتان را حذف کنید.", error=True)
+        return RedirectResponse("/admin", status_code=303)
+
+    target = db.get(User, user_id)
+    if target is None:
+        flash(request, "کاربر پیدا نشد.", error=True)
+        return RedirectResponse("/admin", status_code=303)
+
+    username = target.username
+    db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == user_id).delete(
+        synchronize_session=False
+    )
+    db.delete(target)
+    db.commit()
+    flash(request, f"کاربر «{username}» و تمام داده‌هایش حذف شد.")
+    return RedirectResponse("/admin", status_code=303)
 
 
 @app.get("/profile", response_class=HTMLResponse)

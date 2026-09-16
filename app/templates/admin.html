@@ -37,12 +37,14 @@
         <tr>
           <th scope="col"><button type="button" class="th-sort" data-col="user">کاربر</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="created">عضو از</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="last_login">آخرین ورود</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="total">ارزش کل</button></th>
           {% for key, label in asset_columns %}
           <th scope="col"><button type="button" class="th-sort" data-col="{{ key }}">{{ label }}</button></th>
           {% endfor %}
           <th scope="col"><button type="button" class="th-sort" data-col="snapshots">اسنپ‌شات</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="sanjeh">سنجه</button></th>
+          <th scope="col">حذف</th>
         </tr>
       </thead>
       <tbody>
@@ -50,6 +52,7 @@
         <tr
           data-sort-user="{{ row.sort_user }}"
           data-sort-created="{{ row.sort_created }}"
+          data-sort-last-login="{{ row.sort_last_login }}"
           data-sort-total="{{ row.sort_total }}"
           data-sort-snapshots="{{ row.sort_snapshots }}"
           data-sort-sanjeh="{{ row.sort_sanjeh }}"
@@ -58,13 +61,29 @@
           {% endfor %}
         >
           <td><span dir="ltr">{{ row.username }}</span></td>
-          <td dir="ltr">{{ row.created_label }}</td>
+          <td>{{ row.created_label }}</td>
+          <td>{{ row.last_login_label }}</td>
           <td dir="ltr">{{ row.total_label }}</td>
           {% for key, _ in asset_columns %}
           <td dir="ltr">{{ row.assets[key] }}</td>
           {% endfor %}
           <td dir="ltr">{{ row.snapshot_count }}</td>
           <td>{{ row.sanjeh_label }}</td>
+          <td>
+            {% if row.can_delete %}
+            <form
+              method="post"
+              action="/admin/users/{{ row.id }}/delete"
+              class="inline-form"
+              onsubmit="return confirm('کاربر «{{ row.username }}» و تمام اسنپ‌شات‌ها و داده‌هایش حذف شود؟ این عمل برگشت‌پذیر نیست.');"
+            >
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+            </form>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -97,7 +116,7 @@
           <td dir="ltr">{{ row.symbol }}</td>
           <td>{{ row.name_fa }}</td>
           <td dir="ltr">{{ row.price_label }}</td>
-          <td dir="ltr">{{ row.fetched_label }}</td>
+          <td>{{ row.fetched_label }}</td>
         </tr>
         {% endfor %}
       </tbody>

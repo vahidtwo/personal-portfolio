@@ -31,6 +31,7 @@ class User(Base):
     car_count: Mapped[int] = mapped_column(default=0)
     sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     car_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")

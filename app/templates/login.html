@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}ورود / Log in{% endblock %}
+{% block content %}
+<section class="card auth">
+  <h1>ورود <small>Log in</small></h1>
+  {% if error %}<p class="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/login">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>
+      نام کاربری / Username
+      <input name="username" value="{{ form.username }}" autocomplete="username" required>
+    </label>
+    <label>
+      رمز عبور / Password
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">ورود / Log in</button>
+  </form>
+  <p class="muted">حساب ندارید؟ <a href="/register">ثبت‌نام / Register</a></p>
+</section>
+{% endblock %}

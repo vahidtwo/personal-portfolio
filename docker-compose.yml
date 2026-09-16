@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-dokploy}
+      HTTPS_ONLY: ${HTTPS_ONLY:-0}
+      DATA_DIR: /app/data
+    volumes:
+      - inventory-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  inventory-data:

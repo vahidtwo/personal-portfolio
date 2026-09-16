@@ -8,6 +8,7 @@ import bcrypt
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.config import ADMIN_USERNAMES
 from app.models import User
 
 USERNAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$")
@@ -79,6 +80,12 @@ def get_current_user(request: Request, db: Session) -> User | None:
     if not user_id:
         return None
     return db.get(User, user_id)
+
+
+def is_admin(user: User | None) -> bool:
+    if user is None or not ADMIN_USERNAMES:
+        return False
+    return normalize_username(user.username) in ADMIN_USERNAMES
 
 
 def require_user(request: Request, db: Session) -> User:

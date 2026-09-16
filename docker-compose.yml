@@ -9,6 +9,7 @@ services:
       DATA_DIR: /app/data
       PRICE_REFRESH_HOURS: ${PRICE_REFRESH_HOURS:-1}
       ENABLE_INTERNAL_SCHEDULER: ${ENABLE_INTERNAL_SCHEDULER:-1}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
     volumes:
       - inventory-data:/app/data
     restart: unless-stopped

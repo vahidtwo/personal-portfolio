@@ -1,5 +1,5 @@
 (function () {
-  const COL_ATTR = {
+  const LEGACY_COL_ATTR = {
     name: "sortName",
     qty: "sortQty",
     unit: "sortUnit",
@@ -8,20 +8,38 @@
     share: "sortShare",
   };
 
+  function sortDatasetKey(col) {
+    if (LEGACY_COL_ATTR[col]) {
+      return LEGACY_COL_ATTR[col];
+    }
+    const parts = col.split("_");
+    return (
+      "sort" +
+      parts
+        .map(function (part) {
+          return part.charAt(0).toUpperCase() + part.slice(1);
+        })
+        .join("")
+    );
+  }
+
   function parseNum(raw) {
     if (raw == null || raw === "") return null;
     const n = Number(String(raw).replace(/,/g, ""));
     return Number.isFinite(n) ? n : null;
   }
 
+  function isStringCol(col) {
+    return col === "name" || col === "unit" || col === "user" || col === "symbol" || col === "sanjeh";
+  }
+
   function compareRows(a, b, col, dir) {
-    const attr = COL_ATTR[col];
-    if (!attr) return 0;
+    const attr = sortDatasetKey(col);
     const va = a.dataset[attr] ?? "";
     const vb = b.dataset[attr] ?? "";
 
-    if (col === "name" || col === "unit") {
-      const cmp = va.localeCompare(vb, "fa", { sensitivity: "base" });
+    if (isStringCol(col) || col === "created" || col === "fetched") {
+      const cmp = String(va).localeCompare(String(vb), "fa", { sensitivity: "base" });
       return cmp * dir;
     }
 
@@ -35,7 +53,7 @@
   }
 
   function setHeaderState(buttons, active, dir) {
-    buttons.forEach((btn) => {
+    buttons.forEach(function (btn) {
       const on = btn.dataset.col === active;
       btn.setAttribute("aria-sort", on ? (dir > 0 ? "ascending" : "descending") : "none");
       btn.classList.toggle("is-sorted", on);
@@ -43,36 +61,51 @@
     });
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const table = document.getElementById("portfolio-table");
-    if (!table) return;
+  function initSortableTable(table) {
     const tbody = table.querySelector("tbody");
     const buttons = table.querySelectorAll("thead .th-sort");
     if (!tbody || !buttons.length) return;
 
-    let sortCol = "value";
-    let sortDir = -1;
+    const defaultCol = table.dataset.sortDefault || "value";
+    const defaultDesc = table.dataset.sortDesc === "1";
+    let sortCol = defaultCol;
+    let sortDir = defaultDesc ? -1 : 1;
+    if (isStringCol(sortCol) && !defaultDesc) {
+      sortDir = 1;
+    }
 
     function sort() {
       const rows = Array.from(tbody.querySelectorAll("tr"));
-      rows.sort((a, b) => compareRows(a, b, sortCol, sortDir));
-      rows.forEach((row) => tbody.appendChild(row));
+      rows.sort(function (a, b) {
+        return compareRows(a, b, sortCol, sortDir);
+      });
+      rows.forEach(function (row) {
+        tbody.appendChild(row);
+      });
       setHeaderState(buttons, sortCol, sortDir);
     }
 
-    buttons.forEach((btn) => {
+    buttons.forEach(function (btn) {
       btn.addEventListener("click", function () {
         const col = btn.dataset.col;
         if (!col) return;
         if (sortCol === col) sortDir *= -1;
         else {
           sortCol = col;
-          sortDir = col === "name" || col === "unit" ? 1 : -1;
+          sortDir = isStringCol(col) || col === "created" || col === "fetched" ? 1 : -1;
         }
         sort();
       });
     });
 
     sort();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const portfolio = document.getElementById("portfolio-table");
+    if (portfolio) {
+      initSortableTable(portfolio);
+    }
+    document.querySelectorAll("table[data-sortable]").forEach(initSortableTable);
   });
 })();

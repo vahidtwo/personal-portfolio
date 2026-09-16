@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}مدیریت · موجودی من{% endblock %}
+{% block content %}
+{% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+
+<section class="summary admin-summary" aria-labelledby="admin-heading">
+  <div class="summary-text">
+    <p class="eyebrow">مدیریت</p>
+    <h1 id="admin-heading">داشبورد ادمین</h1>
+    <p class="meta">کاربران و ارزش پرتفوی · قیمت‌های ذخیره‌شده در پایگاه داده</p>
+  </div>
+</section>
+
+<section class="admin-stats" aria-label="خلاصه">
+  <div class="stat-card">
+    <p class="stat-label">کاربران</p>
+    <p class="stat-value" dir="ltr">{{ user_count }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">جمع ارزش پرتفوی‌ها</p>
+    <p class="stat-value" dir="ltr">{{ total_aum_label }} <span class="stat-unit">تومان</span></p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">آخرین قیمت بازار</p>
+    <p class="stat-value stat-value-sm" dir="ltr">{{ prices_fetched_label }}</p>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="users-heading">
+  <div class="card-head">
+    <h2 id="users-heading">کاربران</h2>
+    <p class="card-desc">توکن سنجه نمایش داده نمی‌شود · برای مرتب‌سازی روی عنوان ستون کلیک کنید</p>
+  </div>
+  <div class="table-wrap table-wrap-wide">
+    <table class="data-table" data-sortable data-sort-default="total" data-sort-desc="1">
+      <thead>
+        <tr>
+          <th scope="col"><button type="button" class="th-sort" data-col="user">کاربر</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="created">عضو از</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="total">ارزش کل</button></th>
+          {% for key, label in asset_columns %}
+          <th scope="col"><button type="button" class="th-sort" data-col="{{ key }}">{{ label }}</button></th>
+          {% endfor %}
+          <th scope="col"><button type="button" class="th-sort" data-col="snapshots">اسنپ‌شات</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="sanjeh">سنجه</button></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in user_rows %}
+        <tr
+          data-sort-user="{{ row.sort_user }}"
+          data-sort-created="{{ row.sort_created }}"
+          data-sort-total="{{ row.sort_total }}"
+          data-sort-snapshots="{{ row.sort_snapshots }}"
+          data-sort-sanjeh="{{ row.sort_sanjeh }}"
+          {% for key, _ in asset_columns %}{% set sk = 'sort_' ~ key %}
+          data-sort-{{ key }}="{{ row[sk] }}"
+          {% endfor %}
+        >
+          <td><span dir="ltr">{{ row.username }}</span></td>
+          <td dir="ltr">{{ row.created_label }}</td>
+          <td dir="ltr">{{ row.total_label }}</td>
+          {% for key, _ in asset_columns %}
+          <td dir="ltr">{{ row.assets[key] }}</td>
+          {% endfor %}
+          <td dir="ltr">{{ row.snapshot_count }}</td>
+          <td>{{ row.sanjeh_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="prices-heading">
+  <div class="card-head">
+    <h2 id="prices-heading">قیمت‌های بازار (دیتابیس)</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" data-sortable data-sort-default="symbol" data-sort-desc="0">
+      <thead>
+        <tr>
+          <th scope="col"><button type="button" class="th-sort" data-col="symbol">نماد</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="name">دارایی</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="price">قیمت (تومان)</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="fetched">دریافت</button></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in price_rows %}
+        <tr
+          data-sort-symbol="{{ row.sort_symbol }}"
+          data-sort-name="{{ row.name_fa }}"
+          data-sort-price="{{ row.sort_price }}"
+          data-sort-fetched="{{ row.sort_fetched }}"
+        >
+          <td dir="ltr">{{ row.symbol }}</td>
+          <td>{{ row.name_fa }}</td>
+          <td dir="ltr">{{ row.price_label }}</td>
+          <td dir="ltr">{{ row.fetched_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/table-sort.js" defer></script>
+{% endblock %}

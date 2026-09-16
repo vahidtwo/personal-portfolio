@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -46,6 +47,7 @@ from app.security import (
     csrf_token,
     get_current_user,
     hash_password,
+    is_admin,
     normalize_username,
     parse_decimal,
     require_csrf,
@@ -188,10 +190,12 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 
 def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
+    current = get_current_user(request, db)
     context.update(
         {
             "request": request,
-            "user": get_current_user(request, db),
+            "user": current,
+            "is_admin": is_admin(current),
             "csrf": csrf_token(request),
         }
     )
@@ -363,6 +367,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     chart_json = json.dumps(chart_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)
     refresh_wait_sec = market_price_refresh_wait_seconds(db)
+    refresh_wait_label = None
+    if refresh_wait_sec > 0:
+        refresh_wait_label = f"حدود {max(1, (refresh_wait_sec + 59) // 60)} دقیقه دیگر"
     return render(
         request,
         "dashboard.html",
@@ -376,6 +383,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         flash=flash_message,
         flash_error=flash_error,
         refresh_wait_sec=refresh_wait_sec,
+        refresh_wait_label=refresh_wait_label,
         price_refresh_minutes=PRICE_MANUAL_REFRESH_MINUTES,
     )
 
@@ -407,6 +415,84 @@ async def dashboard_refresh_prices(
         return RedirectResponse("/dashboard", status_code=303)
     flash(request, "قیمت بازار و پرتفوی به‌روز شد")
     return RedirectResponse("/dashboard", status_code=303)
+
+
+def _build_admin_user_rows(db: Session, users: list[User], prices) -> list[dict]:
+    snapshot_counts = dict(
+        db.query(PortfolioSnapshot.user_id, func.count(PortfolioSnapshot.id))
+        .group_by(PortfolioSnapshot.user_id)
+        .all()
+    )
+    rows: list[dict] = []
+    for account in users:
+        view = build_portfolio(account, prices)
+        values = {row.key: row.value_toman for row in view.rows}
+        rows.append(
+            {
+                "id": account.id,
+                "username": account.username,
+                "created_label": format_when(account.created_at),
+                "total_label": format_toman(view.total_toman),
+                "snapshot_count": snapshot_counts.get(account.id, 0),
+                "sanjeh_label": "بله" if account.sanjeh_token else "—",
+                "assets": {key: format_toman(values.get(key, Decimal("0"))) for key in ASSET_ORDER},
+                "sort_user": account.username,
+                "sort_created": account.created_at.isoformat() if account.created_at else "",
+                "sort_total": str(view.total_toman),
+                "sort_snapshots": str(snapshot_counts.get(account.id, 0)),
+                "sort_sanjeh": "1" if account.sanjeh_token else "0",
+                **{f"sort_{key}": str(values.get(key, Decimal("0"))) for key in ASSET_ORDER},
+            }
+        )
+    return rows
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    if not is_admin(user):
+        flash(request, "دسترسی مدیریت ندارید.", error=True)
+        return RedirectResponse("/dashboard", status_code=303)
+
+    prices = load_prices(db)
+    users = db.query(User).order_by(User.id.asc()).all()
+    user_rows = _build_admin_user_rows(db, users, prices)
+    total_aum = sum(Decimal(r["sort_total"]) for r in user_rows)
+
+    price_rows = []
+    for symbol in ASSET_ORDER:
+        row = prices.get(symbol)
+        if row is None:
+            continue
+        price_rows.append(
+            {
+                "symbol": symbol,
+                "name_fa": ASSET_LABEL_FA.get(symbol, symbol),
+                "price_label": format_toman(row.price_toman),
+                "fetched_label": format_when(row.fetched_at),
+                "sort_symbol": symbol,
+                "sort_price": str(row.price_toman),
+                "sort_fetched": row.fetched_at.isoformat() if row.fetched_at else "",
+            }
+        )
+
+    flash_message, flash_error = pop_flash(request)
+    asset_columns = [(key, ASSET_LABEL_FA.get(key, key)) for key in ASSET_ORDER]
+    return render(
+        request,
+        "admin.html",
+        db,
+        user_rows=user_rows,
+        price_rows=price_rows,
+        asset_columns=asset_columns,
+        user_count=len(users),
+        total_aum_label=format_toman(total_aum),
+        prices_fetched_label=format_when(latest_market_prices_fetched_at(prices)),
+        flash=flash_message,
+        flash_error=flash_error,
+    )
 
 
 @app.get("/profile", response_class=HTMLResponse)

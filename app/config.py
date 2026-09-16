@@ -1,7 +1,14 @@
 import os
 from pathlib import Path
 
+
+def _admin_usernames() -> frozenset[str]:
+    raw = os.environ.get("ADMIN_USERNAMES", "")
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
+ADMIN_USERNAMES = _admin_usernames()
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'inventory.db'}")
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 HTTPS_ONLY = os.environ.get("HTTPS_ONLY", "0") == "1"

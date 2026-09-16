@@ -25,6 +25,7 @@
         {% if user %}
         <a class="nav-link" href="/dashboard">داشبورد</a>
         <a class="nav-link" href="/profile">پروفایل</a>
+        {% if is_admin %}<a class="nav-link" href="/admin">مدیریت</a>{% endif %}
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button type="submit" class="btn btn-ghost">خروج</button>

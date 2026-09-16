@@ -1,21 +1,22 @@
 {% extends "base.html" %}
-{% block title %}ثبت‌نام / Register{% endblock %}
+{% block title %}ثبت‌نام · موجودی من{% endblock %}
 {% block content %}
-<section class="card auth">
-  <h1>ثبت‌نام <small>Create account</small></h1>
-  {% if error %}<p class="alert">{{ error }}</p>{% endif %}
-  <form method="post" action="/register">
+<section class="card auth-card">
+  <h1>ثبت‌نام</h1>
+  <p class="card-desc">یک حساب بسازید و موجودی خود را ثبت کنید.</p>
+  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/register" class="stack-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
-      نام کاربری / Username
+      <span class="label-text">نام کاربری</span>
       <input name="username" value="{{ form.username }}" autocomplete="username" required>
     </label>
     <label>
-      رمز عبور / Password
+      <span class="label-text">رمز عبور</span>
       <input type="password" name="password" autocomplete="new-password" required minlength="8">
     </label>
-    <button type="submit">ساخت حساب / Register</button>
+    <button type="submit" class="btn btn-primary btn-block">ساخت حساب</button>
   </form>
-  <p class="muted">قبلاً ثبت‌نام کرده‌اید؟ <a href="/login">ورود / Log in</a></p>
+  <p class="muted center">قبلاً ثبت‌نام کرده‌اید؟ <a href="/login">ورود</a></p>
 </section>
 {% endblock %}

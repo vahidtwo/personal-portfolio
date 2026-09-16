@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -20,8 +21,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import DATA_DIR, HTTPS_ONLY, PRICE_REFRESH_HOURS, SECRET_KEY
 from app.db import get_db, init_db
 from app.jobs import run_hourly_job
-from app.models import User
-from app.portfolio import ASSET_META, build_portfolio, load_prices
+from app.models import PortfolioSnapshot, User
+from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices
 from app.security import (
     csrf_token,
     get_current_user,
@@ -77,6 +78,30 @@ def format_when(value: datetime | None) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(TEHRAN).strftime("%Y-%m-%d %H:%M")
+
+
+def format_when_chart(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(TEHRAN).strftime("%m/%d %H:%M")
+
+
+def load_timeline(db: Session, user_id: int, limit: int = 720) -> list[dict[str, str | float]]:
+    rows = (
+        db.query(PortfolioSnapshot)
+        .filter(PortfolioSnapshot.user_id == user_id)
+        .order_by(PortfolioSnapshot.taken_at.desc())
+        .limit(limit)
+        .all()
+    )
+    rows.reverse()
+    return [
+        {
+            "t": format_when_chart(row.taken_at),
+            "v": float(row.total_toman),
+        }
+        for row in rows
+    ]
 
 
 templates.env.filters["toman"] = format_toman
@@ -168,14 +193,14 @@ async def register(
             request,
             "register.html",
             db,
-            error="این نام کاربری قبلاً ثبت شده / Username already taken",
+            error="این نام کاربری قبلاً ثبت شده است",
             form={"username": username},
         )
     user = User(username=username, password_hash=hash_password(password))
     db.add(user)
     db.commit()
     request.session["user_id"] = user.id
-    flash(request, "حساب ساخته شد. موجودی را در پروفایل وارد کنید / Account created. Add holdings in Profile.")
+    flash(request, "حساب شما ساخته شد. موجودی را در پروفایل وارد کنید.")
     return RedirectResponse("/profile", status_code=303)
 
 
@@ -202,7 +227,7 @@ async def login(
             request,
             "login.html",
             db,
-            error="نام کاربری یا رمز عبور نادرست است / Invalid username or password",
+            error="نام کاربری یا رمز عبور نادرست است",
             form={"username": username},
         )
     request.session["user_id"] = user.id
@@ -223,17 +248,26 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/login", status_code=303)
     prices = load_prices(db)
     view = build_portfolio(user, prices)
+    total = view.total_toman if view.total_toman > 0 else Decimal("1")
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
+        share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
         rows.append(
             {
-                **row.__dict__,
+                "key": row.key,
+                "name_fa": row.name_fa,
                 "quantity_label": format_qty(row.quantity, places if row.key != "car" else 0),
+                "unit_fa": row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
                 "value_label": format_toman(row.value_toman),
+                "share_label": format(share, "f").rstrip("0").rstrip("."),
+                "manual": row.manual,
             }
         )
+    missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
+    timeline = load_timeline(db, user.id)
+    timeline_json = json.dumps(timeline, ensure_ascii=False)
     return render(
         request,
         "dashboard.html",
@@ -242,6 +276,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         rows=rows,
         total_label=format_toman(view.total_toman),
         fetched_label=format_when(view.prices_fetched_at),
+        missing_fa=missing_fa,
+        timeline=timeline,
+        timeline_json=timeline_json,
         flash=pop_flash(request),
     )
 
@@ -290,12 +327,12 @@ async def profile_save(
             request,
             "profile.html",
             db,
-            error="یکی از مقدارها نامعتبر است / One of the values is invalid",
+            error="یکی از مقادیر وارد شده نامعتبر است",
             flash=None,
             form=form,
         )
     db.commit()
-    flash(request, "موجودی ذخیره شد / Holdings saved")
+    flash(request, "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
 
 

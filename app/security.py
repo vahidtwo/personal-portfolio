@@ -31,13 +31,13 @@ def normalize_username(raw: str) -> str:
 
 def validate_username(username: str) -> str | None:
     if not USERNAME_RE.match(username):
-        return "نام کاربری ۳ تا ۳۲ حرف، با حرف انگلیسی شروع شود / Username: 3–32 chars, start with a letter"
+        return "نام کاربری باید ۳ تا ۳۲ کاراکتر باشد و با حرف انگلیسی شروع شود"
     return None
 
 
 def validate_password(password: str) -> str | None:
     if len(password) < 8:
-        return "رمز عبور حداقل ۸ کاراکتر / Password must be at least 8 characters"
+        return "رمز عبور باید حداقل ۸ کاراکتر باشد"
     return None
 
 
@@ -50,12 +50,12 @@ def parse_decimal(raw: str | None, *, field: str) -> Decimal:
     except InvalidOperation as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"عدد نامعتبر / Invalid number: {field}",
+            detail=f"عدد نامعتبر: {field}",
         ) from exc
     if value < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"مقدار منفی مجاز نیست / Negative values are not allowed: {field}",
+            detail=f"مقدار منفی مجاز نیست: {field}",
         )
     return value
 

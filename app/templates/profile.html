@@ -1,37 +1,41 @@
 {% extends "base.html" %}
-{% block title %}پروفایل / Profile{% endblock %}
+{% block title %}پروفایل · موجودی من{% endblock %}
 {% block content %}
-<section class="card auth wide">
-  <h1>موجودی من <small>My holdings</small></h1>
-  {% if flash %}<p class="notice">{{ flash }}</p>{% endif %}
-  {% if error %}<p class="alert">{{ error }}</p>{% endif %}
-  <form method="post" action="/profile" class="grid">
+<section class="card auth-card wide">
+  <h1>ویرایش موجودی</h1>
+  <p class="card-desc">مقادیر دارایی‌های خود را وارد کنید. قیمت خودرو به‌صورت دستی است.</p>
+  {% if flash %}<p class="toast toast-ok" role="status">{{ flash }}</p>{% endif %}
+  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/profile" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
-      طلا ۱۸ عیار (گرم) / 18k gold (grams)
+      <span class="label-text">طلا ۱۸ عیار (گرم)</span>
       <input name="gold_grams" value="{{ form.gold_grams }}" inputmode="decimal">
     </label>
     <label>
-      بیت‌کوین / Bitcoin (BTC)
+      <span class="label-text">بیت‌کوین</span>
       <input name="btc" value="{{ form.btc }}" inputmode="decimal">
     </label>
     <label>
-      کاردانو / Cardano (ADA)
+      <span class="label-text">کاردانو</span>
       <input name="ada" value="{{ form.ada }}" inputmode="decimal">
     </label>
     <label>
-      اتریوم / Ethereum (ETH)
+      <span class="label-text">اتریوم</span>
       <input name="eth" value="{{ form.eth }}" inputmode="decimal">
     </label>
     <label>
-      دلار نقد / US dollars (USD)
+      <span class="label-text">دلار نقد</span>
       <input name="usd" value="{{ form.usd }}" inputmode="decimal">
     </label>
-    <label>
-      قیمت خودرو (تومان، دستی) / Car price (Toman, manual)
+    <label class="span-2">
+      <span class="label-text">ارزش خودرو (تومان)</span>
       <input name="car_toman" value="{{ form.car_toman }}" inputmode="numeric">
     </label>
-    <button type="submit">ذخیره / Save</button>
+    <div class="form-actions span-2">
+      <a class="btn btn-ghost" href="/dashboard">انصراف</a>
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+    </div>
   </form>
 </section>
 {% endblock %}

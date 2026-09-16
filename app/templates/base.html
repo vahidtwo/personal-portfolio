@@ -1,30 +1,48 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}موجودی من / My Inventory{% endblock %}</title>
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0c0f14" id="meta-theme-color">
+  <title>{% block title %}موجودی من{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/theme.js" defer></script>
+  {% block head %}{% endblock %}
 </head>
 <body>
+  <a class="skip-link" href="#main">رفتن به محتوا</a>
   <header class="top">
-    <a class="brand" href="/dashboard">موجودی من <span>My Inventory</span></a>
-    {% if user %}
-    <nav>
-      <a href="/dashboard">داشبورد / Dashboard</a>
-      <a href="/profile">پروفایل / Profile</a>
-      <form method="post" action="/logout" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit">خروج / Log out</button>
-      </form>
-    </nav>
-    {% endif %}
+    <div class="top-inner">
+      <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>موجودی من</span>
+      </a>
+      <nav class="nav" aria-label="ناوبری اصلی">
+        {% if user %}
+        <a class="nav-link" href="/dashboard">داشبورد</a>
+        <a class="nav-link" href="/profile">پروفایل</a>
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn btn-ghost">خروج</button>
+        </form>
+        {% endif %}
+        <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
+          <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
+        </button>
+      </nav>
+    </div>
   </header>
-  <main class="shell">
+  <main id="main" class="shell">
     {% block content %}{% endblock %}
   </main>
+  <footer class="foot">
+    <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> · به‌روزرسانی ساعتی</p>
+  </footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

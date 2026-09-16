@@ -8,7 +8,7 @@
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
 
-<section class="summary summary-grid" aria-labelledby="total-heading">
+<section class="summary summary-grid" dir="rtl" aria-labelledby="total-heading">
   <div class="summary-main">
     <div class="summary-text">
       <p class="eyebrow">{{ user.username }}</p>

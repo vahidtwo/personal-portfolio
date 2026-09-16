@@ -116,7 +116,7 @@ ASSET_META = {
     },
 }
 
-MANUAL_TOman_KEYS = frozenset({"cash", "car"})
+MANUAL_TOman_KEYS = frozenset({"cash"})
 
 
 @dataclass
@@ -130,6 +130,7 @@ class AssetRow:
     unit_price: Decimal | None
     value_toman: Decimal
     manual: bool
+    sanjeh: bool = False
 
 
 @dataclass
@@ -156,15 +157,36 @@ def build_portfolio(user: User, prices: dict[str, MarketPrice]) -> PortfolioView
     fetched_at = None
     for key in ASSET_ORDER:
         meta = ASSET_META[key]
+        if key == "car":
+            amount = Decimal(user.car_toman or 0).quantize(Decimal("1"))
+            count = int(user.car_count or 0)
+            if count <= 0 and amount > 0:
+                count = 1
+            quantity = Decimal(count) if count > 0 else Decimal("0")
+            unit_price = (amount / quantity).quantize(Decimal("1")) if quantity > 0 else None
+            from_sanjeh = bool(getattr(user, "sanjeh_token", None))
+            rows.append(
+                AssetRow(
+                    key=key,
+                    name_fa=meta["name_fa"],
+                    name_en=meta["name_en"],
+                    quantity=quantity,
+                    unit_fa=meta["unit_fa"],
+                    unit_en=meta["unit_en"],
+                    unit_price=unit_price,
+                    value_toman=amount,
+                    manual=not from_sanjeh,
+                    sanjeh=from_sanjeh,
+                )
+            )
+            total += amount
+            continue
+
         if key in MANUAL_TOman_KEYS:
             attr = meta["qty_attr"]
             amount = Decimal(getattr(user, attr) or 0).quantize(Decimal("1"))
-            if key == "car":
-                quantity = Decimal("1") if amount > 0 else Decimal("0")
-                unit_price = amount if amount > 0 else None
-            else:
-                quantity = amount
-                unit_price = None
+            quantity = amount
+            unit_price = None
             value = amount
             rows.append(
                 AssetRow(

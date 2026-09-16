@@ -4,7 +4,7 @@ import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,7 +21,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import DATA_DIR, HTTPS_ONLY, PRICE_REFRESH_HOURS, SECRET_KEY
 from app.db import get_db, init_db
-from app.jobs import refresh_prices_and_snapshot_user, run_hourly_job
+from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car, run_hourly_job
+from app.sanjeh import SanjehAuthError
 from app.models import PortfolioSnapshot, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER, build_portfolio, load_prices
 from app.security import (
@@ -279,11 +280,28 @@ async def logout(request: Request, csrf: str = Form("")):
     return RedirectResponse("/login", status_code=303)
 
 
+CAR_REFRESH = timedelta(hours=1)
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user is None:
         return RedirectResponse("/login", status_code=303)
+    if user.sanjeh_token:
+        fetched = user.car_fetched_at
+        if fetched is not None and fetched.tzinfo is None:
+            fetched = fetched.replace(tzinfo=timezone.utc)
+        stale = fetched is None or utcnow() - fetched > CAR_REFRESH
+        if stale:
+            try:
+                await refresh_user_sanjeh_car(user)
+                db.commit()
+                db.refresh(user)
+            except SanjehAuthError:
+                pass
+            except Exception:
+                logger.exception("Sanjeh refresh failed for user %s", user.id)
     prices = load_prices(db)
     view = build_portfolio(user, prices)
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
@@ -304,6 +322,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "value_label": format_toman(row.value_toman),
                 "share_label": format(share, "f").rstrip("0").rstrip("."),
                 "manual": row.manual,
+                "sanjeh": row.sanjeh,
                 "sort_qty": str(row.quantity),
                 "sort_unit_price": str(row.unit_price) if row.unit_price is not None else "",
                 "sort_value": str(row.value_toman),
@@ -332,7 +351,17 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user is None:
         return RedirectResponse("/login", status_code=303)
-    return render(request, "profile.html", db, error=None, flash=pop_flash(request), form=_holdings_form(user))
+    return render(
+        request,
+        "profile.html",
+        db,
+        error=None,
+        flash=pop_flash(request),
+        form=_holdings_form(user),
+        has_sanjeh_token=bool(user.sanjeh_token),
+        car_fetched_label=format_when(user.car_fetched_at),
+        car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+    )
 
 
 @app.post("/profile")
@@ -348,7 +377,8 @@ async def profile_save(
     matic: str = Form("0"),
     usd: str = Form("0"),
     cash_toman: str = Form("0"),
-    car_toman: str = Form("0"),
+    sanjeh_token: str = Form(""),
+    clear_sanjeh: str = Form(""),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -367,7 +397,7 @@ async def profile_save(
         "matic": matic,
         "usd": usd,
         "cash_toman": cash_toman,
-        "car_toman": car_toman,
+        "sanjeh_token": "",
     }
     try:
         user.gold_grams = parse_decimal(gold_grams, field="gold")
@@ -380,7 +410,6 @@ async def profile_save(
         user.matic = parse_decimal(matic, field="matic")
         user.usd = parse_decimal(usd, field="usd")
         user.cash_toman = parse_decimal(cash_toman, field="cash")
-        user.car_toman = parse_decimal(car_toman, field="car")
     except Exception:
         return render(
             request,
@@ -389,7 +418,45 @@ async def profile_save(
             error="یکی از مقادیر وارد شده نامعتبر است",
             flash=None,
             form=form,
+            has_sanjeh_token=bool(user.sanjeh_token),
+            car_fetched_label=format_when(user.car_fetched_at),
+            car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
         )
+    if clear_sanjeh == "1":
+        user.sanjeh_token = None
+        user.car_toman = Decimal("0")
+        user.car_count = 0
+        user.car_fetched_at = None
+    elif sanjeh_token.strip():
+        user.sanjeh_token = sanjeh_token.strip()
+    if user.sanjeh_token:
+        try:
+            await refresh_user_sanjeh_car(user)
+        except SanjehAuthError:
+            return render(
+                request,
+                "profile.html",
+                db,
+                error="توکن سنجه نامعتبر است. در sanjeh.app پروفایل را تکمیل کنید و توکن درست را وارد کنید.",
+                flash=None,
+                form=form,
+                has_sanjeh_token=bool(user.sanjeh_token),
+                car_fetched_label=format_when(user.car_fetched_at),
+                car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+            )
+        except Exception:
+            logger.exception("Sanjeh fetch failed on profile save")
+            return render(
+                request,
+                "profile.html",
+                db,
+                error="دریافت قیمت خودرو از سنجه ممکن نشد. بعداً دوباره تلاش کنید.",
+                flash=None,
+                form=form,
+                has_sanjeh_token=bool(user.sanjeh_token),
+                car_fetched_label=format_when(user.car_fetched_at),
+                car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+            )
     db.commit()
     await refresh_prices_and_snapshot_user(user.id)
     flash(request, "موجودی ذخیره شد")
@@ -408,5 +475,4 @@ def _holdings_form(user: User) -> dict[str, str]:
         "matic": format_qty(Decimal(user.matic or 0), 4),
         "usd": format_qty(Decimal(user.usd or 0), 2),
         "cash_toman": format_qty(Decimal(user.cash_toman or 0), 0),
-        "car_toman": format_qty(Decimal(user.car_toman or 0), 0),
     }

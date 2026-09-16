@@ -3,7 +3,7 @@
 {% block content %}
 <section class="card auth-card wide">
   <h1>ویرایش موجودی</h1>
-  <p class="card-desc">مقادیر دارایی‌های خود را وارد کنید. نقد و خودرو به‌صورت مبلغ تومان ثبت می‌شوند.</p>
+  <p class="card-desc">مقادیر دارایی‌ها را وارد کنید. ارزش خودرو از اپ سنجه با توکن API خوانده می‌شود.</p>
   {% if flash %}<p class="toast toast-ok" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
   <form method="post" action="/profile" class="grid-form">
@@ -48,10 +48,28 @@
       <span class="label-text">نقد (تومان)</span>
       <input name="cash_toman" value="{{ form.cash_toman }}" inputmode="numeric">
     </label>
-    <label>
-      <span class="label-text">ارزش خودرو (تومان)</span>
-      <input name="car_toman" value="{{ form.car_toman }}" inputmode="numeric">
-    </label>
+
+    <div class="span-2 sanjeh-block">
+      <div class="label-row">
+        <span class="label-text">خودرو (سنجه)</span>
+        <a class="help-link" href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer" title="رفتن به سنجه برای تکمیل پروفایل و دریافت توکن">
+          <span class="help-icon" aria-hidden="true">?</span>
+          <span>راهنما: sanjeh.app</span>
+        </a>
+      </div>
+      <p class="field-hint">در سنجه پروفایل و خودروهای خود را تکمیل کنید، سپس توکن API را اینجا بگذارید.</p>
+      {% if has_sanjeh_token %}
+      <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span dir="ltr">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
+      {% endif %}
+      <input type="password" name="sanjeh_token" value="" autocomplete="off" placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
+      {% if has_sanjeh_token %}
+      <label class="checkbox-row">
+        <input type="checkbox" name="clear_sanjeh" value="1">
+        <span>حذف توکن سنجه</span>
+      </label>
+      {% endif %}
+    </div>
+
     <div class="form-actions span-2">
       <a class="btn btn-ghost" href="/dashboard">انصراف</a>
       <button type="submit" class="btn btn-primary">ذخیره</button>

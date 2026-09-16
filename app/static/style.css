@@ -450,6 +450,54 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   color: var(--accent);
   vertical-align: middle;
 }
+.badge-sanjeh {
+  background: rgba(39, 174, 96, 0.15);
+  color: #27ae60;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.field-hint, .field-status {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.sanjeh-block { margin-top: 4px; }
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.checkbox-row input { width: auto; margin: 0; }
 
 .asset-dot {
   display: inline-block;

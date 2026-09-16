@@ -526,19 +526,22 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   letter-spacing: 0.02em;
 }
 
-.total {
+.summary-text p.total,
+p.total {
   margin: 0 0 10px;
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: 8px;
-  flex-wrap: wrap;
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: isolate;
+  line-height: 1.2;
 }
 
 .total-num {
+  display: inline;
   font-size: clamp(32px, 6vw, 48px);
   font-weight: 700;
   letter-spacing: -0.03em;
+  unicode-bidi: embed;
+  direction: rtl;
   background: linear-gradient(120deg, var(--text) 20%, var(--accent) 120%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -552,10 +555,14 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   color: transparent;
 }
 
+.total-suffix,
 .total-unit {
+  display: inline;
   font-size: 16px;
   color: var(--text-muted);
   font-weight: 500;
+  unicode-bidi: embed;
+  direction: rtl;
 }
 
 .meta {

@@ -30,6 +30,137 @@
     return Math.round(v).toLocaleString("en-US") + " تومان";
   }
 
+  const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+
+  function toPersianDigits(text) {
+    return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
+  }
+
+  /** Percent change vs previous point in the same series. */
+  function formatChangeFromPrevious(current, previous) {
+    if (
+      previous == null ||
+      Number.isNaN(previous) ||
+      Number.isNaN(current)
+    ) {
+      return null;
+    }
+    if (previous === 0) {
+      if (current === 0) {
+        return toPersianDigits("0") + "٪";
+      }
+      return null;
+    }
+    const pct = ((current - previous) / Math.abs(previous)) * 100;
+    const abs = Math.abs(pct);
+    const body =
+      abs >= 100 ? abs.toFixed(0) : abs.toFixed(1).replace(/\.0$/, "");
+    let sign = "";
+    if (pct > 0) sign = "+";
+    else if (pct < 0) sign = "−";
+    return sign + toPersianDigits(body) + "٪";
+  }
+
+  function changeLabelForPoint(ctx) {
+    const idx = ctx.dataIndex;
+    if (idx <= 0) {
+      return "تغییر نسبت به قبل: —";
+    }
+    const series = ctx.dataset.data;
+    const current = ctx.parsed.y;
+    const previous = Number(series[idx - 1]);
+    const change = formatChangeFromPrevious(current, previous);
+    if (change == null) {
+      return "تغییر نسبت به قبل: —";
+    }
+    return "تغییر نسبت به قبل: " + change;
+  }
+
+  let pieChartInited = false;
+
+  function initPieChart() {
+    if (pieChartInited) return;
+    const el = document.getElementById("pie-data");
+    const canvas = document.getElementById("allocation-chart");
+    if (!el || !canvas || typeof Chart === "undefined") return;
+
+    let payload = { slices: [] };
+    try {
+      payload = JSON.parse(el.textContent || "{}");
+    } catch (_) {
+      payload = { slices: [] };
+    }
+
+    const slices = payload.slices || [];
+    if (!slices.length) return;
+
+    const muted = cssVar("--text-muted") || "#9aa3b2";
+    const surface = cssVar("--surface") || "#181d27";
+    const text = cssVar("--text") || "#eef1f6";
+    const border = cssVar("--border") || "#2a3140";
+
+    const labels = slices.map((s) => s.label);
+    const data = slices.map((s) => Number(s.value));
+    const colors = slices.map((s) => ASSET_COLORS[s.key] || "#9aa3b2");
+
+    pieChartInited = true;
+    new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data,
+            backgroundColor: colors,
+            borderColor: cssVar("--bg-elevated") || surface,
+            borderWidth: 2,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "58%",
+        plugins: {
+          legend: {
+            position: "bottom",
+            rtl: true,
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              padding: 14,
+              usePointStyle: true,
+              color: muted,
+              font: { size: 12, weight: "500" },
+            },
+          },
+          tooltip: {
+            backgroundColor: surface,
+            titleColor: text,
+            bodyColor: text,
+            borderColor: border,
+            borderWidth: 1,
+            padding: 12,
+            usePointStyle: true,
+            callbacks: {
+              label: function (ctx) {
+                const slice = slices[ctx.dataIndex];
+                if (!slice) return "";
+                return (
+                  slice.value_label +
+                  " · " +
+                  slice.share_label +
+                  "٪"
+                );
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   function registerZoomPlugin() {
     if (typeof Chart === "undefined") return false;
     const zoomPlugin = window.ChartZoom;
@@ -59,7 +190,9 @@
           tension: 0.3,
           borderWidth: 2.5,
           hoverBorderWidth: 4,
-          pointRadius: data.map((_, i) => (i === 0 ? 5 : many ? 3 : 4)),
+          pointRadius: data.map((_, i) =>
+            i === data.length - 1 ? 5 : many ? 3 : 4
+          ),
           pointHitRadius: 28,
           pointHoverRadius: 8,
           pointBackgroundColor: accent,
@@ -141,6 +274,11 @@
             if (v == null || Number.isNaN(v)) return null;
             return name + ": " + formatToman(v);
           },
+          afterLabel: function (ctx) {
+            const v = ctx.parsed.y;
+            if (v == null || Number.isNaN(v)) return null;
+            return changeLabelForPoint(ctx);
+          },
         },
       },
     };
@@ -199,6 +337,7 @@
       plugins,
       scales: {
         x: {
+          reverse: false,
           title: {
             display: true,
             text: "تاریخ و زمان (شمسی)",
@@ -352,7 +491,9 @@
   }
 
   function boot(retries) {
-    if (init()) return;
+    const timelineOk = init();
+    initPieChart();
+    if (timelineOk) return;
     if (retries > 0) {
       window.setTimeout(() => boot(retries - 1), 80);
     }

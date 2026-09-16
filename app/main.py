@@ -126,7 +126,7 @@ def format_chart_jalali(value: datetime) -> str:
 
 
 def build_chart_data(db: Session, user_id: int, view) -> dict:
-    """Labels + per-asset series; first point is live portfolio, rest are snapshots."""
+    """Labels + per-asset series; chronological left→right, last point is live portfolio."""
     snaps = (
         db.query(PortfolioSnapshot)
         .filter(PortfolioSnapshot.user_id == user_id)
@@ -135,7 +135,7 @@ def build_chart_data(db: Session, user_id: int, view) -> dict:
         .all()
     )
     snaps.reverse()
-    labels = [format_chart_jalali(utcnow())] + [format_chart_jalali(s.taken_at) for s in snaps]
+    labels = [format_chart_jalali(s.taken_at) for s in snaps] + [format_chart_jalali(utcnow())]
 
     current: dict[str, float] = {row.key: float(row.value_toman) for row in view.rows}
     current["total"] = float(view.total_toman)
@@ -144,8 +144,8 @@ def build_chart_data(db: Session, user_id: int, view) -> dict:
         {
             "key": "total",
             "label": "جمع کل",
-            "data": [current["total"]]
-            + [float(json.loads(s.breakdown_json).get("total", s.total_toman)) for s in snaps],
+            "data": [float(json.loads(s.breakdown_json).get("total", s.total_toman)) for s in snaps]
+            + [current["total"]],
         }
     ]
     for key in ASSET_ORDER:
@@ -157,10 +157,33 @@ def build_chart_data(db: Session, user_id: int, view) -> dict:
             {
                 "key": key,
                 "label": ASSET_LABEL_FA.get(key, key),
-                "data": [current.get(key, 0.0)] + history_vals,
+                "data": history_vals + [current.get(key, 0.0)],
             }
         )
     return {"labels": labels, "series": series}
+
+
+def build_pie_data(view) -> dict:
+    """Current portfolio share per asset (positive values only)."""
+    total = view.total_toman
+    slices: list[dict] = []
+    for row in view.rows:
+        val = row.value_toman
+        if val <= 0:
+            continue
+        share = (val / total * Decimal("100")) if total > 0 else Decimal("0")
+        share_q = share.quantize(Decimal("0.1"))
+        slices.append(
+            {
+                "key": row.key,
+                "label": row.name_fa,
+                "value": float(val),
+                "value_label": format_toman(val),
+                "share_label": persian_digits(format(share_q, "f").rstrip("0").rstrip(".")),
+            }
+        )
+    slices.sort(key=lambda s: s["value"], reverse=True)
+    return {"slices": slices}
 
 
 templates.env.filters["toman"] = format_toman
@@ -369,6 +392,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
     chart_data = build_chart_data(db, user.id, view)
     chart_json = json.dumps(chart_data, ensure_ascii=False)
+    pie_data = build_pie_data(view)
+    pie_json = json.dumps(pie_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)
     refresh_wait_sec = market_price_refresh_wait_seconds(db)
     refresh_wait_label = None
@@ -384,6 +409,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,
+        pie_json=pie_json,
+        pie_has_data=bool(pie_data["slices"]),
         flash=flash_message,
         flash_error=flash_error,
         refresh_wait_sec=refresh_wait_sec,

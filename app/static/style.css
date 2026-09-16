@@ -525,6 +525,39 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   }
 }
 
+.dashboard-charts {
+  display: grid;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 960px) {
+  .dashboard-charts {
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 2.2fr);
+    align-items: start;
+  }
+}
+
+.pie-card .chart-head {
+  padding-bottom: 4px;
+}
+
+.pie-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.pie-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  height: min(320px, 42vh);
+  min-height: 220px;
+  margin: 0 auto;
+}
+
 .chart-card {
   padding: 0;
   overflow: hidden;

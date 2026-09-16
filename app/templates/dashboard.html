@@ -8,24 +8,13 @@
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
 
-<section class="summary" aria-labelledby="total-heading">
-  <div class="summary-body">
-  <div class="summary-text">
-    <p class="eyebrow">{{ user.username }}</p>
-    <h1 id="total-heading">ارزش کل پرتفوی</h1>
-    <p class="total" dir="ltr"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
-    <aside class="summary-pie summary-pie-below" id="pie-panel" aria-labelledby="pie-heading">
-      <h2 id="pie-heading" class="summary-pie-title">توزیع دارایی‌ها</h2>
-      <p class="summary-pie-hint">ارزش فعلی (تومان)</p>
-      {% if pie_has_data %}
-      <div class="pie-wrap pie-wrap-summary">
-        <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
-      </div>
-      {% else %}
-      <p class="chart-empty chart-empty-compact">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
-      {% endif %}
-    </aside>
-    <div class="market-bar" role="group" aria-label="وضعیت قیمت بازار">
+<section class="summary summary-grid" aria-labelledby="total-heading">
+  <div class="summary-main">
+    <div class="summary-text">
+      <p class="eyebrow">{{ user.username }}</p>
+      <h1 id="total-heading">ارزش کل پرتفوی</h1>
+      <p class="total" dir="ltr"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
+      <div class="market-bar" role="group" aria-label="وضعیت قیمت بازار">
       <div class="market-bar-status">
         <span class="market-bar-dot" aria-hidden="true"></span>
         <div class="market-bar-text">
@@ -63,14 +52,26 @@
         {% endif %}
       </form>
     </div>
-    {% if missing_fa %}
-    <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>
+      {% if missing_fa %}
+      <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>
+      {% endif %}
+    </div>
+    <div class="summary-actions">
+      <a class="btn btn-primary" href="/profile">ویرایش موجودی</a>
+    </div>
+  </div>
+
+  <aside class="summary-pie" id="pie-panel" aria-labelledby="pie-heading">
+    <h2 id="pie-heading" class="summary-pie-title">توزیع دارایی‌ها</h2>
+    <p class="summary-pie-hint">ارزش فعلی (تومان)</p>
+    {% if pie_has_data %}
+    <div class="pie-wrap pie-wrap-summary">
+      <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
+    </div>
+    {% else %}
+    <p class="chart-empty chart-empty-compact">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
     {% endif %}
-  </div>
-  <div class="summary-actions">
-    <a class="btn btn-primary" href="/profile">ویرایش موجودی</a>
-  </div>
-  </div>
+  </aside>
 </section>
 
 <section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">

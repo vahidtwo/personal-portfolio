@@ -10,8 +10,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import jdatetime
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,9 +17,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import DATA_DIR, HTTPS_ONLY, PRICE_REFRESH_HOURS, SECRET_KEY
+from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY
 from app.db import get_db, init_db
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car, run_hourly_job
+from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
 from app.sanjeh import SanjehAuthError
 from app.models import PortfolioSnapshot, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER, build_portfolio, load_prices
@@ -43,7 +42,6 @@ logger = logging.getLogger(__name__)
 TEHRAN = ZoneInfo("Asia/Tehran")
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-scheduler = AsyncIOScheduler()
 
 
 def _secret_key() -> str:
@@ -151,17 +149,12 @@ templates.env.filters["when"] = format_when
 async def lifespan(_app: FastAPI):
     init_db()
     await run_hourly_job(take_snapshots=False)
-    scheduler.add_job(
-        run_hourly_job,
-        IntervalTrigger(hours=PRICE_REFRESH_HOURS),
-        id="hourly-portfolio",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.start()
+    if ENABLE_INTERNAL_SCHEDULER:
+        start_hourly_scheduler()
+    else:
+        logger.info("Internal hourly scheduler disabled (use external cron + scripts/create_snapshot.py)")
     yield
-    scheduler.shutdown(wait=False)
+    await stop_hourly_scheduler()
 
 
 app = FastAPI(title="My Inventory", lifespan=lifespan)

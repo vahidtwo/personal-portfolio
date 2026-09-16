@@ -7,9 +7,22 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-me-in-dokploy}
       HTTPS_ONLY: ${HTTPS_ONLY:-0}
       DATA_DIR: /app/data
+      PRICE_REFRESH_HOURS: ${PRICE_REFRESH_HOURS:-1}
+      ENABLE_INTERNAL_SCHEDULER: ${ENABLE_INTERNAL_SCHEDULER:-1}
     volumes:
       - inventory-data:/app/data
     restart: unless-stopped
+
+  # Optional backup if you disable the in-app scheduler (ENABLE_INTERNAL_SCHEDULER=0).
+  # cron:
+  #   build: .
+  #   command: sh -c "while true; do python scripts/create_snapshot.py; sleep 3600; done"
+  #   environment:
+  #     DATA_DIR: /app/data
+  #     SECRET_KEY: ${SECRET_KEY:-change-me-in-dokploy}
+  #   volumes:
+  #     - inventory-data:/app/data
+  #   restart: unless-stopped
 
 volumes:
   inventory-data:

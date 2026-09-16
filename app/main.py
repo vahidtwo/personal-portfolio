@@ -186,6 +186,78 @@ def build_pie_data(view) -> dict:
     return {"slices": slices}
 
 
+ASSET_SPARKLINE_COLORS = {
+    "gold": "#f59e0b",
+    "silver": "#cbd5e1",
+    "btc": "#f97316",
+    "ada": "#3b82f6",
+    "eth": "#8b5cf6",
+    "sol": "#14b8a6",
+    "doge": "#eab308",
+    "matic": "#a855f7",
+    "usd": "#22c55e",
+    "cash": "#38bdf8",
+    "car": "#94a3b8",
+}
+
+
+def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
+    """Per-asset value (toman) for the last 7 days + current, chronological."""
+    since = utcnow() - timedelta(days=7)
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(PortfolioSnapshot.user_id == user_id, PortfolioSnapshot.taken_at >= since)
+        .order_by(PortfolioSnapshot.taken_at.asc())
+        .all()
+    )
+    current = {row.key: float(row.value_toman) for row in view.rows}
+    trends: dict[str, list[float]] = {key: [] for key in ASSET_ORDER}
+    for snap in snaps:
+        bd = json.loads(snap.breakdown_json)
+        for key in ASSET_ORDER:
+            trends[key].append(float(bd.get(key, 0)))
+    for key in ASSET_ORDER:
+        trends[key].append(current.get(key, 0.0))
+    return trends
+
+
+def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> str:
+    if not values:
+        return ""
+    series = list(values)
+    if len(series) == 1:
+        series = [series[0], series[0]]
+    vmin = min(series)
+    vmax = max(series)
+    span = vmax - vmin
+    if span <= 0:
+        mid = height / 2
+        return f"M 1,{mid:.1f} L {width - 1},{mid:.1f}"
+    n = len(series)
+    parts: list[str] = []
+    for i, v in enumerate(series):
+        x = 1 + (i / (n - 1)) * (width - 2)
+        y = height - 1 - ((v - vmin) / span) * (height - 2)
+        parts.append(f"{x:.1f},{y:.1f}")
+    return "M " + parts[0] + " L " + " L ".join(parts[1:])
+
+
+def week_trend_change_label(values: list[float]) -> str | None:
+    if len(values) < 2:
+        return None
+    first, last = values[0], values[-1]
+    if first == 0 and last == 0:
+        return persian_digits("0") + "٪"
+    if first == 0:
+        return None
+    pct = ((last - first) / abs(first)) * 100
+    body = abs(pct)
+    text = (body if body >= 100 else round(body, 1))
+    s = format(text, "f").rstrip("0").rstrip(".")
+    sign = "+" if pct > 0 else "−" if pct < 0 else ""
+    return sign + persian_digits(s) + "٪"
+
+
 templates.env.filters["toman"] = format_toman
 templates.env.filters["when"] = format_when
 
@@ -365,14 +437,20 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     prices = load_prices(db)
     view = build_portfolio(user, prices)
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
+    week_trends = build_week_asset_trends(db, user.id, view)
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
         share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
+        trend_vals = week_trends.get(row.key, [float(row.value_toman)])
+        trend_change = week_trend_change_label(trend_vals)
         rows.append(
             {
                 "key": row.key,
                 "name_fa": row.name_fa,
+                "sparkline_path": sparkline_path(trend_vals),
+                "sparkline_color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
+                "trend_change_label": trend_change,
                 "quantity_label": format_qty(
                     row.quantity,
                     places if row.key not in ("car", "cash") else 0,

@@ -122,6 +122,7 @@
           <th scope="col"><button type="button" class="th-sort" data-col="unit_price">قیمت واحد</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="value">ارزش (تومان)</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="share">سهم</button></th>
+          <th scope="col" class="sparkline-col">۷ روز</th>
         </tr>
       </thead>
       <tbody>
@@ -144,6 +145,27 @@
           <td class="num" dir="ltr">{{ row.unit_price_label }}</td>
           <td class="num num-strong" dir="ltr">{{ row.value_label }}</td>
           <td class="num" dir="ltr">{{ row.share_label }}٪</td>
+          <td class="sparkline-cell">
+            {% if row.sparkline_path %}
+            <svg
+              class="row-sparkline"
+              width="72"
+              height="26"
+              viewBox="0 0 72 26"
+              role="img"
+              aria-label="روند ارزش هفت روز{% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
+            >
+              <path
+                d="{{ row.sparkline_path }}"
+                fill="none"
+                stroke="{{ row.sparkline_color }}"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -152,6 +174,7 @@
           <th scope="row" colspan="4">جمع</th>
           <td class="num num-strong" dir="ltr">{{ total_label }}</td>
           <td class="num" dir="ltr">۱۰۰٪</td>
+          <td></td>
         </tr>
       </tfoot>
     </table>

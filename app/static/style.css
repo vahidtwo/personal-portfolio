@@ -918,6 +918,25 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 .asset-dot-cash { background: #38bdf8; }
 .asset-dot-car { background: #94a3b8; }
 
+.sparkline-col {
+  width: 80px;
+  text-align: center !important;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sparkline-cell {
+  width: 80px;
+  padding-inline: 6px !important;
+  vertical-align: middle;
+}
+
+.row-sparkline {
+  display: block;
+  margin: 0 auto;
+  opacity: 0.95;
+}
+
 .btn {
   font: inherit;
   font-weight: 600;

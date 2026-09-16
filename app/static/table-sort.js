@@ -38,7 +38,12 @@
     const va = a.dataset[attr] ?? "";
     const vb = b.dataset[attr] ?? "";
 
-    if (isStringCol(col) || col === "created" || col === "fetched") {
+    if (
+      isStringCol(col) ||
+      col === "created" ||
+      col === "fetched" ||
+      col === "last_login"
+    ) {
       const cmp = String(va).localeCompare(String(vb), "fa", { sensitivity: "base" });
       return cmp * dir;
     }
@@ -92,7 +97,13 @@
         if (sortCol === col) sortDir *= -1;
         else {
           sortCol = col;
-          sortDir = isStringCol(col) || col === "created" || col === "fetched" ? 1 : -1;
+          sortDir =
+            isStringCol(col) ||
+            col === "created" ||
+            col === "fetched" ||
+            col === "last_login"
+              ? 1
+              : -1;
         }
         sort();
       });

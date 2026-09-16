@@ -911,6 +911,31 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
+.btn-danger {
+  background: #b42318;
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.btn-danger:hover {
+  background: #912018;
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
 .btn-ghost:hover {
   background: var(--surface-hover);
   color: var(--text);

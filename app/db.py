@@ -26,6 +26,7 @@ _USER_HOLDING_COLUMNS = (
     ("car_count", "INTEGER NOT NULL DEFAULT 0"),
     ("sanjeh_token", "VARCHAR(128)"),
     ("car_fetched_at", "DATETIME"),
+    ("last_login_at", "DATETIME"),
 )
 
 

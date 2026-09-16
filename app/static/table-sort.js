@@ -6,6 +6,7 @@
     unit_price: "sortUnitPrice",
     value: "sortValue",
     share: "sortShare",
+    max_gain: "sortMaxGain",
   };
 
   function sortDatasetKey(col) {

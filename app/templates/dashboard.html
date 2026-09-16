@@ -60,6 +60,25 @@
   </div>
 </section>
 
+<div class="dashboard-charts">
+<section class="card chart-card pie-card" id="pie-panel" aria-labelledby="pie-heading">
+  <div class="chart-head">
+    <div class="chart-head-title">
+      <h2 id="pie-heading">توزیع دارایی‌ها</h2>
+      <p class="chart-hint">بر اساس ارزش فعلی پرتفوی (تومان)</p>
+    </div>
+  </div>
+  <div class="chart-stage pie-stage">
+    {% if pie_has_data %}
+    <div class="pie-wrap">
+      <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
+    </div>
+    {% else %}
+    <p class="chart-empty">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
+    {% endif %}
+  </div>
+</section>
+
 <section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">
   <div class="chart-head">
     <div class="chart-head-title">
@@ -69,7 +88,7 @@
     <div class="chart-head-actions">
       <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
         <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
-        <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">دارایی‌ها</button>
+        <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">به تفکیک دارایی</button>
       </div>
       <div class="chart-tools" aria-label="ابزار نمودار">
         <button type="button" class="chart-tool-btn" data-zoom="in" title="زوم بیشتر" aria-label="زوم بیشتر">+</button>
@@ -81,11 +100,12 @@
     </div>
   </div>
   <div class="chart-stage">
-    <div class="chart-wrap">
+    <div class="chart-wrap chart-wrap-ltr" dir="ltr">
       <canvas id="timeline-chart" role="img" aria-label="نمودار زمانی ارزش پرتفوی به تومان"></canvas>
     </div>
   </div>
 </section>
+</div>
 
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">
@@ -140,6 +160,7 @@
 {% endblock %}
 {% block scripts %}
 <script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
+<script id="pie-data" type="application/json">{{ pie_json | safe }}</script>
 <script src="/static/dashboard.js" defer></script>
 <script src="/static/table-sort.js" defer></script>
 <script>

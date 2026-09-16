@@ -28,6 +28,9 @@ class User(Base):
     usd: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     cash_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
+    car_count: Mapped[int] = mapped_column(default=0)
+    sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    car_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")

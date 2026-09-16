@@ -78,7 +78,7 @@
           <td>
             <span class="asset-dot asset-dot-{{ row.key }}" aria-hidden="true"></span>
             {{ row.name_fa }}
-            {% if row.manual %}<span class="badge">دستی</span>{% endif %}
+            {% if row.sanjeh %}<span class="badge badge-sanjeh">سنجه</span>{% elif row.manual %}<span class="badge">دستی</span>{% endif %}
           </td>
           <td class="num" dir="ltr">{{ row.quantity_label }}</td>
           <td>{{ row.unit_fa }}</td>

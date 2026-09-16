@@ -30,26 +30,37 @@
     return Math.round(v).toLocaleString("en-US") + " تومان";
   }
 
-  function buildDatasets(mode, series, labels) {
+  function registerZoomPlugin() {
+    if (typeof Chart === "undefined") return false;
+    const zoomPlugin = window.ChartZoom;
+    if (!zoomPlugin) return false;
+    if (!Chart.registry.plugins.get("zoom")) {
+      Chart.register(zoomPlugin);
+    }
+    return Chart.registry.plugins.get("zoom") != null;
+  }
+
+  function buildDatasets(mode, series) {
     const accent = cssVar("--accent") || ASSET_COLORS.total;
     const fill = cssVar("--chart-fill") || "rgba(91, 157, 255, 0.12)";
-    const many = labels.length > 49;
+    const many = (series[0]?.data?.length || 0) > 49;
 
     if (mode === "total") {
       const row = series.find((s) => s.key === "total");
       if (!row) return [];
+      const data = row.data.map((v) => Number(v));
       return [
         {
           label: row.label,
-          data: row.data,
+          data,
           borderColor: accent,
           backgroundColor: fill,
           fill: true,
           tension: 0.3,
           borderWidth: 2.5,
           hoverBorderWidth: 4,
-          pointRadius: row.data.map((_, i) => (i === 0 ? 5 : many ? 2 : 4)),
-          pointHitRadius: 24,
+          pointRadius: data.map((_, i) => (i === 0 ? 5 : many ? 3 : 4)),
+          pointHitRadius: 28,
           pointHoverRadius: 8,
           pointBackgroundColor: accent,
           pointBorderColor: cssVar("--surface") || "#fff",
@@ -60,20 +71,21 @@
 
     return series
       .filter((s) => s.key !== "total")
-      .filter((s) => s.data.some((v) => v > 0))
+      .filter((s) => s.data.some((v) => Number(v) > 0))
       .map((s) => {
         const color = ASSET_COLORS[s.key] || "#9aa3b2";
+        const data = s.data.map((v) => Number(v));
         return {
           label: s.label,
-          data: s.data,
+          data,
           borderColor: color,
           backgroundColor: color + "33",
           fill: false,
           tension: 0.3,
           borderWidth: 2,
           hoverBorderWidth: 4,
-          pointRadius: many ? 2 : 3,
-          pointHitRadius: 24,
+          pointRadius: many ? 3 : 4,
+          pointHitRadius: 28,
           pointHoverRadius: 7,
           pointBackgroundColor: color,
           pointBorderColor: cssVar("--surface") || "#fff",
@@ -82,13 +94,12 @@
       });
   }
 
-  function chartOptions(mode, labels) {
+  function chartOptions(mode, labels, rangeSelect, zoomEnabled) {
     const muted = cssVar("--text-muted") || "#9aa3b2";
     const grid = cssVar("--chart-grid") || "rgba(255,255,255,0.06)";
     const surface = cssVar("--surface") || "#181d27";
     const text = cssVar("--text") || "#eef1f6";
     const border = cssVar("--border") || "#2a3140";
-    const hasZoom = typeof Chart !== "undefined" && Chart.registry.plugins.get("zoom");
 
     const plugins = {
       legend: {
@@ -103,17 +114,10 @@
           color: muted,
           font: { size: 12, weight: "500" },
         },
-        onHover: (e) => {
-          e.native.target.style.cursor = "pointer";
-        },
-        onLeave: (e) => {
-          e.native.target.style.cursor = "default";
-        },
       },
       tooltip: {
-        enabled: true,
+        enabled: !rangeSelect,
         position: "nearest",
-        rtl: true,
         backgroundColor: surface,
         titleColor: text,
         bodyColor: text,
@@ -134,34 +138,39 @@
           label: function (ctx) {
             const name = ctx.dataset.label || "";
             const v = ctx.parsed.y;
-            if (v == null) return null;
+            if (v == null || Number.isNaN(v)) return null;
             return name + ": " + formatToman(v);
           },
         },
       },
     };
 
-    if (hasZoom) {
+    if (zoomEnabled) {
       plugins.zoom = {
-        zoom: {
-          wheel: { enabled: true, speed: 0.08 },
-          pinch: { enabled: true },
-          drag: {
-            enabled: true,
-            modifierKey: "alt",
-            backgroundColor: "rgba(91, 157, 255, 0.12)",
-            borderColor: "rgba(91, 157, 255, 0.45)",
-            borderWidth: 1,
-          },
-          mode: "x",
+        limits: {
+          x: { minRange: 1 },
         },
         pan: {
           enabled: true,
           mode: "x",
           modifierKey: "shift",
         },
-        limits: {
-          x: { minRange: 2 },
+        zoom: {
+          wheel: {
+            enabled: !rangeSelect,
+            speed: 0.1,
+          },
+          pinch: {
+            enabled: !rangeSelect,
+          },
+          drag: {
+            enabled: rangeSelect,
+            backgroundColor: "rgba(91, 157, 255, 0.15)",
+            borderColor: "rgba(91, 157, 255, 0.6)",
+            borderWidth: 1,
+            threshold: 4,
+          },
+          mode: "x",
         },
       };
     }
@@ -169,16 +178,19 @@
     return {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
+      events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchend"],
       layout: { padding: { top: 8, right: 12, bottom: 4, left: 4 } },
       interaction: {
-        mode: mode === "assets" ? "index" : "nearest",
+        mode: "index",
         intersect: false,
         axis: "x",
+        includeInvisible: true,
       },
       elements: {
         point: {
-          hitRadius: 24,
-          hoverRadius: 6,
+          hitRadius: 28,
+          hoverRadius: 7,
         },
         line: {
           borderWidth: 2,
@@ -225,14 +237,24 @@
     };
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function init() {
     const el = document.getElementById("chart-data");
     const canvas = document.getElementById("timeline-chart");
+    const chartWrap = canvas?.closest(".chart-wrap");
     const panel = document.getElementById("chart-panel");
     const tabs = document.querySelectorAll(".chart-tab");
     const zoomBtns = document.querySelectorAll("[data-zoom]");
+    const rangeBtn = document.getElementById("chart-range-btn");
     const fullscreenBtn = document.getElementById("chart-fullscreen");
-    if (!el || !canvas || typeof Chart === "undefined") return;
+
+    if (!el || !canvas || typeof Chart === "undefined") {
+      return false;
+    }
+
+    const zoomEnabled = registerZoomPlugin();
+    if (!zoomEnabled) {
+      console.warn("chartjs-plugin-zoom not loaded; zoom/range disabled");
+    }
 
     let payload = { labels: [], series: [] };
     try {
@@ -244,37 +266,52 @@
     const labels = payload.labels || [];
     const series = payload.series || [];
     if (!labels.length || !series.length) {
-      canvas.closest(".chart-stage")?.classList.add("hidden");
-      return;
+      chartWrap?.classList.add("hidden");
+      return true;
     }
 
     let chart = null;
     let mode = "total";
+    let rangeSelect = false;
 
     function renderChart() {
-      const datasets = buildDatasets(mode, series, labels);
+      const datasets = buildDatasets(mode, series);
       if (!datasets.length) return;
 
       if (chart) chart.destroy();
       chart = new Chart(canvas, {
         type: "line",
         data: { labels, datasets },
-        options: chartOptions(mode, labels),
+        options: chartOptions(mode, labels, rangeSelect, zoomEnabled),
       });
     }
 
+    function setRangeMode(on) {
+      rangeSelect = on;
+      rangeBtn?.classList.toggle("is-active", on);
+      rangeBtn?.setAttribute("aria-pressed", on ? "true" : "false");
+      chartWrap?.classList.toggle("is-range-mode", on);
+      renderChart();
+    }
+
     function zoomChart(action) {
-      if (!chart || !chart.resetZoom) return;
+      if (!chart || typeof chart.resetZoom !== "function") return;
       if (action === "reset") {
         chart.resetZoom();
         return;
       }
-      const factor = action === "in" ? 1.2 : 0.82;
+      if (typeof chart.zoomScale !== "function") return;
+      const factor = action === "in" ? 1.25 : 0.8;
       chart.zoomScale("x", { factor, center: "center" });
     }
 
+    rangeBtn?.addEventListener("click", function () {
+      setRangeMode(!rangeSelect);
+    });
+
     zoomBtns.forEach((btn) => {
       btn.addEventListener("click", function () {
+        if (rangeSelect) setRangeMode(false);
         zoomChart(btn.dataset.zoom);
       });
     });
@@ -311,5 +348,19 @@
     });
 
     renderChart();
-  });
+    return true;
+  }
+
+  function boot(retries) {
+    if (init()) return;
+    if (retries > 0) {
+      window.setTimeout(() => boot(retries - 1), 80);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => boot(25));
+  } else {
+    boot(25);
+  }
 })();

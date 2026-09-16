@@ -2,17 +2,34 @@
 {% block title %}داشبورد · موجودی من{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js" defer></script>
 {% endblock %}
 {% block content %}
-{% if flash %}<p class="toast toast-ok" role="status">{{ flash }}</p>{% endif %}
+{% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
 
 <section class="summary" aria-labelledby="total-heading">
   <div class="summary-text">
     <p class="eyebrow">{{ user.username }}</p>
     <h1 id="total-heading">ارزش کل پرتفوی</h1>
     <p class="total" dir="ltr"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
-    <p class="meta">آخرین قیمت بازار: <time dir="ltr">{{ fetched_label }}</time> · وقت تهران</p>
+    <p class="meta meta-prices">
+      <form method="post" action="/dashboard/refresh-prices" class="meta-refresh-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button
+          type="submit"
+          class="btn-refresh"
+          {% if refresh_wait_sec > 0 %}
+          disabled
+          title="حداقل {{ price_refresh_minutes }} دقیقه بعد از آخرین به‌روزرسانی"
+          {% else %}
+          title="به‌روزرسانی قیمت بازار"
+          {% endif %}
+          aria-label="به‌روزرسانی قیمت بازار"
+        >↻</button>
+      </form>
+      <span>آخرین قیمت بازار: <time dir="ltr">{{ fetched_label }}</time> · وقت تهران</span>
+    </p>
     {% if missing_fa %}
     <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>
     {% endif %}
@@ -26,7 +43,7 @@
   <div class="chart-head">
     <div class="chart-head-title">
       <h2 id="chart-heading">روند ارزش پرتفوی</h2>
-      <p class="chart-hint">هاور روی نمودار: تاریخ و نام هر خط · زوم با غلطک · انتخاب بازه با Alt+درگ</p>
+      <p class="chart-hint">هاور یا لمس: جزئیات · غلطک: زوم · دکمه ▭: انتخاب بازه با درگ</p>
     </div>
     <div class="chart-head-actions">
       <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
@@ -36,6 +53,7 @@
       <div class="chart-tools" aria-label="ابزار نمودار">
         <button type="button" class="chart-tool-btn" data-zoom="in" title="زوم بیشتر" aria-label="زوم بیشتر">+</button>
         <button type="button" class="chart-tool-btn" data-zoom="out" title="زوم کمتر" aria-label="زوم کمتر">−</button>
+        <button type="button" class="chart-tool-btn" id="chart-range-btn" title="انتخاب بازه با درگ" aria-label="انتخاب بازه" aria-pressed="false">▭</button>
         <button type="button" class="chart-tool-btn" data-zoom="reset" title="بازنشانی زوم" aria-label="بازنشانی زوم">↺</button>
         <button type="button" class="chart-tool-btn" id="chart-fullscreen" title="تمام‌صفحه" aria-label="تمام‌صفحه">⛶</button>
       </div>

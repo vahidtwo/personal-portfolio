@@ -17,13 +17,31 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY
+from app.config import (
+    DATA_DIR,
+    ENABLE_INTERNAL_SCHEDULER,
+    HTTPS_ONLY,
+    PRICE_MANUAL_REFRESH_MINUTES,
+    SECRET_KEY,
+)
 from app.db import get_db, init_db
-from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car, run_hourly_job
+from app.jobs import (
+    refresh_market_prices_for_user,
+    refresh_prices_and_snapshot_user,
+    refresh_user_sanjeh_car,
+    run_hourly_job,
+)
 from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
 from app.sanjeh import SanjehAuthError
 from app.models import PortfolioSnapshot, User, utcnow
-from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER, build_portfolio, load_prices
+from app.portfolio import (
+    ASSET_LABEL_FA,
+    ASSET_META,
+    ASSET_ORDER,
+    build_portfolio,
+    latest_market_prices_fetched_at,
+    load_prices,
+)
 from app.security import (
     csrf_token,
     get_current_user,
@@ -180,12 +198,30 @@ def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
     return templates.TemplateResponse(request, name, context)
 
 
-def flash(request: Request, message: str) -> None:
+def flash(request: Request, message: str, *, error: bool = False) -> None:
     request.session["flash"] = message
+    request.session["flash_error"] = error
 
 
-def pop_flash(request: Request) -> str | None:
-    return request.session.pop("flash", None)
+def pop_flash(request: Request) -> tuple[str | None, bool]:
+    message = request.session.pop("flash", None)
+    is_error = bool(request.session.pop("flash_error", False))
+    return message, is_error
+
+
+def market_price_refresh_wait_seconds(db: Session) -> int:
+    """Seconds until manual market refresh is allowed; 0 if allowed now."""
+    prices = load_prices(db)
+    latest = latest_market_prices_fetched_at(prices)
+    if latest is None:
+        return 0
+    if latest.tzinfo is None:
+        latest = latest.replace(tzinfo=timezone.utc)
+    cooldown = timedelta(minutes=max(1, PRICE_MANUAL_REFRESH_MINUTES))
+    remaining = cooldown - (utcnow() - latest)
+    if remaining.total_seconds() <= 0:
+        return 0
+    return int(remaining.total_seconds())
 
 
 @app.get("/health")
@@ -325,6 +361,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
     chart_data = build_chart_data(db, user.id, view)
     chart_json = json.dumps(chart_data, ensure_ascii=False)
+    flash_message, flash_error = pop_flash(request)
+    refresh_wait_sec = market_price_refresh_wait_seconds(db)
     return render(
         request,
         "dashboard.html",
@@ -335,8 +373,40 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,
-        flash=pop_flash(request),
+        flash=flash_message,
+        flash_error=flash_error,
+        refresh_wait_sec=refresh_wait_sec,
+        price_refresh_minutes=PRICE_MANUAL_REFRESH_MINUTES,
     )
+
+
+@app.post("/dashboard/refresh-prices")
+async def dashboard_refresh_prices(
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    wait_sec = market_price_refresh_wait_seconds(db)
+    if wait_sec > 0:
+        minutes = max(1, wait_sec // 60)
+        flash(
+            request,
+            f"حداقل {PRICE_MANUAL_REFRESH_MINUTES} دقیقه بعد از آخرین به‌روزرسانی باید بگذرد. حدود {minutes} دقیقه دیگر دوباره تلاش کنید.",
+            error=True,
+        )
+        return RedirectResponse("/dashboard", status_code=303)
+    try:
+        await refresh_market_prices_for_user(user.id)
+    except Exception:
+        logger.exception("Manual price refresh failed for user %s", user.id)
+        flash(request, "دریافت قیمت از چنده ممکن نشد. بعداً دوباره تلاش کنید.", error=True)
+        return RedirectResponse("/dashboard", status_code=303)
+    flash(request, "قیمت بازار و پرتفوی به‌روز شد")
+    return RedirectResponse("/dashboard", status_code=303)
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -349,7 +419,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         "profile.html",
         db,
         error=None,
-        flash=pop_flash(request),
+        flash=pop_flash(request)[0],
         form=_holdings_form(user),
         has_sanjeh_token=bool(user.sanjeh_token),
         car_fetched_label=format_when(user.car_fetched_at),

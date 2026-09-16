@@ -81,6 +81,14 @@ body {
   min-height: 100vh;
 }
 
+.num,
+.total-num,
+.stat-value,
+.market-bar-time {
+  font-family: Vazirmatn, Tahoma, sans-serif;
+  font-variant-numeric: normal;
+}
+
 body.app-body {
   background-color: var(--bg);
   background-image:
@@ -944,6 +952,10 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   padding: 0;
 }
 
+.data-table thead th:not(:has(.th-sort)) {
+  padding: 12px 10px;
+}
+
 .th-sort {
   display: flex;
   align-items: center;
@@ -989,7 +1001,7 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   padding-top: 14px;
 }
 
-.num { font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: normal; }
 .num-strong { font-weight: 600; }
 
 .badge {

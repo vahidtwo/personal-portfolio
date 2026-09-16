@@ -18,22 +18,27 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
-  function formatAxis(v) {
-    if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
-    if (v >= 1e6) return (v / 1e6).toFixed(0) + "M";
-    if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
-    return v;
-  }
-
-  function formatToman(v) {
-    if (v == null || Number.isNaN(v)) return "—";
-    return Math.round(v).toLocaleString("en-US") + " تومان";
-  }
-
   const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
   function toPersianDigits(text) {
     return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
+  }
+
+  function formatAxis(v) {
+    let raw;
+    if (v >= 1e9) raw = (v / 1e9).toFixed(1) + "B";
+    else if (v >= 1e6) raw = (v / 1e6).toFixed(0) + "M";
+    else if (v >= 1e3) raw = (v / 1e3).toFixed(0) + "K";
+    else raw = String(v);
+    return toPersianDigits(raw);
+  }
+
+  function formatToman(v) {
+    if (v == null || Number.isNaN(v)) return "—";
+    const grouped = Math.round(v)
+      .toLocaleString("en-US")
+      .replace(/,/g, "٬");
+    return toPersianDigits(grouped) + " تومان";
   }
 
   /** Percent change vs previous point in the same series. */

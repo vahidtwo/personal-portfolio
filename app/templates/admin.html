@@ -14,15 +14,15 @@
 <section class="admin-stats" aria-label="خلاصه">
   <div class="stat-card">
     <p class="stat-label">کاربران</p>
-    <p class="stat-value" dir="ltr">{{ user_count }}</p>
+    <p class="stat-value">{{ user_count }}</p>
   </div>
   <div class="stat-card">
     <p class="stat-label">جمع ارزش پرتفوی‌ها</p>
-    <p class="stat-value" dir="ltr">{{ total_aum_label }} <span class="stat-unit">تومان</span></p>
+    <p class="stat-value">{{ total_aum_label }} <span class="stat-unit">تومان</span></p>
   </div>
   <div class="stat-card">
     <p class="stat-label">آخرین قیمت بازار</p>
-    <p class="stat-value stat-value-sm" dir="ltr">{{ prices_fetched_label }}</p>
+    <p class="stat-value stat-value-sm">{{ prices_fetched_label }}</p>
   </div>
 </section>
 
@@ -63,11 +63,11 @@
           <td><span dir="ltr">{{ row.username }}</span></td>
           <td>{{ row.created_label }}</td>
           <td>{{ row.last_login_label }}</td>
-          <td dir="ltr">{{ row.total_label }}</td>
+          <td class="num">{{ row.total_label }}</td>
           {% for key, _ in asset_columns %}
-          <td dir="ltr">{{ row.assets[key] }}</td>
+          <td class="num">{{ row.assets[key] }}</td>
           {% endfor %}
-          <td dir="ltr">{{ row.snapshot_count }}</td>
+          <td class="num">{{ row.snapshot_count }}</td>
           <td>{{ row.sanjeh_label }}</td>
           <td>
             {% if row.can_delete %}
@@ -115,7 +115,7 @@
         >
           <td dir="ltr">{{ row.symbol }}</td>
           <td>{{ row.name_fa }}</td>
-          <td dir="ltr">{{ row.price_label }}</td>
+          <td class="num">{{ row.price_label }}</td>
           <td>{{ row.fetched_label }}</td>
         </tr>
         {% endfor %}

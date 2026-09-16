@@ -111,6 +111,35 @@ async def refresh_all_sanjeh_cars() -> None:
         db.close()
 
 
+async def refresh_market_prices_for_user(user_id: int) -> None:
+    """Fetch chande prices, refresh this user's Sanjeh car if configured, store a snapshot."""
+    fetched = await fetch_chande_prices()
+    upsert_prices(fetched)
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user is None:
+            return
+        if user.sanjeh_token:
+            try:
+                await refresh_user_sanjeh_car(user)
+            except SanjehAuthError:
+                logger.warning("Invalid Sanjeh token for user %s", user.id)
+            except Exception:
+                logger.exception("Failed to refresh Sanjeh car for user %s", user.id)
+        prices = load_prices(db)
+        if not prices:
+            raise RuntimeError("no prices after fetch")
+        snapshot_user(db, user, prices, utcnow())
+        db.commit()
+        logger.info("Manual price refresh and snapshot for user %s", user_id)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 async def refresh_prices_and_snapshot_user(user_id: int) -> None:
     """Refresh market prices when possible, then store one snapshot for this user."""
     try:

@@ -145,6 +145,17 @@ def load_prices(db: Session) -> dict[str, MarketPrice]:
     return {row.symbol: row for row in db.query(MarketPrice).all()}
 
 
+def latest_market_prices_fetched_at(prices: dict[str, MarketPrice]) -> datetime | None:
+    latest: datetime | None = None
+    for row in prices.values():
+        at = row.fetched_at
+        if at is None:
+            continue
+        if latest is None or at > latest:
+            latest = at
+    return latest
+
+
 def _qty(user: User, key: str) -> Decimal:
     attr = ASSET_META[key]["qty_attr"]
     return Decimal(getattr(user, attr) or 0)

@@ -11,7 +11,7 @@
     usd: "#22c55e",
     cash: "#38bdf8",
     car: "#94a3b8",
-    total: "#5b9dff",
+    total: "#3ee0b8",
   };
 
   function cssVar(name) {
@@ -173,7 +173,7 @@
 
   function buildDatasets(mode, series) {
     const accent = cssVar("--accent") || ASSET_COLORS.total;
-    const fill = cssVar("--chart-fill") || "rgba(91, 157, 255, 0.12)";
+    const fill = cssVar("--chart-fill") || "rgba(62, 224, 184, 0.12)";
     const many = (series[0]?.data?.length || 0) > 49;
 
     if (mode === "total") {
@@ -303,8 +303,8 @@
           },
           drag: {
             enabled: rangeSelect,
-            backgroundColor: "rgba(91, 157, 255, 0.15)",
-            borderColor: "rgba(91, 157, 255, 0.6)",
+            backgroundColor: "rgba(62, 224, 184, 0.15)",
+            borderColor: "rgba(62, 224, 184, 0.6)",
             borderWidth: 1,
             threshold: 4,
           },

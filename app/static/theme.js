@@ -6,7 +6,7 @@
   function apply(theme) {
     root.setAttribute("data-theme", theme);
     if (meta) {
-      meta.setAttribute("content", theme === "light" ? "#f4f6fa" : "#0c0f14");
+      meta.setAttribute("content", theme === "light" ? "#eef1f8" : "#050608");
     }
   }
 

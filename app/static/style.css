@@ -1073,22 +1073,45 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 .asset-dot-car { background: #94a3b8; }
 
 .sparkline-col {
-  width: 80px;
+  width: 96px;
   text-align: center !important;
   font-size: 11px;
   white-space: nowrap;
 }
 
 .sparkline-cell {
-  width: 80px;
-  padding-inline: 6px !important;
+  width: 96px;
+  padding-inline: 4px !important;
   vertical-align: middle;
 }
 
 .row-sparkline {
   display: block;
   margin: 0 auto;
-  opacity: 0.95;
+  opacity: 0.98;
+}
+
+.sparkline-line,
+.sparkline-end {
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkline-up .sparkline-line,
+.sparkline-up .sparkline-end {
+  stroke: var(--success);
+  fill: var(--success);
+}
+
+.sparkline-down .sparkline-line,
+.sparkline-down .sparkline-end {
+  stroke: #f87171;
+  fill: #f87171;
+}
+
+[data-theme="light"] .sparkline-down .sparkline-line,
+[data-theme="light"] .sparkline-down .sparkline-end {
+  stroke: #dc2626;
+  fill: #dc2626;
 }
 
 .gain-cell {

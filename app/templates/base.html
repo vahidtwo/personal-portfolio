@@ -31,9 +31,11 @@
           <button type="submit" class="btn btn-ghost">خروج</button>
         </form>
         {% else %}
+        {% block guest_nav %}
         <a class="nav-link" href="/">معرفی</a>
         <a class="nav-link" href="/login">ورود</a>
         <a class="nav-link nav-link-accent" href="/register">ثبت‌نام</a>
+        {% endblock %}
         {% endif %}
         <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
           <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>

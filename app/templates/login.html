@@ -1,7 +1,6 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 {% block title %}ورود · موجودی من{% endblock %}
-{% block content %}
-<section class="card auth-card">
+{% block auth_body %}
   <h1>ورود به حساب</h1>
   <p class="card-desc">برای مشاهده پرتفوی خود وارد شوید.</p>
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
@@ -18,5 +17,5 @@
     <button type="submit" class="btn btn-primary btn-block">ورود</button>
   </form>
   <p class="muted center">حساب ندارید؟ <a href="/register">ثبت‌نام</a></p>
-</section>
+  <p class="muted center"><a href="/">درباره اپ</a></p>
 {% endblock %}

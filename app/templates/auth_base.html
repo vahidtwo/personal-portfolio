@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-split shell-wide">
+  {% set show_previews = true %}
+  {% include "partials/intro_panel.html" %}
+  <section class="card auth-card page-split-form">
+    {% block auth_body %}{% endblock %}
+  </section>
+</div>
+{% endblock %}

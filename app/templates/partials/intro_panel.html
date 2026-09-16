@@ -1,0 +1,40 @@
+<div class="intro-panel">
+  <p class="intro-eyebrow">پرتفوی شخصی · تومان</p>
+  <h2 class="intro-title">همه دارایی‌هایتان در یک جا</h2>
+  <p class="intro-lead">
+    موجودی من ارزش پرتفوی شما را با قیمت بازار به‌روز می‌کند: طلا و نقره، ارز دیجیتال، دلار و نقد،
+    و در صورت تمایل ارزش خودرو از <a href="https://sanjeh.app/" rel="noopener noreferrer">سنجه</a>.
+  </p>
+  <ul class="intro-features">
+    <li>قیمت لحظه‌ای از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> و به‌روزرسانی ساعتی</li>
+    <li>داشبورد با جمع کل، جدول دارایی‌ها و نمودار روند</li>
+    <li>اسنپ‌شات برای مقایسه ارزش در طول زمان</li>
+    <li>میزبانی خودتان — داده‌ها روی سرور شما</li>
+  </ul>
+  {% if show_previews %}
+  <div class="intro-previews" aria-hidden="false">
+    <figure class="preview-card">
+      <img
+        src="/static/onboarding/dashboard.svg"
+        width="420"
+        height="260"
+        alt="نمونه داشبورد: ارزش کل و لیست دارایی‌ها"
+        loading="lazy"
+        class="preview-img"
+      >
+      <figcaption>داشبورد و جمع ارزش</figcaption>
+    </figure>
+    <figure class="preview-card">
+      <img
+        src="/static/onboarding/chart.svg"
+        width="420"
+        height="260"
+        alt="نمونه نمودار روند ارزش پرتفوی"
+        loading="lazy"
+        class="preview-img"
+      >
+      <figcaption>نمودار روند</figcaption>
+    </figure>
+  </div>
+  {% endif %}
+</div>

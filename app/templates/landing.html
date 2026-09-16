@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}موجودی من — پرتفوی شخصی{% endblock %}
+{% block content %}
+<div class="landing shell-wide">
+  <section class="landing-hero page-split" aria-labelledby="landing-heading">
+    <div class="landing-hero-copy">
+      {% set show_previews = false %}
+      {% include "partials/intro_panel.html" %}
+    </div>
+    <div class="landing-cta card">
+      <h1 id="landing-heading">شروع در چند دقیقه</h1>
+      <p class="card-desc">حساب بسازید، موجودی را در پروفایل وارد کنید و ارزش لحظه‌ای را ببینید.</p>
+      <ol class="landing-steps">
+        <li><span class="step-num">۱</span> ثبت‌نام با نام کاربری</li>
+        <li><span class="step-num">۲</span> وارد کردن مقادیر دارایی</li>
+        <li><span class="step-num">۳</span> مشاهده داشبورد و نمودار</li>
+      </ol>
+      <div class="landing-actions">
+        <a class="btn btn-primary btn-block" href="/register">ساخت حساب</a>
+        <a class="btn btn-ghost btn-block" href="/login">ورود</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-onboarding card" aria-labelledby="onboard-heading">
+    <div class="card-head">
+      <h2 id="onboard-heading">داخل اپ چه می‌بینید؟</h2>
+      <p class="card-desc">تصاویر زیر نمای ساده از رابط کاربری هستند (نه داده واقعی).</p>
+    </div>
+    <div class="intro-previews intro-previews-lg">
+      <figure class="preview-card">
+        <img
+          src="/static/onboarding/dashboard.svg"
+          width="480"
+          height="300"
+          alt="نمونه داشبورد"
+          loading="lazy"
+          class="preview-img"
+        >
+        <figcaption>ارزش کل، به‌روزرسانی قیمت و جدول پرتفوی</figcaption>
+      </figure>
+      <figure class="preview-card">
+        <img
+          src="/static/onboarding/chart.svg"
+          width="480"
+          height="300"
+          alt="نمونه نمودار"
+          loading="lazy"
+          class="preview-img"
+        >
+        <figcaption>روند ارزش در زمان با نمودار تعاملی</figcaption>
+      </figure>
+    </div>
+  </section>
+</div>
+{% endblock %}

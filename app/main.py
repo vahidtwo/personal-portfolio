@@ -186,21 +186,6 @@ def build_pie_data(view) -> dict:
     return {"slices": slices}
 
 
-ASSET_SPARKLINE_COLORS = {
-    "gold": "#f59e0b",
-    "silver": "#cbd5e1",
-    "btc": "#f97316",
-    "ada": "#3b82f6",
-    "eth": "#8b5cf6",
-    "sol": "#14b8a6",
-    "doge": "#eab308",
-    "matic": "#a855f7",
-    "usd": "#22c55e",
-    "cash": "#38bdf8",
-    "car": "#94a3b8",
-}
-
-
 def build_asset_value_history(
     db: Session,
     user_id: int,
@@ -225,8 +210,97 @@ def build_asset_value_history(
     return trends
 
 
-def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
-    return build_asset_value_history(db, user_id, view, days=7)
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def build_week_asset_timed_series(
+    db: Session, user_id: int, view
+) -> tuple[dict[str, list[tuple[datetime, float]]], datetime, datetime]:
+    """Per-asset (timestamp, value) for the last 7 days + live point at window end."""
+    window_end = utcnow()
+    window_start = window_end - timedelta(days=7)
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(
+            PortfolioSnapshot.user_id == user_id,
+            PortfolioSnapshot.taken_at >= window_start,
+        )
+        .order_by(PortfolioSnapshot.taken_at.asc())
+        .all()
+    )
+    current = {row.key: float(row.value_toman) for row in view.rows}
+    series: dict[str, list[tuple[datetime, float]]] = {key: [] for key in ASSET_ORDER}
+    for snap in snaps:
+        when = _as_utc(snap.taken_at)
+        bd = json.loads(snap.breakdown_json)
+        for key in ASSET_ORDER:
+            series[key].append((when, float(bd.get(key, 0))))
+    end = _as_utc(window_end)
+    for key in ASSET_ORDER:
+        points = series[key]
+        live = current.get(key, 0.0)
+        if points and abs(points[-1][0].timestamp() - end.timestamp()) < 60:
+            points[-1] = (end, live)
+        else:
+            points.append((end, live))
+    return series, window_start, window_end
+
+
+def sparkline_trend_kind(values: list[float]) -> str:
+    """up includes flat week; down only when last < first."""
+    if len(values) < 2:
+        return "up"
+    if values[-1] < values[0]:
+        return "down"
+    return "up"
+
+
+def sparkline_path_timed(
+    points: list[tuple[datetime, float]],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    width: int = 88,
+    height: int = 28,
+) -> tuple[str, dict[str, float] | None]:
+    if not points:
+        return "", None
+    win0 = _as_utc(window_start).timestamp()
+    win1 = _as_utc(window_end).timestamp()
+    span_t = win1 - win0
+    if span_t <= 0:
+        span_t = 1.0
+
+    ordered = sorted(
+        (_as_utc(t), v) for t, v in points,
+        key=lambda p: p[0].timestamp(),
+    )
+    values = [v for _, v in ordered]
+    if len(ordered) == 1:
+        t0, v0 = ordered[0]
+        ordered = [(t0, v0), (t0, v0)]
+
+    vmin = min(values)
+    vmax = max(values)
+    span_v = vmax - vmin
+    mid_y = height / 2
+
+    parts: list[str] = []
+    for when, val in ordered:
+        ratio = (when.timestamp() - win0) / span_t
+        ratio = max(0.0, min(1.0, ratio))
+        x = 1 + ratio * (width - 2)
+        if span_v <= 0:
+            y = mid_y
+        else:
+            y = height - 1 - ((val - vmin) / span_v) * (height - 2)
+        parts.append(f"{x:.1f},{y:.1f}")
+    path = "M " + parts[0] + " L " + " L ".join(parts[1:])
+    last_x, last_y = parts[-1].split(",")
+    return path, {"x": float(last_x), "y": float(last_y)}
 
 
 def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
@@ -243,27 +317,6 @@ def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
         values.append(float(bd.get("total", snap.total_toman)))
     values.append(float(view.total_toman))
     return values
-
-
-def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> str:
-    if not values:
-        return ""
-    series = list(values)
-    if len(series) == 1:
-        series = [series[0], series[0]]
-    vmin = min(series)
-    vmax = max(series)
-    span = vmax - vmin
-    if span <= 0:
-        mid = height / 2
-        return f"M 1,{mid:.1f} L {width - 1},{mid:.1f}"
-    n = len(series)
-    parts: list[str] = []
-    for i, v in enumerate(series):
-        x = 1 + (i / (n - 1)) * (width - 2)
-        y = height - 1 - ((v - vmin) / span) * (height - 2)
-        parts.append(f"{x:.1f},{y:.1f}")
-    return "M " + parts[0] + " L " + " L ".join(parts[1:])
 
 
 def format_percent_label(pct: float) -> str:
@@ -487,22 +540,29 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     prices = load_prices(db)
     view = build_portfolio(user, prices)
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
-    week_trends = build_week_asset_trends(db, user.id, view)
+    week_timed, week_start, week_end = build_week_asset_timed_series(db, user.id, view)
     history_trends = build_asset_value_history(db, user.id, view)
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
         share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
-        trend_vals = week_trends.get(row.key, [float(row.value_toman)])
+        timed = week_timed.get(row.key, [])
+        trend_vals = [v for _, v in timed] or [float(row.value_toman)]
         history_vals = history_trends.get(row.key, [float(row.value_toman)])
         trend_change = week_trend_change_label(trend_vals)
         max_gain_label, sort_max_gain = max_gain_labels(history_vals)
+        spark_path, spark_end = sparkline_path_timed(
+            timed,
+            window_start=week_start,
+            window_end=week_end,
+        )
         rows.append(
             {
                 "key": row.key,
                 "name_fa": row.name_fa,
-                "sparkline_path": sparkline_path(trend_vals),
-                "sparkline_color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
+                "sparkline_path": spark_path,
+                "sparkline_end": spark_end,
+                "sparkline_trend": sparkline_trend_kind(trend_vals),
                 "trend_change_label": trend_change,
                 "max_gain_label": max_gain_label,
                 "max_gain_positive": sort_max_gain != "",

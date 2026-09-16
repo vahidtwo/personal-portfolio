@@ -147,21 +147,29 @@
           <td class="sparkline-cell">
             {% if row.sparkline_path %}
             <svg
-              class="row-sparkline"
-              width="72"
-              height="26"
-              viewBox="0 0 72 26"
+              class="row-sparkline sparkline-{{ row.sparkline_trend }}"
+              width="88"
+              height="28"
+              viewBox="0 0 88 28"
               role="img"
-              aria-label="روند ارزش هفت روز{% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
+              aria-label="روند ارزش هفت روز (زمان واقعی){% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
             >
               <path
+                class="sparkline-line"
                 d="{{ row.sparkline_path }}"
                 fill="none"
-                stroke="{{ row.sparkline_color }}"
                 stroke-width="1.75"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
+              {% if row.sparkline_end %}
+              <circle
+                class="sparkline-end"
+                cx="{{ row.sparkline_end.x }}"
+                cy="{{ row.sparkline_end.y }}"
+                r="2.25"
+              />
+              {% endif %}
             </svg>
             {% else %}<span class="text-muted">—</span>{% endif %}
           </td>

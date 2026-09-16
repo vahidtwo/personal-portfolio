@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#050608" id="meta-theme-color">
   <title>{% block title %}موجودی من{% endblock %}</title>
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,8 +19,8 @@
   <header class="top">
     <div class="top-inner">
       <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span>موجودی من</span>
+        <img class="brand-logo" src="/static/logo.svg" width="40" height="40" alt="">
+        <span class="brand-name">موجودی من</span>
       </a>
       <nav class="nav" aria-label="ناوبری اصلی">
         {% if user %}

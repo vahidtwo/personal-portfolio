@@ -298,6 +298,9 @@ async def profile_save(
     btc: str = Form("0"),
     ada: str = Form("0"),
     eth: str = Form("0"),
+    sol: str = Form("0"),
+    doge: str = Form("0"),
+    matic: str = Form("0"),
     usd: str = Form("0"),
     car_toman: str = Form("0"),
     csrf: str = Form(""),
@@ -312,6 +315,9 @@ async def profile_save(
         "btc": btc,
         "ada": ada,
         "eth": eth,
+        "sol": sol,
+        "doge": doge,
+        "matic": matic,
         "usd": usd,
         "car_toman": car_toman,
     }
@@ -320,6 +326,9 @@ async def profile_save(
         user.btc = parse_decimal(btc, field="btc")
         user.ada = parse_decimal(ada, field="ada")
         user.eth = parse_decimal(eth, field="eth")
+        user.sol = parse_decimal(sol, field="sol")
+        user.doge = parse_decimal(doge, field="doge")
+        user.matic = parse_decimal(matic, field="matic")
         user.usd = parse_decimal(usd, field="usd")
         user.car_toman = parse_decimal(car_toman, field="car")
     except Exception:
@@ -342,6 +351,9 @@ def _holdings_form(user: User) -> dict[str, str]:
         "btc": format_qty(Decimal(user.btc or 0), 8),
         "ada": format_qty(Decimal(user.ada or 0), 4),
         "eth": format_qty(Decimal(user.eth or 0), 8),
+        "sol": format_qty(Decimal(user.sol or 0), 4),
+        "doge": format_qty(Decimal(user.doge or 0), 4),
+        "matic": format_qty(Decimal(user.matic or 0), 4),
         "usd": format_qty(Decimal(user.usd or 0), 2),
         "car_toman": format_qty(Decimal(user.car_toman or 0), 0),
     }

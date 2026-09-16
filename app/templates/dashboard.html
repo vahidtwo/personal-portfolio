@@ -2,6 +2,7 @@
 {% block title %}داشبورد · موجودی من{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js" defer></script>
 {% endblock %}
 {% block content %}
 {% if flash %}<p class="toast toast-ok" role="status">{{ flash }}</p>{% endif %}
@@ -21,16 +22,29 @@
   </div>
 </section>
 
-<section class="card" aria-labelledby="chart-heading">
-  <div class="card-head chart-head">
-    <h2 id="chart-heading">روند ارزش پرتفوی</h2>
-    <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
-      <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
-      <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">دارایی‌ها</button>
+<section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">
+  <div class="chart-head">
+    <div class="chart-head-title">
+      <h2 id="chart-heading">روند ارزش پرتفوی</h2>
+      <p class="chart-hint">روی هر خط بروید تا نام و مقدار نمایش داده شود · زوم با غلطک یا دکمه‌ها</p>
+    </div>
+    <div class="chart-head-actions">
+      <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
+        <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
+        <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">دارایی‌ها</button>
+      </div>
+      <div class="chart-tools" aria-label="ابزار نمودار">
+        <button type="button" class="chart-tool-btn" data-zoom="in" title="زوم بیشتر" aria-label="زوم بیشتر">+</button>
+        <button type="button" class="chart-tool-btn" data-zoom="out" title="زوم کمتر" aria-label="زوم کمتر">−</button>
+        <button type="button" class="chart-tool-btn" data-zoom="reset" title="بازنشانی زوم" aria-label="بازنشانی زوم">↺</button>
+        <button type="button" class="chart-tool-btn" id="chart-fullscreen" title="تمام‌صفحه" aria-label="تمام‌صفحه">⛶</button>
+      </div>
     </div>
   </div>
-  <div class="chart-wrap">
-    <canvas id="timeline-chart" role="img" aria-label="نمودار زمانی ارزش پرتفوی به تومان"></canvas>
+  <div class="chart-stage">
+    <div class="chart-wrap">
+      <canvas id="timeline-chart" role="img" aria-label="نمودار زمانی ارزش پرتفوی به تومان"></canvas>
+    </div>
   </div>
 </section>
 

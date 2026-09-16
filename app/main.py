@@ -201,15 +201,19 @@ ASSET_SPARKLINE_COLORS = {
 }
 
 
-def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
-    """Per-asset value (toman) for the last 7 days + current, chronological."""
-    since = utcnow() - timedelta(days=7)
-    snaps = (
-        db.query(PortfolioSnapshot)
-        .filter(PortfolioSnapshot.user_id == user_id, PortfolioSnapshot.taken_at >= since)
-        .order_by(PortfolioSnapshot.taken_at.asc())
-        .all()
-    )
+def build_asset_value_history(
+    db: Session,
+    user_id: int,
+    view,
+    *,
+    days: int | None = None,
+    max_snaps: int = 720,
+) -> dict[str, list[float]]:
+    """Per-asset value (toman), chronological snapshots + current."""
+    q = db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == user_id)
+    if days is not None:
+        q = q.filter(PortfolioSnapshot.taken_at >= utcnow() - timedelta(days=days))
+    snaps = q.order_by(PortfolioSnapshot.taken_at.asc()).limit(max_snaps).all()
     current = {row.key: float(row.value_toman) for row in view.rows}
     trends: dict[str, list[float]] = {key: [] for key in ASSET_ORDER}
     for snap in snaps:
@@ -219,6 +223,26 @@ def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[f
     for key in ASSET_ORDER:
         trends[key].append(current.get(key, 0.0))
     return trends
+
+
+def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
+    return build_asset_value_history(db, user_id, view, days=7)
+
+
+def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(PortfolioSnapshot.user_id == user_id)
+        .order_by(PortfolioSnapshot.taken_at.asc())
+        .limit(720)
+        .all()
+    )
+    values: list[float] = []
+    for snap in snaps:
+        bd = json.loads(snap.breakdown_json)
+        values.append(float(bd.get("total", snap.total_toman)))
+    values.append(float(view.total_toman))
+    return values
 
 
 def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> str:
@@ -242,6 +266,14 @@ def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> st
     return "M " + parts[0] + " L " + " L ".join(parts[1:])
 
 
+def format_percent_label(pct: float) -> str:
+    body = abs(pct)
+    text = body if body >= 100 else round(body, 1)
+    s = format(text, "f").rstrip("0").rstrip(".")
+    sign = "+" if pct > 0 else "−" if pct < 0 else ""
+    return sign + persian_digits(s) + "٪"
+
+
 def week_trend_change_label(values: list[float]) -> str | None:
     if len(values) < 2:
         return None
@@ -250,12 +282,30 @@ def week_trend_change_label(values: list[float]) -> str | None:
         return persian_digits("0") + "٪"
     if first == 0:
         return None
-    pct = ((last - first) / abs(first)) * 100
-    body = abs(pct)
-    text = (body if body >= 100 else round(body, 1))
-    s = format(text, "f").rstrip("0").rstrip(".")
-    sign = "+" if pct > 0 else "−" if pct < 0 else ""
-    return sign + persian_digits(s) + "٪"
+    return format_percent_label(((last - first) / abs(first)) * 100)
+
+
+def max_runup_gain_percent(values: list[float]) -> float | None:
+    """Largest % rise from an earlier trough to a later value in the series."""
+    if len(values) < 2:
+        return None
+    best: float | None = None
+    trough = values[0]
+    for value in values[1:]:
+        if trough > 0 and value > trough:
+            pct = ((value - trough) / trough) * 100.0
+            if best is None or pct > best:
+                best = pct
+        if value < trough:
+            trough = value
+    return best
+
+
+def max_gain_labels(values: list[float]) -> tuple[str, str]:
+    pct = max_runup_gain_percent(values)
+    if pct is None or pct <= 0:
+        return "—", ""
+    return format_percent_label(pct), str(pct)
 
 
 templates.env.filters["toman"] = format_toman
@@ -438,12 +488,15 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     view = build_portfolio(user, prices)
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
     week_trends = build_week_asset_trends(db, user.id, view)
+    history_trends = build_asset_value_history(db, user.id, view)
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
         share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
         trend_vals = week_trends.get(row.key, [float(row.value_toman)])
+        history_vals = history_trends.get(row.key, [float(row.value_toman)])
         trend_change = week_trend_change_label(trend_vals)
+        max_gain_label, sort_max_gain = max_gain_labels(history_vals)
         rows.append(
             {
                 "key": row.key,
@@ -451,6 +504,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "sparkline_path": sparkline_path(trend_vals),
                 "sparkline_color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
                 "trend_change_label": trend_change,
+                "max_gain_label": max_gain_label,
+                "max_gain_positive": sort_max_gain != "",
                 "quantity_label": format_qty(
                     row.quantity,
                     places if row.key not in ("car", "cash") else 0,
@@ -465,6 +520,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "sort_unit_price": str(row.unit_price) if row.unit_price is not None else "",
                 "sort_value": str(row.value_toman),
                 "sort_share": str(share),
+                "sort_max_gain": sort_max_gain,
             }
         )
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
@@ -477,6 +533,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     refresh_wait_label = None
     if refresh_wait_sec > 0:
         refresh_wait_label = f"حدود {max(1, (refresh_wait_sec + 59) // 60)} دقیقه دیگر"
+    total_max_gain_label, total_max_gain_sort = max_gain_labels(
+        build_total_value_history(db, user.id, view)
+    )
     return render(
         request,
         "dashboard.html",
@@ -484,6 +543,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         view=view,
         rows=rows,
         total_label=format_toman(view.total_toman),
+        total_max_gain_label=total_max_gain_label,
+        total_max_gain_positive=total_max_gain_sort != "",
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,

@@ -8,12 +8,23 @@
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
 
-<section class="summary summary-split" aria-labelledby="total-heading">
+<section class="summary" aria-labelledby="total-heading">
   <div class="summary-body">
   <div class="summary-text">
     <p class="eyebrow">{{ user.username }}</p>
     <h1 id="total-heading">ارزش کل پرتفوی</h1>
     <p class="total" dir="ltr"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
+    <aside class="summary-pie summary-pie-below" id="pie-panel" aria-labelledby="pie-heading">
+      <h2 id="pie-heading" class="summary-pie-title">توزیع دارایی‌ها</h2>
+      <p class="summary-pie-hint">ارزش فعلی (تومان)</p>
+      {% if pie_has_data %}
+      <div class="pie-wrap pie-wrap-summary">
+        <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
+      </div>
+      {% else %}
+      <p class="chart-empty chart-empty-compact">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
+      {% endif %}
+    </aside>
     <div class="market-bar" role="group" aria-label="وضعیت قیمت بازار">
       <div class="market-bar-status">
         <span class="market-bar-dot" aria-hidden="true"></span>
@@ -60,18 +71,6 @@
     <a class="btn btn-primary" href="/profile">ویرایش موجودی</a>
   </div>
   </div>
-
-  <aside class="summary-pie" id="pie-panel" aria-labelledby="pie-heading">
-    <h2 id="pie-heading" class="summary-pie-title">توزیع دارایی‌ها</h2>
-    <p class="summary-pie-hint">ارزش فعلی (تومان)</p>
-    {% if pie_has_data %}
-    <div class="pie-wrap pie-wrap-summary">
-      <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
-    </div>
-    {% else %}
-    <p class="chart-empty chart-empty-compact">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
-    {% endif %}
-  </aside>
 </section>
 
 <section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">
@@ -104,7 +103,7 @@
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">
     <h2 id="table-heading">پرتفوی فعلی</h2>
-    <p class="card-desc">برای مرتب‌سازی روی عنوان ستون‌ها کلیک کنید</p>
+    <p class="card-desc">برای مرتب‌سازی روی عنوان ستون‌ها کلیک کنید · بیشترین رشد: حداکثر درصد صعود از یک کف قبلی در تاریخچه اسنپ‌شات</p>
   </div>
   <div class="table-wrap">
     <table class="data-table" id="portfolio-table">
@@ -116,6 +115,7 @@
           <th scope="col"><button type="button" class="th-sort" data-col="unit_price">قیمت واحد</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="value">ارزش (تومان)</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="share">سهم</button></th>
+          <th scope="col"><button type="button" class="th-sort" data-col="max_gain">بیشترین رشد</button></th>
           <th scope="col" class="sparkline-col">۷ روز</th>
         </tr>
       </thead>
@@ -128,6 +128,7 @@
           data-sort-unit-price="{{ row.sort_unit_price }}"
           data-sort-value="{{ row.sort_value }}"
           data-sort-share="{{ row.sort_share }}"
+          data-sort-max-gain="{{ row.sort_max_gain }}"
         >
           <td>
             <span class="asset-dot asset-dot-{{ row.key }}" aria-hidden="true"></span>
@@ -139,6 +140,9 @@
           <td class="num" dir="ltr">{{ row.unit_price_label }}</td>
           <td class="num num-strong" dir="ltr">{{ row.value_label }}</td>
           <td class="num" dir="ltr">{{ row.share_label }}٪</td>
+          <td class="num gain-cell" dir="ltr">
+            {% if row.max_gain_positive %}<span class="gain-positive">{{ row.max_gain_label }}</span>{% else %}{{ row.max_gain_label }}{% endif %}
+          </td>
           <td class="sparkline-cell">
             {% if row.sparkline_path %}
             <svg
@@ -168,6 +172,9 @@
           <th scope="row" colspan="4">جمع</th>
           <td class="num num-strong" dir="ltr">{{ total_label }}</td>
           <td class="num" dir="ltr">۱۰۰٪</td>
+          <td class="num gain-cell" dir="ltr">
+            {% if total_max_gain_positive %}<span class="gain-positive">{{ total_max_gain_label }}</span>{% else %}{{ total_max_gain_label }}{% endif %}
+          </td>
           <td></td>
         </tr>
       </tfoot>

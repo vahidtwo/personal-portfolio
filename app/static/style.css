@@ -352,12 +352,6 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   box-shadow: var(--shadow);
 }
 
-.summary-split {
-  display: grid;
-  gap: 24px;
-  align-items: center;
-}
-
 .summary-body {
   display: flex;
   flex-wrap: wrap;
@@ -365,6 +359,7 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   justify-content: space-between;
   gap: 20px;
   min-width: 0;
+  width: 100%;
 }
 
 .summary-pie {
@@ -373,6 +368,14 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   border-radius: 14px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
+}
+
+.summary-pie-below {
+  width: min(300px, 100%);
+  margin-top: 4px;
+  margin-bottom: 14px;
+  margin-left: auto;
+  margin-right: 0;
 }
 
 .summary-pie-title {
@@ -389,34 +392,13 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 
 .pie-wrap-summary {
   max-width: none;
-  height: min(240px, 36vw);
-  min-height: 200px;
+  height: min(220px, 34vw);
+  min-height: 180px;
 }
 
 .chart-empty-compact {
   padding: 24px 12px;
   font-size: 13px;
-}
-
-@media (min-width: 840px) {
-  .summary-split {
-    grid-template-columns: 1fr minmax(220px, 300px);
-    align-items: stretch;
-  }
-
-  /* RTL: first column = main (right), second = pie (visual left) */
-  .summary-pie {
-    grid-column: 2;
-    grid-row: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .summary-body {
-    grid-column: 1;
-    grid-row: 1;
-  }
 }
 
 .eyebrow {
@@ -978,6 +960,16 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   display: block;
   margin: 0 auto;
   opacity: 0.95;
+}
+
+.gain-cell {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.gain-positive {
+  color: var(--success);
+  font-weight: 600;
 }
 
 .btn {

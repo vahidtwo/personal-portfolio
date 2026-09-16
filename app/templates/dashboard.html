@@ -13,14 +13,14 @@
     <div class="summary-text">
       <p class="eyebrow">{{ user.username }}</p>
       <h1 id="total-heading">ارزش کل پرتفوی</h1>
-      <p class="total" dir="ltr"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
+      <p class="total"><span class="total-num">{{ total_label }}</span> <span class="total-unit">تومان</span></p>
       <div class="market-bar" role="group" aria-label="وضعیت قیمت بازار">
       <div class="market-bar-status">
         <span class="market-bar-dot" aria-hidden="true"></span>
         <div class="market-bar-text">
           <span class="market-bar-label">آخرین قیمت بازار</span>
           <span class="market-bar-time-wrap">
-            <time class="market-bar-time" dir="ltr">{{ fetched_label }}</time>
+            <time class="market-bar-time">{{ fetched_label }}</time>
             <span class="market-bar-tz">وقت تهران</span>
           </span>
         </div>
@@ -104,17 +104,17 @@
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">
     <h2 id="table-heading">پرتفوی فعلی</h2>
-    <p class="card-desc">برای مرتب‌سازی روی عنوان ستون‌ها کلیک کنید · بیشترین رشد: حداکثر درصد صعود از یک کف در ۷ روز گذشته</p>
+    <p class="card-desc">مرتب‌سازی فقط روی «سهم» و «بیشترین رشد» · بیشترین رشد: حداکثر صعود از یک کف در ۷ روز گذشته</p>
   </div>
   <div class="table-wrap">
-    <table class="data-table" id="portfolio-table">
+    <table class="data-table" id="portfolio-table" data-sort-default="share" data-sort-desc="1">
       <thead>
         <tr>
-          <th scope="col"><button type="button" class="th-sort" data-col="name">دارایی</button></th>
-          <th scope="col"><button type="button" class="th-sort" data-col="qty">مقدار</button></th>
-          <th scope="col"><button type="button" class="th-sort" data-col="unit">واحد</button></th>
-          <th scope="col"><button type="button" class="th-sort" data-col="unit_price">قیمت واحد</button></th>
-          <th scope="col"><button type="button" class="th-sort" data-col="value">ارزش (تومان)</button></th>
+          <th scope="col">دارایی</th>
+          <th scope="col">مقدار</th>
+          <th scope="col">واحد</th>
+          <th scope="col">قیمت واحد</th>
+          <th scope="col">ارزش (تومان)</th>
           <th scope="col"><button type="button" class="th-sort" data-col="share">سهم</button></th>
           <th scope="col"><button type="button" class="th-sort" data-col="max_gain">بیشترین رشد</button></th>
           <th scope="col" class="sparkline-col">۷ روز</th>
@@ -136,12 +136,12 @@
             {{ row.name_fa }}
             {% if row.sanjeh %}<span class="badge badge-sanjeh">سنجه</span>{% elif row.manual %}<span class="badge">دستی</span>{% endif %}
           </td>
-          <td class="num" dir="ltr">{{ row.quantity_label }}</td>
+          <td class="num">{{ row.quantity_label }}</td>
           <td>{{ row.unit_fa }}</td>
-          <td class="num" dir="ltr">{{ row.unit_price_label }}</td>
-          <td class="num num-strong" dir="ltr">{{ row.value_label }}</td>
-          <td class="num" dir="ltr">{{ row.share_label }}٪</td>
-          <td class="num gain-cell" dir="ltr">
+          <td class="num">{{ row.unit_price_label }}</td>
+          <td class="num num-strong">{{ row.value_label }}</td>
+          <td class="num">{{ row.share_label }}٪</td>
+          <td class="num gain-cell">
             {% if row.max_gain_positive %}<span class="gain-positive">{{ row.max_gain_label }}</span>{% else %}{{ row.max_gain_label }}{% endif %}
           </td>
           <td class="sparkline-cell">
@@ -189,9 +189,9 @@
       <tfoot>
         <tr>
           <th scope="row" colspan="4">جمع</th>
-          <td class="num num-strong" dir="ltr">{{ total_label }}</td>
-          <td class="num" dir="ltr">۱۰۰٪</td>
-          <td class="num gain-cell" dir="ltr">
+          <td class="num num-strong">{{ total_label }}</td>
+          <td class="num">۱۰۰٪</td>
+          <td class="num gain-cell">
             {% if total_max_gain_positive %}<span class="gain-positive">{{ total_max_gain_label }}</span>{% else %}{{ total_max_gain_label }}{% endif %}
           </td>
           <td></td>

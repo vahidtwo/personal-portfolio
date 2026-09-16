@@ -59,7 +59,7 @@
       </div>
       <p class="field-hint">در سنجه پروفایل و خودروهای خود را تکمیل کنید، سپس توکن API را اینجا بگذارید.</p>
       {% if has_sanjeh_token %}
-      <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span dir="ltr">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
+      <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
       {% endif %}
       <input type="password" name="sanjeh_token" value="" autocomplete="off" placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
       {% if has_sanjeh_token %}

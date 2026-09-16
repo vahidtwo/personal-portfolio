@@ -97,7 +97,12 @@ def format_qty(value: Decimal, places: int) -> str:
     text = format(quantized, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return text or "0"
+    return persian_digits(text or "0")
+
+
+def format_share_label(share: Decimal) -> str:
+    text = format(share, "f").rstrip("0").rstrip(".")
+    return persian_digits(text)
 
 
 def format_when(value: datetime | None) -> str:
@@ -387,6 +392,7 @@ def max_gain_labels(values: list[float]) -> tuple[str, str]:
 
 templates.env.filters["toman"] = format_toman
 templates.env.filters["when"] = format_when
+templates.env.filters["fa"] = persian_digits
 
 
 @asynccontextmanager
@@ -596,7 +602,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "unit_fa": row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
                 "value_label": format_toman(row.value_toman),
-                "share_label": format(share, "f").rstrip("0").rstrip("."),
+                "share_label": format_share_label(share),
                 "manual": row.manual,
                 "sanjeh": row.sanjeh,
                 "sort_qty": str(row.quantity),
@@ -615,7 +621,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     refresh_wait_sec = market_price_refresh_wait_seconds(db)
     refresh_wait_label = None
     if refresh_wait_sec > 0:
-        refresh_wait_label = f"حدود {max(1, (refresh_wait_sec + 59) // 60)} دقیقه دیگر"
+        minutes = max(1, (refresh_wait_sec + 59) // 60)
+        refresh_wait_label = f"حدود {persian_digits(str(minutes))} دقیقه دیگر"
     total_max_gain_label, total_max_gain_sort = max_gain_labels(
         build_week_total_values(db, user.id, view)
     )
@@ -637,7 +644,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         flash_error=flash_error,
         refresh_wait_sec=refresh_wait_sec,
         refresh_wait_label=refresh_wait_label,
-        price_refresh_minutes=PRICE_MANUAL_REFRESH_MINUTES,
+        price_refresh_minutes=persian_digits(str(PRICE_MANUAL_REFRESH_MINUTES)),
     )
 
 
@@ -656,7 +663,8 @@ async def dashboard_refresh_prices(
         minutes = max(1, wait_sec // 60)
         flash(
             request,
-            f"حداقل {PRICE_MANUAL_REFRESH_MINUTES} دقیقه بعد از آخرین به‌روزرسانی باید بگذرد. حدود {minutes} دقیقه دیگر دوباره تلاش کنید.",
+            f"حداقل {persian_digits(str(PRICE_MANUAL_REFRESH_MINUTES))} دقیقه بعد از آخرین به‌روزرسانی باید بگذرد. "
+            f"حدود {persian_digits(str(minutes))} دقیقه دیگر دوباره تلاش کنید.",
             error=True,
         )
         return RedirectResponse("/dashboard", status_code=303)

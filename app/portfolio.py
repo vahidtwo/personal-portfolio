@@ -11,6 +11,15 @@ from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
 
 ASSET_ORDER = ("gold", "btc", "ada", "eth", "usd", "car")
 
+ASSET_LABEL_FA = {
+    "gold": "طلا ۱۸ عیار",
+    "btc": "بیت‌کوین",
+    "ada": "کاردانو",
+    "eth": "اتریوم",
+    "usd": "دلار",
+    "car": "خودرو",
+}
+
 ASSET_META = {
     "gold": {
         "name_fa": "طلا ۱۸ عیار",

@@ -1091,6 +1091,46 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   opacity: 0.98;
 }
 
+.sparkline-bg {
+  fill: rgba(0, 0, 0, 0.28);
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+[data-theme="light"] .sparkline-bg {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: var(--border);
+}
+
+.sparkline-area {
+  opacity: 1;
+}
+
+.sparkline-up .sparkline-grad-top {
+  stop-color: var(--success);
+  stop-opacity: 0.38;
+}
+
+.sparkline-up .sparkline-grad-bottom {
+  stop-color: var(--success);
+  stop-opacity: 0.02;
+}
+
+.sparkline-down .sparkline-grad-top {
+  stop-color: #f87171;
+  stop-opacity: 0.32;
+}
+
+.sparkline-down .sparkline-grad-bottom {
+  stop-color: #f87171;
+  stop-opacity: 0.02;
+}
+
+[data-theme="light"] .sparkline-down .sparkline-grad-top {
+  stop-color: #dc2626;
+  stop-opacity: 0.22;
+}
+
 .sparkline-line,
 .sparkline-end {
   vector-effect: non-scaling-stroke;

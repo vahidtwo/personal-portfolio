@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DATA_DIR, DATABASE_URL
@@ -17,10 +17,29 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+_USER_HOLDING_COLUMNS = (
+    ("sol", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
+    ("doge", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
+    ("matic", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
+)
+
+
+def _migrate_user_holdings() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("users")}
+    with engine.begin() as conn:
+        for name, ddl in _USER_HOLDING_COLUMNS:
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _migrate_user_holdings()
 
 
 def get_db():

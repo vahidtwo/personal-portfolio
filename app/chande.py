@@ -14,6 +14,9 @@ CHANDE_SYMBOLS = {
     "btc": "BTC",
     "ada": "ADA",
     "eth": "ETH",
+    "sol": "SOL",
+    "doge": "DOGE",
+    "matic": "MATIC",
     "usd": "USD",
 }
 

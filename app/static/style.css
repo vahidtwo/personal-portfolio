@@ -293,6 +293,9 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 .asset-dot-btc { background: #f97316; }
 .asset-dot-ada { background: #3b82f6; }
 .asset-dot-eth { background: #8b5cf6; }
+.asset-dot-sol { background: #14b8a6; }
+.asset-dot-doge { background: #eab308; }
+.asset-dot-matic { background: #a855f7; }
 .asset-dot-usd { background: #22c55e; }
 .asset-dot-car { background: #94a3b8; }
 

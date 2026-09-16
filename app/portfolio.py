@@ -9,13 +9,16 @@ from sqlalchemy.orm import Session
 
 from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
 
-ASSET_ORDER = ("gold", "btc", "ada", "eth", "usd", "car")
+ASSET_ORDER = ("gold", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "car")
 
 ASSET_LABEL_FA = {
     "gold": "طلا ۱۸ عیار",
     "btc": "بیت‌کوین",
     "ada": "کاردانو",
     "eth": "اتریوم",
+    "sol": "سولانا",
+    "doge": "دوج‌کوین",
+    "matic": "پالیگان",
     "usd": "دلار",
     "car": "خودرو",
 }
@@ -52,6 +55,30 @@ ASSET_META = {
         "unit_en": "ETH",
         "qty_attr": "eth",
         "qty_places": 8,
+    },
+    "sol": {
+        "name_fa": "سولانا",
+        "name_en": "Solana",
+        "unit_fa": "SOL",
+        "unit_en": "SOL",
+        "qty_attr": "sol",
+        "qty_places": 4,
+    },
+    "doge": {
+        "name_fa": "دوج‌کوین",
+        "name_en": "Dogecoin",
+        "unit_fa": "DOGE",
+        "unit_en": "DOGE",
+        "qty_attr": "doge",
+        "qty_places": 4,
+    },
+    "matic": {
+        "name_fa": "پالیگان",
+        "name_en": "Polygon",
+        "unit_fa": "MATIC",
+        "unit_en": "MATIC",
+        "qty_attr": "matic",
+        "qty_places": 4,
     },
     "usd": {
         "name_fa": "دلار آمریکا",

@@ -58,20 +58,26 @@ async def run_hourly_job(take_snapshots: bool = True) -> None:
         if not acquired:
             logger.info("Hourly job already running; skip")
             return
+        logger.info("Hourly job started (snapshots=%s)", take_snapshots)
         try:
             fetched = await fetch_chande_prices()
+            upsert_prices(fetched)
+            logger.info("Market prices updated from chande.net")
         except Exception:
-            logger.exception("Failed to fetch prices from chande.net")
-            return
-        upsert_prices(fetched)
-        await refresh_all_sanjeh_cars()
+            logger.exception("Failed to fetch prices from chande.net; continuing with stored prices")
+        try:
+            await refresh_all_sanjeh_cars()
+        except Exception:
+            logger.exception("Failed to refresh Sanjeh car values")
         if not take_snapshots:
+            logger.info("Hourly job finished (no snapshots)")
             return
         try:
             count = create_snapshots()
             logger.info("Stored hourly snapshots for %s users", count)
         except Exception:
             logger.exception("Failed to store portfolio snapshots")
+        logger.info("Hourly job finished")
 
 
 async def refresh_user_sanjeh_car(user: User) -> None:

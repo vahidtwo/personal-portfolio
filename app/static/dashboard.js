@@ -48,8 +48,9 @@
           tension: 0.3,
           borderWidth: 2.5,
           hoverBorderWidth: 4,
-          pointRadius: row.data.map((_, i) => (i === 0 ? 5 : many ? 0 : 3)),
-          pointHoverRadius: 7,
+          pointRadius: row.data.map((_, i) => (i === 0 ? 5 : many ? 2 : 4)),
+          pointHitRadius: 24,
+          pointHoverRadius: 8,
           pointBackgroundColor: accent,
           pointBorderColor: cssVar("--surface") || "#fff",
           pointBorderWidth: 2,
@@ -71,8 +72,9 @@
           tension: 0.3,
           borderWidth: 2,
           hoverBorderWidth: 4,
-          pointRadius: many ? 0 : 2,
-          pointHoverRadius: 6,
+          pointRadius: many ? 2 : 3,
+          pointHitRadius: 24,
+          pointHoverRadius: 7,
           pointBackgroundColor: color,
           pointBorderColor: cssVar("--surface") || "#fff",
           pointBorderWidth: 1,
@@ -109,6 +111,8 @@
         },
       },
       tooltip: {
+        enabled: true,
+        position: "nearest",
         rtl: true,
         backgroundColor: surface,
         titleColor: text,
@@ -124,12 +128,14 @@
         callbacks: {
           title: function (items) {
             if (!items.length) return "";
-            return items[0].label || labels[items[0].dataIndex] || "";
+            const idx = items[0].dataIndex;
+            return labels[idx] ?? "";
           },
           label: function (ctx) {
             const name = ctx.dataset.label || "";
             const v = ctx.parsed.y;
-            return " " + name + ": " + formatToman(v);
+            if (v == null) return null;
+            return name + ": " + formatToman(v);
           },
         },
       },
@@ -142,6 +148,7 @@
           pinch: { enabled: true },
           drag: {
             enabled: true,
+            modifierKey: "alt",
             backgroundColor: "rgba(91, 157, 255, 0.12)",
             borderColor: "rgba(91, 157, 255, 0.45)",
             borderWidth: 1,
@@ -164,14 +171,18 @@
       maintainAspectRatio: false,
       layout: { padding: { top: 8, right: 12, bottom: 4, left: 4 } },
       interaction: {
-        mode: "nearest",
-        intersect: true,
-        axis: "xy",
+        mode: mode === "assets" ? "index" : "nearest",
+        intersect: false,
+        axis: "x",
       },
-      hover: {
-        mode: "nearest",
-        intersect: true,
-        axis: "xy",
+      elements: {
+        point: {
+          hitRadius: 24,
+          hoverRadius: 6,
+        },
+        line: {
+          borderWidth: 2,
+        },
       },
       plugins,
       scales: {

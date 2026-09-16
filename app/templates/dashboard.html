@@ -8,7 +8,8 @@
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
 
-<section class="summary" aria-labelledby="total-heading">
+<section class="summary summary-split" aria-labelledby="total-heading">
+  <div class="summary-body">
   <div class="summary-text">
     <p class="eyebrow">{{ user.username }}</p>
     <h1 id="total-heading">ارزش کل پرتفوی</h1>
@@ -58,25 +59,19 @@
   <div class="summary-actions">
     <a class="btn btn-primary" href="/profile">ویرایش موجودی</a>
   </div>
-</section>
-
-<div class="dashboard-charts">
-<section class="card chart-card pie-card" id="pie-panel" aria-labelledby="pie-heading">
-  <div class="chart-head">
-    <div class="chart-head-title">
-      <h2 id="pie-heading">توزیع دارایی‌ها</h2>
-      <p class="chart-hint">بر اساس ارزش فعلی پرتفوی (تومان)</p>
-    </div>
   </div>
-  <div class="chart-stage pie-stage">
+
+  <aside class="summary-pie" id="pie-panel" aria-labelledby="pie-heading">
+    <h2 id="pie-heading" class="summary-pie-title">توزیع دارایی‌ها</h2>
+    <p class="summary-pie-hint">ارزش فعلی (تومان)</p>
     {% if pie_has_data %}
-    <div class="pie-wrap">
+    <div class="pie-wrap pie-wrap-summary">
       <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
     </div>
     {% else %}
-    <p class="chart-empty">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
+    <p class="chart-empty chart-empty-compact">هنوز دارایی با ارزش مثبت ثبت نشده است.</p>
     {% endif %}
-  </div>
+  </aside>
 </section>
 
 <section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">
@@ -105,7 +100,6 @@
     </div>
   </div>
 </section>
-</div>
 
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">

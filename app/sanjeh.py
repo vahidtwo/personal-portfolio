@@ -22,26 +22,19 @@ class SanjehPortfolio:
     car_count: int
 
 
-def _rial_to_toman(rial: int | float | str) -> Decimal:
-    return (Decimal(str(rial)) / Decimal("10")).quantize(Decimal("1"))
+def _price_to_toman(price: int | float | str) -> Decimal:
+    """latest_price_sum.price from Sanjeh is already in Toman."""
+    return Decimal(str(price)).quantize(Decimal("1"))
 
 
 def parse_portfolio_payload(payload: dict) -> SanjehPortfolio:
-    total_rial = None
     block = payload.get("latest_price_sum")
-    if isinstance(block, dict) and block.get("price") is not None:
-        total_rial = block["price"]
-    if total_rial is None:
-        total_rial = 0
-        for item in payload.get("results") or []:
-            if not isinstance(item, dict):
-                continue
-            latest = item.get("latest_price") or {}
-            if isinstance(latest, dict) and latest.get("price"):
-                total_rial += latest["price"]
+    if not isinstance(block, dict) or block.get("price") is None:
+        raise SanjehError("فیلد latest_price_sum.price در پاسخ سنجه نیست")
+    total_toman = _price_to_toman(block["price"])
     results = payload.get("results") or []
     count = len(results) if isinstance(results, list) else 0
-    return SanjehPortfolio(total_toman=_rial_to_toman(total_rial), car_count=count)
+    return SanjehPortfolio(total_toman=total_toman, car_count=count)
 
 
 async def fetch_sanjeh_portfolio(token: str) -> SanjehPortfolio:

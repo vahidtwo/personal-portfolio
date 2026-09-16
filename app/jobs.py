@@ -7,8 +7,8 @@ from contextlib import contextmanager
 from app.chande import fetch_chande_prices
 from app.config import DATA_DIR
 from app.db import SessionLocal
-from app.models import MarketPrice
-from app.portfolio import load_prices, snapshot_all_users
+from app.models import MarketPrice, User, utcnow
+from app.portfolio import load_prices, snapshot_all_users, snapshot_user
 
 logger = logging.getLogger(__name__)
 LOCK_PATH = DATA_DIR / "hourly.lock"
@@ -65,14 +65,51 @@ async def run_hourly_job(take_snapshots: bool = True) -> None:
         upsert_prices(fetched)
         if not take_snapshots:
             return
-        db = SessionLocal()
         try:
-            prices = load_prices(db)
-            count = snapshot_all_users(db, prices)
-            db.commit()
+            count = create_snapshots()
             logger.info("Stored hourly snapshots for %s users", count)
         except Exception:
-            db.rollback()
             logger.exception("Failed to store portfolio snapshots")
-        finally:
-            db.close()
+
+
+async def refresh_prices_and_snapshot_user(user_id: int) -> None:
+    """Refresh market prices when possible, then store one snapshot for this user."""
+    try:
+        fetched = await fetch_chande_prices()
+        upsert_prices(fetched)
+    except Exception:
+        logger.exception("Price fetch failed; snapshot will use stored prices")
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user is None:
+            return
+        prices = load_prices(db)
+        if not prices:
+            logger.warning("No market prices in database; skipped snapshot for user %s", user_id)
+            return
+        snapshot_user(db, user, prices, utcnow())
+        db.commit()
+        logger.info("Snapshot stored for user %s after holdings change", user_id)
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to store snapshot for user %s", user_id)
+    finally:
+        db.close()
+
+
+def create_snapshots() -> int:
+    """Record current portfolio totals for every user using prices in the database."""
+    db = SessionLocal()
+    try:
+        prices = load_prices(db)
+        if not prices:
+            raise RuntimeError("هیچ قیمت بازاری در پایگاه داده نیست؛ ابتدا قیمت را به‌روز کنید")
+        count = snapshot_all_users(db, prices)
+        db.commit()
+        return count
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()

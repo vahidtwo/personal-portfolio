@@ -21,6 +21,7 @@ _USER_HOLDING_COLUMNS = (
     ("sol", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
     ("doge", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
     ("matic", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
+    ("cash_toman", "NUMERIC(20, 2) NOT NULL DEFAULT 0"),
 )
 
 

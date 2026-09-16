@@ -25,6 +25,7 @@ class User(Base):
     doge: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     matic: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     usd: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
+    cash_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

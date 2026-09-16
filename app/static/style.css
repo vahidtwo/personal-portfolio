@@ -216,10 +216,50 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   font-size: 14px;
 }
 
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.chart-head h2 { margin-bottom: 0; }
+
+.chart-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.chart-tab {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chart-tab:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.chart-tab.is-active {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 .chart-wrap {
   position: relative;
   height: min(320px, 50vh);
   min-height: 220px;
+  margin-top: 16px;
 }
 
 .chart-empty {
@@ -327,6 +367,7 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   vertical-align: middle;
 }
 .asset-dot-gold { background: #f59e0b; }
+.asset-dot-silver { background: #cbd5e1; }
 .asset-dot-btc { background: #f97316; }
 .asset-dot-ada { background: #3b82f6; }
 .asset-dot-eth { background: #8b5cf6; }

@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import jdatetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import Depends, FastAPI, Form, Request
@@ -21,8 +22,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import DATA_DIR, HTTPS_ONLY, PRICE_REFRESH_HOURS, SECRET_KEY
 from app.db import get_db, init_db
 from app.jobs import refresh_prices_and_snapshot_user, run_hourly_job
-from app.models import PortfolioSnapshot, User
-from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices
+from app.models import PortfolioSnapshot, User, utcnow
+from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER, build_portfolio, load_prices
 from app.security import (
     csrf_token,
     get_current_user,
@@ -80,37 +81,65 @@ def format_when(value: datetime | None) -> str:
     return value.astimezone(TEHRAN).strftime("%Y-%m-%d %H:%M")
 
 
-def format_when_chart(value: datetime) -> str:
+_PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def _to_tehran(value: datetime) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(TEHRAN).strftime("%m/%d %H:%M")
+    return value.astimezone(TEHRAN)
 
 
-def load_timeline(db: Session, user_id: int, limit: int = 720) -> list[dict[str, str | float]]:
-    rows = (
+def format_chart_jalali(value: datetime) -> str:
+    """Jalali date-time label for chart x-axis (Tehran), Persian digits."""
+    local = _to_tehran(value)
+    j = jdatetime.datetime.fromgregorian(
+        year=local.year,
+        month=local.month,
+        day=local.day,
+        hour=local.hour,
+        minute=local.minute,
+    )
+    text = j.strftime("%Y/%m/%d %H:%M")
+    return text.translate(_PERSIAN_DIGITS)
+
+
+def build_chart_data(db: Session, user_id: int, view) -> dict:
+    """Labels + per-asset series; first point is live portfolio, rest are snapshots."""
+    snaps = (
         db.query(PortfolioSnapshot)
         .filter(PortfolioSnapshot.user_id == user_id)
         .order_by(PortfolioSnapshot.taken_at.desc())
-        .limit(limit)
+        .limit(720)
         .all()
     )
-    rows.reverse()
-    return [
+    snaps.reverse()
+    labels = [format_chart_jalali(utcnow())] + [format_chart_jalali(s.taken_at) for s in snaps]
+
+    current: dict[str, float] = {row.key: float(row.value_toman) for row in view.rows}
+    current["total"] = float(view.total_toman)
+
+    series: list[dict] = [
         {
-            "t": format_when_chart(row.taken_at),
-            "v": float(row.total_toman),
+            "key": "total",
+            "label": "جمع کل",
+            "data": [current["total"]]
+            + [float(json.loads(s.breakdown_json).get("total", s.total_toman)) for s in snaps],
         }
-        for row in rows
     ]
-
-
-def build_chart_timeline(db: Session, user_id: int, current_total: Decimal) -> list[dict]:
-    """Chart series: live portfolio value first, then historical snapshots (oldest → newest)."""
-    history = load_timeline(db, user_id)
-    current = {"t": "وضعیت فعلی", "v": float(current_total), "live": True}
-    if not history:
-        return [current]
-    return [current] + history
+    for key in ASSET_ORDER:
+        history_vals = []
+        for s in snaps:
+            bd = json.loads(s.breakdown_json)
+            history_vals.append(float(bd.get(key, 0)))
+        series.append(
+            {
+                "key": key,
+                "label": ASSET_LABEL_FA.get(key, key),
+                "data": [current.get(key, 0.0)] + history_vals,
+            }
+        )
+    return {"labels": labels, "series": series}
 
 
 templates.env.filters["toman"] = format_toman
@@ -282,8 +311,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             }
         )
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
-    timeline = build_chart_timeline(db, user.id, view.total_toman)
-    timeline_json = json.dumps(timeline, ensure_ascii=False)
+    chart_data = build_chart_data(db, user.id, view)
+    chart_json = json.dumps(chart_data, ensure_ascii=False)
     return render(
         request,
         "dashboard.html",
@@ -293,8 +322,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         total_label=format_toman(view.total_toman),
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
-        timeline=timeline,
-        timeline_json=timeline_json,
+        chart_json=chart_json,
         flash=pop_flash(request),
     )
 
@@ -311,6 +339,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
 async def profile_save(
     request: Request,
     gold_grams: str = Form("0"),
+    silver_grams: str = Form("0"),
     btc: str = Form("0"),
     ada: str = Form("0"),
     eth: str = Form("0"),
@@ -329,6 +358,7 @@ async def profile_save(
         return RedirectResponse("/login", status_code=303)
     form = {
         "gold_grams": gold_grams,
+        "silver_grams": silver_grams,
         "btc": btc,
         "ada": ada,
         "eth": eth,
@@ -341,6 +371,7 @@ async def profile_save(
     }
     try:
         user.gold_grams = parse_decimal(gold_grams, field="gold")
+        user.silver_grams = parse_decimal(silver_grams, field="silver")
         user.btc = parse_decimal(btc, field="btc")
         user.ada = parse_decimal(ada, field="ada")
         user.eth = parse_decimal(eth, field="eth")
@@ -368,6 +399,7 @@ async def profile_save(
 def _holdings_form(user: User) -> dict[str, str]:
     return {
         "gold_grams": format_qty(Decimal(user.gold_grams or 0), 4),
+        "silver_grams": format_qty(Decimal(user.silver_grams or 0), 4),
         "btc": format_qty(Decimal(user.btc or 0), 8),
         "ada": format_qty(Decimal(user.ada or 0), 4),
         "eth": format_qty(Decimal(user.eth or 0), 8),

@@ -22,9 +22,12 @@
 </section>
 
 <section class="card" aria-labelledby="chart-heading">
-  <div class="card-head">
+  <div class="card-head chart-head">
     <h2 id="chart-heading">روند ارزش پرتفوی</h2>
-    <p class="card-desc">ابتدا وضعیت فعلی، سپس اسنپ‌شات‌های ثبت‌شده (ساعتی یا پس از تغییر موجودی)</p>
+    <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
+      <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
+      <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">دارایی‌ها</button>
+    </div>
   </div>
   <div class="chart-wrap">
     <canvas id="timeline-chart" role="img" aria-label="نمودار زمانی ارزش پرتفوی به تومان"></canvas>
@@ -83,7 +86,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script id="timeline-data" type="application/json">{{ timeline_json | safe }}</script>
+<script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
 <script src="/static/dashboard.js" defer></script>
 <script src="/static/table-sort.js" defer></script>
 {% endblock %}

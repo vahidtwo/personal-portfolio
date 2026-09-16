@@ -11,6 +11,7 @@ from app.models import utcnow
 
 CHANDE_SYMBOLS = {
     "gold": "GOLD_18K",
+    "silver": "SILVER",
     "btc": "BTC",
     "ada": "ADA",
     "eth": "ETH",

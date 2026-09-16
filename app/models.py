@@ -18,6 +18,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(128))
     gold_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
+    silver_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     btc: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     ada: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
     eth: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))

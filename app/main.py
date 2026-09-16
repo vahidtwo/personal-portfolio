@@ -237,7 +237,7 @@ async def health():
 async def home(request: Request, db: Session = Depends(get_db)):
     if get_current_user(request, db):
         return RedirectResponse("/dashboard", status_code=303)
-    return RedirectResponse("/login", status_code=303)
+    return render(request, "landing.html", db)
 
 
 @app.get("/register", response_class=HTMLResponse)

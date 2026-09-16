@@ -249,6 +249,27 @@ def build_week_asset_timed_series(
     return series, window_start, window_end
 
 
+def build_week_total_values(db: Session, user_id: int, view) -> list[float]:
+    """Portfolio total (toman) for the last 7 days + current."""
+    window_end = utcnow()
+    window_start = window_end - timedelta(days=7)
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(
+            PortfolioSnapshot.user_id == user_id,
+            PortfolioSnapshot.taken_at >= window_start,
+        )
+        .order_by(PortfolioSnapshot.taken_at.asc())
+        .all()
+    )
+    values: list[float] = []
+    for snap in snaps:
+        bd = json.loads(snap.breakdown_json)
+        values.append(float(bd.get("total", snap.total_toman)))
+    values.append(float(view.total_toman))
+    return values
+
+
 def sparkline_trend_kind(values: list[float]) -> str:
     """up includes flat week; down only when last < first."""
     if len(values) < 2:
@@ -265,9 +286,9 @@ def sparkline_path_timed(
     window_end: datetime,
     width: int = 88,
     height: int = 28,
-) -> tuple[str, dict[str, float] | None]:
+) -> tuple[str, str, dict[str, float] | None]:
     if not points:
-        return "", None
+        return "", "", None
     win0 = _as_utc(window_start).timestamp()
     win1 = _as_utc(window_end).timestamp()
     span_t = win1 - win0
@@ -298,9 +319,12 @@ def sparkline_path_timed(
         else:
             y = height - 1 - ((val - vmin) / span_v) * (height - 2)
         parts.append(f"{x:.1f},{y:.1f}")
-    path = "M " + parts[0] + " L " + " L ".join(parts[1:])
+    line_path = "M " + parts[0] + " L " + " L ".join(parts[1:])
+    first_x, _ = parts[0].split(",")
     last_x, last_y = parts[-1].split(",")
-    return path, {"x": float(last_x), "y": float(last_y)}
+    floor = f"{height - 1:.1f}"
+    area_path = f"{line_path} L {last_x},{floor} L {first_x},{floor} Z"
+    return line_path, area_path, {"x": float(last_x), "y": float(last_y)}
 
 
 def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
@@ -541,17 +565,15 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     view = build_portfolio(user, prices)
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
     week_timed, week_start, week_end = build_week_asset_timed_series(db, user.id, view)
-    history_trends = build_asset_value_history(db, user.id, view)
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
         share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
         timed = week_timed.get(row.key, [])
         trend_vals = [v for _, v in timed] or [float(row.value_toman)]
-        history_vals = history_trends.get(row.key, [float(row.value_toman)])
         trend_change = week_trend_change_label(trend_vals)
-        max_gain_label, sort_max_gain = max_gain_labels(history_vals)
-        spark_path, spark_end = sparkline_path_timed(
+        max_gain_label, sort_max_gain = max_gain_labels(trend_vals)
+        spark_path, spark_area, spark_end = sparkline_path_timed(
             timed,
             window_start=week_start,
             window_end=week_end,
@@ -561,6 +583,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "key": row.key,
                 "name_fa": row.name_fa,
                 "sparkline_path": spark_path,
+                "sparkline_area": spark_area,
                 "sparkline_end": spark_end,
                 "sparkline_trend": sparkline_trend_kind(trend_vals),
                 "trend_change_label": trend_change,
@@ -594,7 +617,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     if refresh_wait_sec > 0:
         refresh_wait_label = f"حدود {max(1, (refresh_wait_sec + 59) // 60)} دقیقه دیگر"
     total_max_gain_label, total_max_gain_sort = max_gain_labels(
-        build_total_value_history(db, user.id, view)
+        build_week_total_values(db, user.id, view)
     )
     return render(
         request,

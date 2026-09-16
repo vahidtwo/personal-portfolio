@@ -104,7 +104,7 @@
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">
     <h2 id="table-heading">پرتفوی فعلی</h2>
-    <p class="card-desc">برای مرتب‌سازی روی عنوان ستون‌ها کلیک کنید · بیشترین رشد: حداکثر درصد صعود از یک کف قبلی در تاریخچه اسنپ‌شات</p>
+    <p class="card-desc">برای مرتب‌سازی روی عنوان ستون‌ها کلیک کنید · بیشترین رشد: حداکثر درصد صعود از یک کف در ۷ روز گذشته</p>
   </div>
   <div class="table-wrap">
     <table class="data-table" id="portfolio-table">
@@ -154,6 +154,16 @@
               role="img"
               aria-label="روند ارزش هفت روز (زمان واقعی){% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
             >
+              <defs>
+                <linearGradient id="spark-fill-{{ row.key }}" x1="0" y1="0" x2="0" y2="1">
+                  <stop class="sparkline-grad-top" offset="0%" />
+                  <stop class="sparkline-grad-bottom" offset="100%" />
+                </linearGradient>
+              </defs>
+              <rect class="sparkline-bg" x="0" y="0" width="88" height="28" rx="7" ry="7" />
+              {% if row.sparkline_area %}
+              <path class="sparkline-area" d="{{ row.sparkline_area }}" fill="url(#spark-fill-{{ row.key }})" />
+              {% endif %}
               <path
                 class="sparkline-line"
                 d="{{ row.sparkline_path }}"

@@ -367,27 +367,24 @@ def week_trend_change_label(values: list[float]) -> str | None:
     return format_percent_label(((last - first) / abs(first)) * 100)
 
 
-def max_runup_gain_percent(values: list[float]) -> float | None:
-    """Largest % rise from an earlier trough to a later value in the series."""
+def week_period_change_percent(values: list[float]) -> float | None:
+    """Percent change from first point in series to last (start of window → now)."""
     if len(values) < 2:
         return None
-    best: float | None = None
-    trough = values[0]
-    for value in values[1:]:
-        if trough > 0 and value > trough:
-            pct = ((value - trough) / trough) * 100.0
-            if best is None or pct > best:
-                best = pct
-        if value < trough:
-            trough = value
-    return best
+    first, last = values[0], values[-1]
+    if first == 0 and last == 0:
+        return 0.0
+    if first == 0:
+        return None
+    return ((last - first) / abs(first)) * 100.0
 
 
-def max_gain_labels(values: list[float]) -> tuple[str, str]:
-    pct = max_runup_gain_percent(values)
-    if pct is None or pct <= 0:
-        return "—", ""
-    return format_percent_label(pct), str(pct)
+def max_gain_labels(values: list[float]) -> tuple[str, str, bool]:
+    """Display label, sort key, and whether change is strictly positive."""
+    pct = week_period_change_percent(values)
+    if pct is None:
+        return "—", "", False
+    return format_percent_label(pct), str(pct), pct > 0
 
 
 templates.env.filters["toman"] = format_toman
@@ -578,7 +575,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         timed = week_timed.get(row.key, [])
         trend_vals = [v for _, v in timed] or [float(row.value_toman)]
         trend_change = week_trend_change_label(trend_vals)
-        max_gain_label, sort_max_gain = max_gain_labels(trend_vals)
+        max_gain_label, sort_max_gain, max_gain_positive = max_gain_labels(trend_vals)
         spark_path, spark_area, spark_end = sparkline_path_timed(
             timed,
             window_start=week_start,
@@ -594,7 +591,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "sparkline_trend": sparkline_trend_kind(trend_vals),
                 "trend_change_label": trend_change,
                 "max_gain_label": max_gain_label,
-                "max_gain_positive": sort_max_gain != "",
+                "max_gain_positive": max_gain_positive,
                 "quantity_label": format_qty(
                     row.quantity,
                     places if row.key not in ("car", "cash") else 0,
@@ -623,7 +620,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     if refresh_wait_sec > 0:
         minutes = max(1, (refresh_wait_sec + 59) // 60)
         refresh_wait_label = f"حدود {persian_digits(str(minutes))} دقیقه دیگر"
-    total_max_gain_label, total_max_gain_sort = max_gain_labels(
+    total_max_gain_label, total_max_gain_sort, total_max_gain_positive = max_gain_labels(
         build_week_total_values(db, user.id, view)
     )
     return render(
@@ -634,7 +631,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         rows=rows,
         total_label=format_toman(view.total_toman),
         total_max_gain_label=total_max_gain_label,
-        total_max_gain_positive=total_max_gain_sort != "",
+        total_max_gain_positive=total_max_gain_positive,
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,

@@ -302,7 +302,7 @@ def sparkline_path_timed(
         span_t = 1.0
 
     ordered = sorted(
-        (_as_utc(t), v) for t, v in points,
+        ((_as_utc(t), v) for t, v in points),
         key=lambda p: p[0].timestamp(),
     )
     values = [v for _, v in ordered]

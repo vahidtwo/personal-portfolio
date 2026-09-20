@@ -82,12 +82,9 @@
     </div>
     <div class="chart-head-actions">
       <div class="chart-view-controls" aria-label="نمای نمودار">
-        <div class="chart-tabs" role="tablist">
-          <button type="button" class="chart-tab is-active" id="chart-tab-total" role="tab" aria-selected="true">جمع کل</button>
-        </div>
-        <label class="chart-asset-picker" id="chart-asset-field" for="chart-asset-select">
+        <label class="chart-asset-picker is-active" id="chart-asset-field" for="chart-asset-select">
           <span class="chart-asset-picker-title">به تفکیک دارایی</span>
-          <select id="chart-asset-select" class="chart-asset-select" {% if not chart_asset_options %}disabled{% endif %} aria-label="انتخاب دارایی برای نمودار">
+          <select id="chart-asset-select" class="chart-asset-select" {% if not chart_asset_options %}disabled{% endif %} aria-label="انتخاب نمای نمودار">
             {% if chart_asset_options %}
             {% for opt in chart_asset_options %}
             <option value="{{ opt.key }}" {% if opt.key == default_chart_asset_key %}selected{% endif %}>{{ opt.name_fa }}</option>

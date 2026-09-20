@@ -165,7 +165,9 @@ def build_chart_data(db: Session, user_id: int, view) -> dict:
                 "data": history_vals + [current.get(key, 0.0)],
             }
         )
-    asset_options = [{"key": row.key, "label": row.name_fa} for row in view.rows]
+    asset_options = [{"key": "total", "label": "جمع کل"}] + [
+        {"key": row.key, "label": row.name_fa} for row in view.rows
+    ]
     return {"labels": labels, "series": series, "assetOptions": asset_options}
 
 
@@ -549,8 +551,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
     chart_data = build_chart_data(db, user.id, view)
     chart_json = json.dumps(chart_data, ensure_ascii=False)
-    chart_asset_options = [{"key": row.key, "name_fa": row.name_fa} for row in view.rows]
-    default_chart_asset_key = view.rows[0].key if view.rows else None
+    chart_asset_options = [{"key": "total", "name_fa": "جمع کل"}] + [
+        {"key": row.key, "name_fa": row.name_fa} for row in view.rows
+    ]
+    default_chart_asset_key = "total"
     pie_data = build_pie_data(view)
     pie_json = json.dumps(pie_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)

@@ -82,8 +82,17 @@
     </div>
     <div class="chart-head-actions">
       <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
-        <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
-        <button type="button" class="chart-tab" role="tab" aria-selected="false" data-chart-tab="assets">به تفکیک دارایی</button>
+        <button type="button" class="chart-tab is-active" id="chart-tab-total" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
+        {% if chart_asset_options %}
+        <div class="chart-asset-field" id="chart-asset-field">
+          <label class="chart-asset-label" for="chart-asset-select">به تفکیک دارایی</label>
+          <select id="chart-asset-select" class="chart-asset-select" aria-label="به تفکیک دارایی">
+            {% for opt in chart_asset_options %}
+            <option value="{{ opt.key }}" {% if opt.key == default_chart_asset_key %}selected{% endif %}>{{ opt.name_fa }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
       </div>
       <div class="chart-tools" aria-label="ابزار نمودار">
         <button type="button" class="chart-tool-btn" data-zoom="in" title="زوم بیشتر" aria-label="زوم بیشتر">+</button>

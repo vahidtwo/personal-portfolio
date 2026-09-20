@@ -612,6 +612,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
     chart_data = build_chart_data(db, user.id, view)
     chart_json = json.dumps(chart_data, ensure_ascii=False)
+    chart_asset_options = [{"key": row.key, "name_fa": row.name_fa} for row in view.rows]
+    default_chart_asset_key = view.rows[0].key if view.rows else None
     pie_data = build_pie_data(view)
     pie_json = json.dumps(pie_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)
@@ -635,6 +637,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,
+        chart_asset_options=chart_asset_options,
+        default_chart_asset_key=default_chart_asset_key,
         pie_json=pie_json,
         pie_has_data=bool(pie_data["slices"]),
         flash=flash_message,

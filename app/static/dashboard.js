@@ -176,60 +176,46 @@
     return Chart.registry.plugins.get("zoom") != null;
   }
 
-  function buildDatasets(mode, series) {
+  function singleSeriesDataset(row, color, fill) {
+    const many = (row.data?.length || 0) > 49;
+    const data = row.data.map((v) => Number(v));
+    return {
+      label: row.label,
+      data,
+      borderColor: color,
+      backgroundColor: fill,
+      fill: true,
+      tension: 0.3,
+      borderWidth: 2.5,
+      hoverBorderWidth: 4,
+      pointRadius: data.map((_, i) => (i === data.length - 1 ? 5 : many ? 3 : 4)),
+      pointHitRadius: 28,
+      pointHoverRadius: 8,
+      pointBackgroundColor: color,
+      pointBorderColor: cssVar("--surface") || "#fff",
+      pointBorderWidth: 2,
+    };
+  }
+
+  function buildDatasets(mode, series, assetKey) {
     const accent = cssVar("--accent") || ASSET_COLORS.total;
     const fill = cssVar("--chart-fill") || "rgba(62, 224, 184, 0.12)";
-    const many = (series[0]?.data?.length || 0) > 49;
 
     if (mode === "total") {
       const row = series.find((s) => s.key === "total");
       if (!row) return [];
-      const data = row.data.map((v) => Number(v));
-      return [
-        {
-          label: row.label,
-          data,
-          borderColor: accent,
-          backgroundColor: fill,
-          fill: true,
-          tension: 0.3,
-          borderWidth: 2.5,
-          hoverBorderWidth: 4,
-          pointRadius: data.map((_, i) =>
-            i === data.length - 1 ? 5 : many ? 3 : 4
-          ),
-          pointHitRadius: 28,
-          pointHoverRadius: 8,
-          pointBackgroundColor: accent,
-          pointBorderColor: cssVar("--surface") || "#fff",
-          pointBorderWidth: 2,
-        },
-      ];
+      return [singleSeriesDataset(row, accent, fill)];
     }
 
-    return series
-      .filter((s) => s.key !== "total")
-      .filter((s) => s.data.some((v) => Number(v) > 0))
-      .map((s) => {
-        const color = ASSET_COLORS[s.key] || "#9aa3b2";
-        const data = s.data.map((v) => Number(v));
-        return {
-          label: s.label,
-          data,
-          borderColor: color,
-          backgroundColor: color + "33",
-          fill: false,
-          tension: 0.3,
-          borderWidth: 2,
-          hoverBorderWidth: 4,
-          pointRadius: many ? 3 : 4,
-          pointHitRadius: 28,
-          pointHoverRadius: 7,
-          pointBackgroundColor: color,
-          pointBorderColor: cssVar("--surface") || "#fff",
-          pointBorderWidth: 1,
-        };
-      });
+    if (mode === "asset" && assetKey) {
+      const row = series.find((s) => s.key === assetKey);
+      if (!row) return [];
+      const color = ASSET_COLORS[assetKey] || accent;
+      const assetFill = color.length === 7 ? color + "22" : fill;
+      return [singleSeriesDataset(row, color, assetFill)];
+    }
+
+    return [];
   }
 
   function chartOptions(mode, labels, rangeSelect, zoomEnabled) {
@@ -241,7 +227,7 @@
 
     const plugins = {
       legend: {
-        display: mode === "assets",
+        display: false,
         position: "bottom",
         rtl: true,
         labels: {
@@ -386,7 +372,9 @@
     const canvas = document.getElementById("timeline-chart");
     const chartWrap = canvas?.closest(".chart-wrap");
     const panel = document.getElementById("chart-panel");
-    const tabs = document.querySelectorAll(".chart-tab");
+    const totalTab = document.getElementById("chart-tab-total");
+    const assetSelect = document.getElementById("chart-asset-select");
+    const assetField = document.getElementById("chart-asset-field");
     const zoomBtns = document.querySelectorAll("[data-zoom]");
     const rangeBtn = document.getElementById("chart-range-btn");
     const fullscreenBtn = document.getElementById("chart-fullscreen");
@@ -416,10 +404,18 @@
 
     let chart = null;
     let mode = "total";
+    let assetKey = assetSelect?.value || "";
     let rangeSelect = false;
 
+    function syncChartModeUi() {
+      const onTotal = mode === "total";
+      totalTab?.classList.toggle("is-active", onTotal);
+      totalTab?.setAttribute("aria-selected", onTotal ? "true" : "false");
+      assetField?.classList.toggle("is-active", !onTotal);
+    }
+
     function renderChart() {
-      const datasets = buildDatasets(mode, series);
+      const datasets = buildDatasets(mode, series, assetKey);
       if (!datasets.length) return;
 
       if (chart) chart.destroy();
@@ -477,20 +473,22 @@
       });
     }
 
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", function () {
-        const next = tab.dataset.chartTab;
-        if (!next || next === mode) return;
-        mode = next;
-        tabs.forEach((t) => {
-          const on = t === tab;
-          t.classList.toggle("is-active", on);
-          t.setAttribute("aria-selected", on ? "true" : "false");
-        });
-        renderChart();
-      });
+    totalTab?.addEventListener("click", function () {
+      if (mode === "total") return;
+      mode = "total";
+      syncChartModeUi();
+      renderChart();
     });
 
+    assetSelect?.addEventListener("change", function () {
+      assetKey = assetSelect.value;
+      if (!assetKey) return;
+      mode = "asset";
+      syncChartModeUi();
+      renderChart();
+    });
+
+    syncChartModeUi();
     renderChart();
     return true;
   }

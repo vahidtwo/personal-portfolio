@@ -793,6 +793,58 @@ p.total {
   background: linear-gradient(135deg, var(--accent), var(--accent-violet));
 }
 
+.chart-asset-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.chart-asset-field.is-active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  box-shadow: 0 0 0 1px var(--accent-muted);
+}
+
+.chart-asset-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chart-asset-field.is-active .chart-asset-label {
+  color: var(--text);
+}
+
+.chart-asset-select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 28px 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  max-width: min(200px, 42vw);
+  direction: rtl;
+}
+
+.chart-asset-field.is-active .chart-asset-select {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+.chart-asset-select:focus {
+  outline: 2px solid var(--accent-muted);
+  border-color: var(--accent);
+}
+
 .chart-tools {
   display: inline-flex;
   gap: 4px;

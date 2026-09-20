@@ -81,18 +81,22 @@
       <p class="chart-hint">هاور یا لمس: جزئیات · غلطک: زوم · دکمه ▭: انتخاب بازه با درگ</p>
     </div>
     <div class="chart-head-actions">
-      <div class="chart-tabs" role="tablist" aria-label="نمای نمودار">
-        <button type="button" class="chart-tab is-active" id="chart-tab-total" role="tab" aria-selected="true" data-chart-tab="total">جمع کل</button>
-        {% if chart_asset_options %}
-        <div class="chart-asset-field" id="chart-asset-field">
-          <label class="chart-asset-label" for="chart-asset-select">به تفکیک دارایی</label>
-          <select id="chart-asset-select" class="chart-asset-select" aria-label="به تفکیک دارایی">
+      <div class="chart-view-controls" aria-label="نمای نمودار">
+        <div class="chart-tabs" role="tablist">
+          <button type="button" class="chart-tab is-active" id="chart-tab-total" role="tab" aria-selected="true">جمع کل</button>
+        </div>
+        <label class="chart-asset-picker" id="chart-asset-field" for="chart-asset-select">
+          <span class="chart-asset-picker-title">به تفکیک دارایی</span>
+          <select id="chart-asset-select" class="chart-asset-select" {% if not chart_asset_options %}disabled{% endif %} aria-label="انتخاب دارایی برای نمودار">
+            {% if chart_asset_options %}
             {% for opt in chart_asset_options %}
             <option value="{{ opt.key }}" {% if opt.key == default_chart_asset_key %}selected{% endif %}>{{ opt.name_fa }}</option>
             {% endfor %}
+            {% else %}
+            <option value="">دارایی ثبت نشده</option>
+            {% endif %}
           </select>
-        </div>
-        {% endif %}
+        </label>
       </div>
       <div class="chart-tools" aria-label="ابزار نمودار">
         <button type="button" class="chart-tool-btn" data-zoom="in" title="زوم بیشتر" aria-label="زوم بیشتر">+</button>
@@ -213,7 +217,7 @@
 {% block scripts %}
 <script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
 <script id="pie-data" type="application/json">{{ pie_json | safe }}</script>
-<script src="/static/dashboard.js" defer></script>
+<script src="/static/dashboard.js?v=2" defer></script>
 <script src="/static/table-sort.js" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {

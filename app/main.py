@@ -165,7 +165,8 @@ def build_chart_data(db: Session, user_id: int, view) -> dict:
                 "data": history_vals + [current.get(key, 0.0)],
             }
         )
-    return {"labels": labels, "series": series}
+    asset_options = [{"key": row.key, "label": row.name_fa} for row in view.rows]
+    return {"labels": labels, "series": series, "assetOptions": asset_options}
 
 
 def build_pie_data(view) -> dict:

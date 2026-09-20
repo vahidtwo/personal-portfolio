@@ -24,16 +24,28 @@
     return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
   }
 
-  function formatAxisCompact(v, divisor, suffix, decimals) {
+  function formatAxisCompact(v, divisor, suffix, decimals, fixedDecimals) {
     const n = v / divisor;
     let raw;
     if (decimals > 0) {
       raw = n.toFixed(decimals);
-      raw = raw.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+      if (!fixedDecimals) {
+        raw = raw.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+      }
     } else {
       raw = String(Math.round(n));
     }
     return toPersianDigits(raw) + suffix;
+  }
+
+  function axisLabelDecimals(step, divisor) {
+    const unit = step / divisor;
+    if (unit >= 100) return 0;
+    if (unit >= 10) return 1;
+    if (unit >= 1) return 2;
+    if (unit >= 0.1) return 3;
+    if (unit >= 0.01) return 4;
+    return 5;
   }
 
   function dataMinMaxFromDatasets(datasets) {
@@ -56,23 +68,27 @@
 
   /** Nice-number axis bounds so Y zooms to the data (not 0..max). */
   function buildYAxisScale(dataMin, dataMax, targetTicks) {
-    const ticks = targetTicks || 6;
+    const ticks = targetTicks || 10;
+    const dataSpan = Math.max(dataMax - dataMin, 0);
     let lo = dataMin;
     let hi = dataMax;
     if (lo === hi) {
-      const margin = lo === 0 ? 1 : Math.abs(lo) * 0.06;
+      const margin = lo === 0 ? 1 : Math.abs(lo) * 0.04;
       lo -= margin;
       hi += margin;
     } else {
-      const span = hi - lo;
-      const pad = span * 0.06;
+      const pad = dataSpan * 0.03;
       lo -= pad;
       hi += pad;
     }
 
     const roughRange = hi - lo;
     const range = niceAxisStep(roughRange, false);
-    const step = niceAxisStep(range / Math.max(ticks - 1, 1), true);
+    let step = niceAxisStep(range / Math.max(ticks - 1, 1), true);
+    if (dataSpan > 0 && step > dataSpan / 3) {
+      const finer = niceAxisStep(step / 2, true);
+      if (finer > 0 && finer < step) step = finer;
+    }
     const axisMin = Math.floor(lo / step) * step;
     const axisMax = Math.ceil(hi / step) * step;
     const formatTick = makeAxisTickFormatter(step, axisMax);
@@ -99,20 +115,19 @@
   function makeAxisTickFormatter(step, axisMax) {
     const ref = Math.max(Math.abs(axisMax), Math.abs(step));
     if (ref >= 1e9) {
-      const decimals =
-        step < 5e6 ? 3 : step < 2e7 ? 2 : step < 1e8 ? 1 : 0;
-      return (v) => formatAxisCompact(v, 1e9, "B", decimals);
+      const decimals = axisLabelDecimals(step, 1e9);
+      return (v) => formatAxisCompact(v, 1e9, "B", decimals, true);
     }
     if (ref >= 1e6) {
-      const decimals = step < 5e3 ? 2 : step < 5e4 ? 1 : 0;
-      return (v) => formatAxisCompact(v, 1e6, "M", decimals);
+      const decimals = axisLabelDecimals(step, 1e6);
+      return (v) => formatAxisCompact(v, 1e6, "M", decimals, true);
     }
     if (ref >= 1e3) {
-      const decimals = step < 50 ? 1 : 0;
-      return (v) => formatAxisCompact(v, 1e3, "K", decimals);
+      const decimals = axisLabelDecimals(step, 1e3);
+      return (v) => formatAxisCompact(v, 1e3, "K", decimals, true);
     }
-    const decimals = step < 1 ? 2 : step < 10 ? 1 : 0;
-    return (v) => formatAxisCompact(v, 1, "", decimals);
+    const decimals = axisLabelDecimals(step, 1);
+    return (v) => formatAxisCompact(v, 1, "", decimals, true);
   }
 
   function formatToman(v) {
@@ -299,7 +314,7 @@
     const muted = cssVar("--text-muted") || "#9aa3b2";
     const grid = cssVar("--chart-grid") || "rgba(255,255,255,0.06)";
     const extent = dataMinMaxFromDatasets(datasets || []);
-    const yScale = buildYAxisScale(extent.min, extent.max, 6);
+    const yScale = buildYAxisScale(extent.min, extent.max, 10);
     const surface = cssVar("--surface") || "#181d27";
     const text = cssVar("--text") || "#eef1f6";
     const border = cssVar("--border") || "#2a3140";
@@ -388,7 +403,7 @@
       maintainAspectRatio: false,
       animation: false,
       events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchend"],
-      layout: { padding: { top: 8, right: 12, bottom: 4, left: 4 } },
+      layout: { padding: { top: 8, right: 12, bottom: 4, left: 10 } },
       interaction: {
         mode: "index",
         intersect: false,
@@ -440,7 +455,8 @@
             color: muted,
             font: { size: 12, weight: "500" },
             stepSize: yScale.stepSize,
-            maxTicksLimit: 7,
+            maxTicksLimit: 12,
+            autoSkip: false,
             callback: yScale.formatTick,
             padding: 8,
           },

@@ -217,7 +217,7 @@
 {% block scripts %}
 <script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
 <script id="pie-data" type="application/json">{{ pie_json | safe }}</script>
-<script src="/static/dashboard.js?v=2" defer></script>
+<script src="/static/dashboard.js" defer></script>
 <script src="/static/table-sort.js" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {

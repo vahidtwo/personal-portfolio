@@ -24,13 +24,95 @@
     return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
   }
 
-  function formatAxis(v) {
+  function formatAxisCompact(v, divisor, suffix, decimals) {
+    const n = v / divisor;
     let raw;
-    if (v >= 1e9) raw = (v / 1e9).toFixed(1) + "B";
-    else if (v >= 1e6) raw = (v / 1e6).toFixed(0) + "M";
-    else if (v >= 1e3) raw = (v / 1e3).toFixed(0) + "K";
-    else raw = String(v);
-    return toPersianDigits(raw);
+    if (decimals > 0) {
+      raw = n.toFixed(decimals);
+      raw = raw.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    } else {
+      raw = String(Math.round(n));
+    }
+    return toPersianDigits(raw) + suffix;
+  }
+
+  function dataMinMaxFromDatasets(datasets) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const ds of datasets) {
+      for (const v of ds.data || []) {
+        const n = Number(v);
+        if (Number.isFinite(n)) {
+          if (n < min) min = n;
+          if (n > max) max = n;
+        }
+      }
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return { min: 0, max: 1 };
+    }
+    return { min, max };
+  }
+
+  /** Nice-number axis bounds so Y zooms to the data (not 0..max). */
+  function buildYAxisScale(dataMin, dataMax, targetTicks) {
+    const ticks = targetTicks || 6;
+    let lo = dataMin;
+    let hi = dataMax;
+    if (lo === hi) {
+      const margin = lo === 0 ? 1 : Math.abs(lo) * 0.06;
+      lo -= margin;
+      hi += margin;
+    } else {
+      const span = hi - lo;
+      const pad = span * 0.06;
+      lo -= pad;
+      hi += pad;
+    }
+
+    const roughRange = hi - lo;
+    const range = niceAxisStep(roughRange, false);
+    const step = niceAxisStep(range / Math.max(ticks - 1, 1), true);
+    const axisMin = Math.floor(lo / step) * step;
+    const axisMax = Math.ceil(hi / step) * step;
+    const formatTick = makeAxisTickFormatter(step, axisMax);
+    return { min: axisMin, max: axisMax, stepSize: step, formatTick };
+  }
+
+  function niceAxisStep(range, roundUp) {
+    if (!Number.isFinite(range) || range <= 0) return 1;
+    const exp = Math.floor(Math.log10(range));
+    const f = range / Math.pow(10, exp);
+    let nf;
+    if (roundUp) {
+      if (f < 1.5) nf = 1;
+      else if (f < 3) nf = 2;
+      else if (f < 7) nf = 5;
+      else nf = 10;
+    } else if (f <= 1) nf = 1;
+    else if (f <= 2) nf = 2;
+    else if (f <= 5) nf = 5;
+    else nf = 10;
+    return nf * Math.pow(10, exp);
+  }
+
+  function makeAxisTickFormatter(step, axisMax) {
+    const ref = Math.max(Math.abs(axisMax), Math.abs(step));
+    if (ref >= 1e9) {
+      const decimals =
+        step < 5e6 ? 3 : step < 2e7 ? 2 : step < 1e8 ? 1 : 0;
+      return (v) => formatAxisCompact(v, 1e9, "B", decimals);
+    }
+    if (ref >= 1e6) {
+      const decimals = step < 5e3 ? 2 : step < 5e4 ? 1 : 0;
+      return (v) => formatAxisCompact(v, 1e6, "M", decimals);
+    }
+    if (ref >= 1e3) {
+      const decimals = step < 50 ? 1 : 0;
+      return (v) => formatAxisCompact(v, 1e3, "K", decimals);
+    }
+    const decimals = step < 1 ? 2 : step < 10 ? 1 : 0;
+    return (v) => formatAxisCompact(v, 1, "", decimals);
   }
 
   function formatToman(v) {
@@ -218,9 +300,11 @@
     return [];
   }
 
-  function chartOptions(mode, labels, rangeSelect, zoomEnabled) {
+  function chartOptions(mode, labels, rangeSelect, zoomEnabled, datasets) {
     const muted = cssVar("--text-muted") || "#9aa3b2";
     const grid = cssVar("--chart-grid") || "rgba(255,255,255,0.06)";
+    const extent = dataMinMaxFromDatasets(datasets || []);
+    const yScale = buildYAxisScale(extent.min, extent.max, 6);
     const surface = cssVar("--surface") || "#181d27";
     const text = cssVar("--text") || "#eef1f6";
     const border = cssVar("--border") || "#2a3140";
@@ -348,6 +432,9 @@
           border: { display: false },
         },
         y: {
+          min: yScale.min,
+          max: yScale.max,
+          beginAtZero: false,
           title: {
             display: true,
             text: "ارزش (تومان)",
@@ -356,9 +443,11 @@
           },
           ticks: {
             color: muted,
-            font: { size: 11 },
-            callback: formatAxis,
-            padding: 6,
+            font: { size: 12, weight: "500" },
+            stepSize: yScale.stepSize,
+            maxTicksLimit: 7,
+            callback: yScale.formatTick,
+            padding: 8,
           },
           grid: { color: grid, drawBorder: false },
           border: { display: false },
@@ -442,7 +531,7 @@
       chart = new Chart(canvas, {
         type: "line",
         data: { labels, datasets },
-        options: chartOptions(mode, labels, rangeSelect, zoomEnabled),
+        options: chartOptions(mode, labels, rangeSelect, zoomEnabled, datasets),
       });
     }
 

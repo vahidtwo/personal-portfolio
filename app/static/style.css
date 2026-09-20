@@ -904,8 +904,8 @@ p.total {
 
 .chart-wrap {
   position: relative;
-  height: min(360px, 52vh);
-  min-height: 260px;
+  height: min(400px, 56vh);
+  min-height: 280px;
   touch-action: manipulation;
 }
 

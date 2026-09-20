@@ -793,56 +793,72 @@ p.total {
   background: linear-gradient(135deg, var(--accent), var(--accent-violet));
 }
 
-.chart-asset-field {
+.chart-view-controls {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
 }
 
-.chart-asset-field.is-active {
-  border-color: var(--accent);
-  background: var(--accent-muted);
-  box-shadow: 0 0 0 1px var(--accent-muted);
+.chart-asset-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: min(220px, 52vw);
+  cursor: pointer;
 }
 
-.chart-asset-label {
-  font-size: 13px;
+.chart-asset-picker-title {
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  white-space: nowrap;
+  line-height: 1.2;
 }
 
-.chart-asset-field.is-active .chart-asset-label {
-  color: var(--text);
+.chart-asset-picker.is-active .chart-asset-picker-title {
+  color: var(--accent);
 }
 
 .chart-asset-select {
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  padding: 8px 28px 8px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  padding: 10px 14px 10px 40px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' d='M7 10l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
   color: var(--text);
   cursor: pointer;
-  max-width: min(200px, 42vw);
+  width: 100%;
   direction: rtl;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
 
-.chart-asset-field.is-active .chart-asset-select {
+.chart-asset-picker.is-active .chart-asset-select {
   border-color: var(--accent);
-  background: var(--bg-elevated);
+  background-color: var(--bg-elevated);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.chart-asset-select:hover:not(:disabled) {
+  border-color: var(--accent);
 }
 
 .chart-asset-select:focus {
-  outline: 2px solid var(--accent-muted);
+  outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.chart-asset-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .chart-tools {

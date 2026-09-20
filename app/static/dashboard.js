@@ -397,15 +397,35 @@
 
     const labels = payload.labels || [];
     const series = payload.series || [];
+    const assetOptions = payload.assetOptions || [];
     if (!labels.length || !series.length) {
       chartWrap?.classList.add("hidden");
       return true;
     }
 
+    if (assetSelect && assetSelect.options.length === 0 && assetOptions.length) {
+      assetOptions.forEach((opt) => {
+        const o = document.createElement("option");
+        o.value = opt.key;
+        o.textContent = opt.label || opt.key;
+        assetSelect.appendChild(o);
+      });
+      assetSelect.disabled = false;
+    }
+
     let chart = null;
     let mode = "total";
-    let assetKey = assetSelect?.value || "";
+    let assetKey = assetSelect?.value || assetOptions[0]?.key || "";
     let rangeSelect = false;
+
+    function showAssetChart() {
+      if (!assetSelect || assetSelect.disabled) return;
+      assetKey = assetSelect.value;
+      if (!assetKey) return;
+      mode = "asset";
+      syncChartModeUi();
+      renderChart();
+    }
 
     function syncChartModeUi() {
       const onTotal = mode === "total";
@@ -480,12 +500,12 @@
       renderChart();
     });
 
-    assetSelect?.addEventListener("change", function () {
-      assetKey = assetSelect.value;
-      if (!assetKey) return;
-      mode = "asset";
-      syncChartModeUi();
-      renderChart();
+    assetSelect?.addEventListener("change", showAssetChart);
+    assetSelect?.addEventListener("input", showAssetChart);
+    assetField?.addEventListener("click", function (e) {
+      if (e.target === assetSelect) return;
+      assetSelect?.focus();
+      showAssetChart();
     });
 
     syncChartModeUi();

@@ -160,39 +160,21 @@
           <td class="sparkline-cell">
             {% if row.sparkline_path %}
             <svg
-              class="row-sparkline sparkline-{{ row.sparkline_trend }}"
-              width="88"
-              height="28"
-              viewBox="0 0 88 28"
+              class="row-sparkline"
+              width="72"
+              height="26"
+              viewBox="0 0 72 26"
               role="img"
-              aria-label="روند ارزش هفت روز (زمان واقعی){% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
+              aria-label="روند ارزش هفت روز{% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
             >
-              <defs>
-                <linearGradient id="spark-fill-{{ row.key }}" x1="0" y1="0" x2="0" y2="1">
-                  <stop class="sparkline-grad-top" offset="0%" />
-                  <stop class="sparkline-grad-bottom" offset="100%" />
-                </linearGradient>
-              </defs>
-              <rect class="sparkline-bg" x="0" y="0" width="88" height="28" rx="7" ry="7" />
-              {% if row.sparkline_area %}
-              <path class="sparkline-area" d="{{ row.sparkline_area }}" fill="url(#spark-fill-{{ row.key }})" />
-              {% endif %}
               <path
-                class="sparkline-line"
                 d="{{ row.sparkline_path }}"
                 fill="none"
+                stroke="{{ row.sparkline_color }}"
                 stroke-width="1.75"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-              {% if row.sparkline_end %}
-              <circle
-                class="sparkline-end"
-                cx="{{ row.sparkline_end.x }}"
-                cy="{{ row.sparkline_end.y }}"
-                r="2.25"
-              />
-              {% endif %}
             </svg>
             {% else %}<span class="text-muted">—</span>{% endif %}
           </td>

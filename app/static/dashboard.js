@@ -279,28 +279,23 @@
     };
   }
 
-  function buildDatasets(mode, series, assetKey) {
+  function buildDatasets(series, seriesKey) {
     const accent = cssVar("--accent") || ASSET_COLORS.total;
     const fill = cssVar("--chart-fill") || "rgba(62, 224, 184, 0.12)";
+    const key = seriesKey || "total";
+    const row = series.find((s) => s.key === key);
+    if (!row) return [];
 
-    if (mode === "total") {
-      const row = series.find((s) => s.key === "total");
-      if (!row) return [];
+    if (key === "total") {
       return [singleSeriesDataset(row, accent, fill)];
     }
 
-    if (mode === "asset" && assetKey) {
-      const row = series.find((s) => s.key === assetKey);
-      if (!row) return [];
-      const color = ASSET_COLORS[assetKey] || accent;
-      const assetFill = color.length === 7 ? color + "22" : fill;
-      return [singleSeriesDataset(row, color, assetFill)];
-    }
-
-    return [];
+    const color = ASSET_COLORS[key] || accent;
+    const assetFill = color.length === 7 ? color + "22" : fill;
+    return [singleSeriesDataset(row, color, assetFill)];
   }
 
-  function chartOptions(mode, labels, rangeSelect, zoomEnabled, datasets) {
+  function chartOptions(labels, rangeSelect, zoomEnabled, datasets) {
     const muted = cssVar("--text-muted") || "#9aa3b2";
     const grid = cssVar("--chart-grid") || "rgba(255,255,255,0.06)";
     const extent = dataMinMaxFromDatasets(datasets || []);
@@ -461,9 +456,7 @@
     const canvas = document.getElementById("timeline-chart");
     const chartWrap = canvas?.closest(".chart-wrap");
     const panel = document.getElementById("chart-panel");
-    const totalTab = document.getElementById("chart-tab-total");
     const assetSelect = document.getElementById("chart-asset-select");
-    const assetField = document.getElementById("chart-asset-field");
     const zoomBtns = document.querySelectorAll("[data-zoom]");
     const rangeBtn = document.getElementById("chart-range-btn");
     const fullscreenBtn = document.getElementById("chart-fullscreen");
@@ -496,42 +489,31 @@
       assetOptions.forEach((opt) => {
         const o = document.createElement("option");
         o.value = opt.key;
-        o.textContent = opt.label || opt.key;
+        o.textContent = opt.label || opt.name_fa || opt.key;
         assetSelect.appendChild(o);
       });
       assetSelect.disabled = false;
     }
 
     let chart = null;
-    let mode = "total";
-    let assetKey = assetSelect?.value || assetOptions[0]?.key || "";
+    let seriesKey = assetSelect?.value || "total";
     let rangeSelect = false;
 
-    function showAssetChart() {
+    function onSeriesChange() {
       if (!assetSelect || assetSelect.disabled) return;
-      assetKey = assetSelect.value;
-      if (!assetKey) return;
-      mode = "asset";
-      syncChartModeUi();
+      seriesKey = assetSelect.value || "total";
       renderChart();
     }
 
-    function syncChartModeUi() {
-      const onTotal = mode === "total";
-      totalTab?.classList.toggle("is-active", onTotal);
-      totalTab?.setAttribute("aria-selected", onTotal ? "true" : "false");
-      assetField?.classList.toggle("is-active", !onTotal);
-    }
-
     function renderChart() {
-      const datasets = buildDatasets(mode, series, assetKey);
+      const datasets = buildDatasets(series, seriesKey);
       if (!datasets.length) return;
 
       if (chart) chart.destroy();
       chart = new Chart(canvas, {
         type: "line",
         data: { labels, datasets },
-        options: chartOptions(mode, labels, rangeSelect, zoomEnabled, datasets),
+        options: chartOptions(labels, rangeSelect, zoomEnabled, datasets),
       });
     }
 
@@ -582,22 +564,9 @@
       });
     }
 
-    totalTab?.addEventListener("click", function () {
-      if (mode === "total") return;
-      mode = "total";
-      syncChartModeUi();
-      renderChart();
-    });
+    assetSelect?.addEventListener("change", onSeriesChange);
+    assetSelect?.addEventListener("input", onSeriesChange);
 
-    assetSelect?.addEventListener("change", showAssetChart);
-    assetSelect?.addEventListener("input", showAssetChart);
-    assetField?.addEventListener("click", function (e) {
-      if (e.target === assetSelect) return;
-      assetSelect?.focus();
-      showAssetChart();
-    });
-
-    syncChartModeUi();
     renderChart();
     return true;
   }

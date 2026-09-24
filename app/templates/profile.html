@@ -82,6 +82,67 @@
       <button type="submit" class="btn btn-primary">{% if editing_id %}ذخیره تغییرات{% else %}افزودن بدهی{% endif %}</button>
     </div>
   </form>
+
+  <section class="monthly-block" aria-labelledby="monthly-heading">
+    <h2 id="monthly-heading">پرداخت ماهانه</h2>
+    <p class="card-desc">اجاره و خرج‌های تکرارشونده. این بخش در داشبورد و جمع بدهی حساب نمی‌شود. جمع ماهانه = مجموع قسط هر ماه + خرج ماهانه.</p>
+    <dl class="net-line">
+      <div><dt>اقساط این ماه</dt><dd class="num">{{ installment_month_label }} تومان</dd></div>
+      <div><dt>خرج ماهانه</dt><dd class="num">{{ expense_month_label }} تومان</dd></div>
+      <div><dt>جمع پرداخت ماهانه</dt><dd class="num">{{ monthly_pay_label }} تومان</dd></div>
+    </dl>
+    {% if expenses %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">عنوان</th>
+            <th scope="col">مبلغ</th>
+            <th scope="col">روز ماه</th>
+            <th scope="col">نوبت بعدی</th>
+            <th scope="col">ویرایش</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for expense in expenses %}
+          <tr>
+            <td>{{ expense.title or "خرج" }}</td>
+            <td class="num">{{ expense.amount_label }}</td>
+            <td class="num">{{ expense.day_label }}</td>
+            <td>{{ expense.next_label }}</td>
+            <td class="row-actions">
+              <a class="btn btn-ghost btn-sm" href="/profile?tab=debts&spend={{ expense.id }}">ویرایش</a>
+              <form method="post" action="/profile/expenses/{{ expense.id }}/delete" class="inline-form" onsubmit="return confirm('این خرج حذف شود؟');">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    <form method="post" action="{% if editing_expense_id %}/profile/expenses/{{ editing_expense_id }}{% else %}/profile/expenses{% endif %}" class="grid-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="span-2">
+        <span class="label-text">عنوان</span>
+        <input name="title" value="{{ expense_form.title }}" maxlength="64" placeholder="مثلاً اجاره خانه">
+      </label>
+      <label>
+        <span class="label-text">مبلغ ماهانه (تومان)</span>
+        <input name="amount_toman" value="{{ expense_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest autocomplete="off">
+      </label>
+      <label>
+        <span class="label-text">روز ماه</span>
+        <input name="due_day" value="{{ expense_form.due_day }}" inputmode="numeric" dir="ltr" placeholder="۱ تا ۳۱">
+      </label>
+      <div class="form-actions span-2">
+        <a class="btn btn-ghost" href="/profile?tab=debts">انصراف</a>
+        <button type="submit" class="btn btn-primary">{% if editing_expense_id %}ذخیره خرج{% else %}افزودن خرج ماهانه{% endif %}</button>
+      </div>
+    </form>
+  </section>
   {% else %}
   <p class="card-desc">مقادیر دارایی‌ها را وارد کنید. ارزش خودرو از اپ سنجه با توکن API خوانده می‌شود.</p>
   <form method="post" action="/profile" class="grid-form">

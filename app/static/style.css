@@ -1413,6 +1413,28 @@ input:focus {
   margin: 0 0 14px;
   font-weight: 700;
 }
+.amount-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.amount-suggest-btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  direction: ltr;
+}
+.amount-suggest-btn:hover {
+  background: var(--accent-muted);
+  border-color: transparent;
+}
 .jalali-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr;

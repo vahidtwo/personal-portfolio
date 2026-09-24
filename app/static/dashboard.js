@@ -1,6 +1,11 @@
 (function () {
   const ASSET_COLORS = {
     gold: "#f59e0b",
+    coin_emami: "#d97706",
+    coin_bahar: "#fbbf24",
+    coin_half: "#b45309",
+    coin_quarter: "#fcd34d",
+    coin_gram: "#92400e",
     silver: "#cbd5e1",
     btc: "#f97316",
     ada: "#3b82f6",

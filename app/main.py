@@ -196,6 +196,11 @@ def build_pie_data(view) -> dict:
 
 ASSET_SPARKLINE_COLORS = {
     "gold": "#f59e0b",
+    "coin_emami": "#d97706",
+    "coin_bahar": "#fbbf24",
+    "coin_half": "#b45309",
+    "coin_quarter": "#fcd34d",
+    "coin_gram": "#92400e",
     "silver": "#cbd5e1",
     "btc": "#f97316",
     "ada": "#3b82f6",
@@ -758,6 +763,11 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
 async def profile_save(
     request: Request,
     gold_grams: str = Form("0"),
+    coin_emami: str = Form("0"),
+    coin_bahar: str = Form("0"),
+    coin_half: str = Form("0"),
+    coin_quarter: str = Form("0"),
+    coin_gram: str = Form("0"),
     silver_grams: str = Form("0"),
     btc: str = Form("0"),
     ada: str = Form("0"),
@@ -778,6 +788,11 @@ async def profile_save(
         return RedirectResponse("/login", status_code=303)
     form = {
         "gold_grams": gold_grams,
+        "coin_emami": coin_emami,
+        "coin_bahar": coin_bahar,
+        "coin_half": coin_half,
+        "coin_quarter": coin_quarter,
+        "coin_gram": coin_gram,
         "silver_grams": silver_grams,
         "btc": btc,
         "ada": ada,
@@ -791,6 +806,11 @@ async def profile_save(
     }
     try:
         user.gold_grams = parse_decimal(gold_grams, field="gold")
+        user.coin_emami = parse_decimal(coin_emami, field="coin_emami")
+        user.coin_bahar = parse_decimal(coin_bahar, field="coin_bahar")
+        user.coin_half = parse_decimal(coin_half, field="coin_half")
+        user.coin_quarter = parse_decimal(coin_quarter, field="coin_quarter")
+        user.coin_gram = parse_decimal(coin_gram, field="coin_gram")
         user.silver_grams = parse_decimal(silver_grams, field="silver")
         user.btc = parse_decimal(btc, field="btc")
         user.ada = parse_decimal(ada, field="ada")
@@ -856,6 +876,11 @@ async def profile_save(
 def _holdings_form(user: User) -> dict[str, str]:
     return {
         "gold_grams": format_qty(Decimal(user.gold_grams or 0), 4),
+        "coin_emami": format_qty(Decimal(user.coin_emami or 0), 2),
+        "coin_bahar": format_qty(Decimal(user.coin_bahar or 0), 2),
+        "coin_half": format_qty(Decimal(user.coin_half or 0), 2),
+        "coin_quarter": format_qty(Decimal(user.coin_quarter or 0), 2),
+        "coin_gram": format_qty(Decimal(user.coin_gram or 0), 2),
         "silver_grams": format_qty(Decimal(user.silver_grams or 0), 4),
         "btc": format_qty(Decimal(user.btc or 0), 8),
         "ada": format_qty(Decimal(user.ada or 0), 4),

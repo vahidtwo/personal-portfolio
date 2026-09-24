@@ -11,7 +11,7 @@ Track gold, silver, crypto, USD, cash, and car value (via [Sanjeh](https://sanje
 ## Features
 
 - **Multi-user** registration and login (username + password, bcrypt, session cookies, CSRF)
-- **Holdings**: 18k gold (grams), silver (grams), BTC, ADA, ETH, SOL, DOGE, MATIC, USD, Toman cash, and cars linked through Sanjeh
+- **Holdings**: 18k gold (grams), Emami / Bahar Azadi / half / quarter / gram coins (count), silver (grams), BTC, ADA, ETH, SOL, DOGE, MATIC, USD, Toman cash, and cars linked through Sanjeh
 - **Market prices** from chande.net (silver normalized from troy ounce to per gram)
 - **Sanjeh integration**: optional API token on your profile to pull car portfolio value from Khodro45
 - **Dashboard**: total value, sortable asset table, Chart.js timeline (total + per-asset), zoom, range select, fullscreen

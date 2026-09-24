@@ -9,10 +9,32 @@ from sqlalchemy.orm import Session
 
 from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
 
-ASSET_ORDER = ("gold", "silver", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash", "car")
+ASSET_ORDER = (
+    "gold",
+    "coin_emami",
+    "coin_bahar",
+    "coin_half",
+    "coin_quarter",
+    "coin_gram",
+    "silver",
+    "btc",
+    "ada",
+    "eth",
+    "sol",
+    "doge",
+    "matic",
+    "usd",
+    "cash",
+    "car",
+)
 
 ASSET_LABEL_FA = {
     "gold": "طلا ۱۸ عیار",
+    "coin_emami": "سکه امامی",
+    "coin_bahar": "سکه بهار آزادی",
+    "coin_half": "نیم سکه",
+    "coin_quarter": "ربع سکه",
+    "coin_gram": "سکه گرمی",
     "silver": "نقره",
     "btc": "بیت‌کوین",
     "ada": "کاردانو",
@@ -33,6 +55,46 @@ ASSET_META = {
         "unit_en": "g",
         "qty_attr": "gold_grams",
         "qty_places": 4,
+    },
+    "coin_emami": {
+        "name_fa": "سکه امامی",
+        "name_en": "Emami Gold Coin",
+        "unit_fa": "عدد",
+        "unit_en": "coin",
+        "qty_attr": "coin_emami",
+        "qty_places": 2,
+    },
+    "coin_bahar": {
+        "name_fa": "سکه بهار آزادی",
+        "name_en": "Bahar Azadi Coin",
+        "unit_fa": "عدد",
+        "unit_en": "coin",
+        "qty_attr": "coin_bahar",
+        "qty_places": 2,
+    },
+    "coin_half": {
+        "name_fa": "نیم سکه",
+        "name_en": "Half Coin",
+        "unit_fa": "عدد",
+        "unit_en": "coin",
+        "qty_attr": "coin_half",
+        "qty_places": 2,
+    },
+    "coin_quarter": {
+        "name_fa": "ربع سکه",
+        "name_en": "Quarter Coin",
+        "unit_fa": "عدد",
+        "unit_en": "coin",
+        "qty_attr": "coin_quarter",
+        "qty_places": 2,
+    },
+    "coin_gram": {
+        "name_fa": "سکه گرمی",
+        "name_en": "Gram Coin",
+        "unit_fa": "عدد",
+        "unit_en": "coin",
+        "qty_attr": "coin_gram",
+        "qty_places": 2,
     },
     "silver": {
         "name_fa": "نقره",

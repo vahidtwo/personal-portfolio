@@ -1,0 +1,116 @@
+# Lightweight default-namespace install for my-inventory.
+# Build the image first, then apply:
+#   docker build -t my-inventory:latest .
+#   kubectl apply -f k8s/deployment.yaml
+#   kubectl port-forward svc/my-inventory 8000:8000
+#
+# Replace SECRET_KEY before using this in anything beyond a local cluster.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-inventory
+  namespace: default
+  labels:
+    app: my-inventory
+type: Opaque
+stringData:
+  SECRET_KEY: change-me-to-a-long-random-string
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-inventory-data
+  namespace: default
+  labels:
+    app: my-inventory
+spec:
+  storageClassName: rawfile-btrfs
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-inventory
+  namespace: default
+  labels:
+    app: my-inventory
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: my-inventory
+  template:
+    metadata:
+      labels:
+        app: my-inventory
+    spec:
+      containers:
+        - name: web
+          image: my-inventory:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: my-inventory
+                  key: SECRET_KEY
+            - name: DATA_DIR
+              value: /app/data
+            - name: HTTPS_ONLY
+              value: "0"
+            - name: ENABLE_INTERNAL_SCHEDULER
+              value: "1"
+            - name: PRICE_REFRESH_HOURS
+              value: "1"
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: my-inventory-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-inventory
+  namespace: default
+  labels:
+    app: my-inventory
+spec:
+  type: ClusterIP
+  selector:
+    app: my-inventory
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -141,7 +141,7 @@ This app is not affiliated with chande.net or Sanjeh.
 
 ## License
 
-Add a `LICENSE` file before publishing if you want others to reuse the code (e.g. MIT). Until then, all rights reserved by the repository owner.
+[Beerware](LICENSE) (Revision 42). Keep the notice, do what you want with the code, and buy vahidtwo a beer if you meet and think it was worth it.
 
 ---
 

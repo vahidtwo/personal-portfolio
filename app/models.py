@@ -45,7 +45,6 @@ class User(Base):
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
     debts: Mapped[list["Debt"]] = relationship(back_populates="user")
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(back_populates="user")
-    monthly_incomes: Mapped[list["MonthlyIncome"]] = relationship(back_populates="user")
 
 
 class MarketPrice(Base):
@@ -98,17 +97,3 @@ class MonthlyExpense(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="monthly_expenses")
-
-
-class MonthlyIncome(Base):
-    """Monthly salary or other income. Used only in the monthly cash report."""
-
-    __tablename__ = "monthly_incomes"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    title: Mapped[str] = mapped_column(String(64), default="")
-    amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    user: Mapped[User] = relationship(back_populates="monthly_incomes")

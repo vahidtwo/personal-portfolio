@@ -34,7 +34,7 @@ from app.jobs import (
 )
 from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
 from app.sanjeh import SanjehAuthError
-from app.models import Debt, MonthlyExpense, MonthlyIncome, PortfolioSnapshot, User, utcnow
+from app.models import Debt, MonthlyExpense, PortfolioSnapshot, User, utcnow
 from app.portfolio import (
     ASSET_LABEL_FA,
     ASSET_META,
@@ -176,31 +176,11 @@ def _monthly_view(
     user: User,
     expense_form: dict | None = None,
     editing_expense_id: int | None = None,
-    income_form: dict | None = None,
-    editing_income_id: int | None = None,
 ) -> dict:
-    """Monthly cash report. Does not change portfolio debt or net worth."""
+    """Monthly cash report. Salary comes only from the profile account field."""
     loans = db.query(Debt).filter(Debt.user_id == user.id).all()
     installment = sum((Decimal(row.monthly_toman) for row in loans), Decimal("0"))
-    incomes = (
-        db.query(MonthlyIncome)
-        .filter(MonthlyIncome.user_id == user.id)
-        .order_by(MonthlyIncome.id.asc())
-        .all()
-    )
-    income_rows = []
-    income_total = Decimal(getattr(user, "salary_toman", 0) or 0)
-    for item in incomes:
-        amount = Decimal(item.amount_toman)
-        income_total += amount
-        income_rows.append(
-            {
-                "id": item.id,
-                "title": (item.title or "").strip(),
-                "amount_raw": format(amount, "f").rstrip("0").rstrip("."),
-                "amount_label": format_toman(amount),
-            }
-        )
+    income_total = Decimal(user.salary_toman or 0)
     items = (
         db.query(MonthlyExpense)
         .filter(MonthlyExpense.user_id == user.id)
@@ -227,7 +207,6 @@ def _monthly_view(
     outflow = installment + expense_total
     return {
         "expenses": rows,
-        "incomes": income_rows,
         "installment_month_label": format_toman(installment),
         "expense_month_label": format_toman(expense_total),
         "income_month_label": format_toman(income_total),
@@ -235,8 +214,6 @@ def _monthly_view(
         "monthly_left_label": format_toman(income_total - outflow),
         "expense_form": expense_form or {"title": "", "amount_toman": "", "due_day": ""},
         "editing_expense_id": editing_expense_id,
-        "income_form": income_form or {"title": "", "amount_toman": ""},
-        "editing_income_id": editing_income_id,
     }
 
 
@@ -251,11 +228,6 @@ def _expense_form_for_request(db: Session, user: User, request: Request) -> dict
             "amount_toman": editing["amount_raw"],
             "due_day": editing["due_day"],
         }
-    pay = request.query_params.get("pay", "")
-    income = next((row for row in view["incomes"] if pay.isdigit() and row["id"] == int(pay)), None)
-    if income is not None:
-        view["editing_income_id"] = income["id"]
-        view["income_form"] = {"title": income["title"], "amount_toman": income["amount_raw"]}
     return view
 
 
@@ -904,7 +876,6 @@ async def admin_delete_user(
     )
     db.query(Debt).filter(Debt.user_id == user_id).delete(synchronize_session=False)
     db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user_id).delete(synchronize_session=False)
-    db.query(MonthlyIncome).filter(MonthlyIncome.user_id == user_id).delete(synchronize_session=False)
     db.delete(target)
     db.commit()
     flash(request, f"کاربر «{username}» و تمام داده‌هایش حذف شد.")
@@ -1266,110 +1237,6 @@ async def profile_delete_expense(
     db.delete(item)
     db.commit()
     flash(request, "خرج ماهانه حذف شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
-
-
-def _read_income_fields(title: str, amount_toman: str):
-    form = {"title": title.strip()[:64], "amount_toman": amount_toman}
-    try:
-        amount = parse_decimal(amount_toman, field="حقوق")
-    except Exception as exc:
-        return form, None, str(getattr(exc, "detail", None) or "مبلغ حقوق نامعتبر است")
-    if amount <= 0:
-        return form, None, "مبلغ حقوق باید بیشتر از صفر باشد"
-    return form, amount, None
-
-
-def _render_income_error(request, db, user, error, form, editing_income_id):
-    debts, debt_total, next_debt_label = debt_rows(
-        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
-    )
-    return render(
-        request,
-        "profile.html",
-        db,
-        error=error,
-        flash=None,
-        form=_holdings_form(user),
-        has_sanjeh_token=bool(user.sanjeh_token),
-        car_fetched_label=format_when(user.car_fetched_at),
-        car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        tab="debts",
-        debts=debts,
-        debt_total_label=format_toman(debt_total),
-        next_debt_label=next_debt_label,
-        editing_id=None,
-        debt_form={"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""},
-        **_monthly_view(db, user, income_form=form, editing_income_id=editing_income_id),
-    )
-
-
-@app.post("/profile/incomes")
-async def profile_add_income(
-    request: Request,
-    title: str = Form(""),
-    amount_toman: str = Form(""),
-    csrf: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    require_csrf(request, csrf)
-    user = get_current_user(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    form, amount, error = _read_income_fields(title, amount_toman)
-    if error or amount is None:
-        return _render_income_error(request, db, user, error or "مقادیر نامعتبر است", form, None)
-    db.add(MonthlyIncome(user_id=user.id, title=form["title"], amount_toman=amount))
-    db.commit()
-    flash(request, "حقوق ذخیره شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
-
-
-@app.post("/profile/incomes/{income_id}")
-async def profile_update_income(
-    income_id: int,
-    request: Request,
-    title: str = Form(""),
-    amount_toman: str = Form(""),
-    csrf: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    require_csrf(request, csrf)
-    user = get_current_user(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    item = db.get(MonthlyIncome, income_id)
-    if item is None or item.user_id != user.id:
-        flash(request, "حقوق پیدا نشد.", error=True)
-        return RedirectResponse("/profile?tab=debts", status_code=303)
-    form, amount, error = _read_income_fields(title, amount_toman)
-    if error or amount is None:
-        return _render_income_error(request, db, user, error or "مقادیر نامعتبر است", form, income_id)
-    item.title = form["title"]
-    item.amount_toman = amount
-    db.commit()
-    flash(request, "حقوق به‌روز شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
-
-
-@app.post("/profile/incomes/{income_id}/delete")
-async def profile_delete_income(
-    income_id: int,
-    request: Request,
-    csrf: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    require_csrf(request, csrf)
-    user = get_current_user(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    item = db.get(MonthlyIncome, income_id)
-    if item is None or item.user_id != user.id:
-        flash(request, "حقوق پیدا نشد.", error=True)
-        return RedirectResponse("/profile?tab=debts", status_code=303)
-    db.delete(item)
-    db.commit()
-    flash(request, "حقوق حذف شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 

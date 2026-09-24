@@ -1106,6 +1106,15 @@ def _daily_view(
     if editing_spend_id is None and edit_raw.isdigit():
         editing_spend_id = int(edit_raw)
     editing = next((row for row in rows if editing_spend_id and row["id"] == editing_spend_id), None)
+    page_size = 15
+    page_count = max(1, (len(rows) + page_size - 1) // page_size)
+    page_raw = request.query_params.get("page", "1")
+    try:
+        page = int(str(page_raw).translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")))
+    except ValueError:
+        page = 1
+    page = min(max(page, 1), page_count)
+    visible = rows[(page - 1) * page_size : page * page_size]
     if spend_form is None and editing:
         spend_form = {
             "amount_toman": editing["amount_raw"],
@@ -1132,7 +1141,11 @@ def _daily_view(
     prev_year, prev_month = shift_jalali_month(year, month, -1)
     next_year, next_month = shift_jalali_month(year, month, 1)
     return {
-        "daily_rows": rows,
+        "daily_rows": visible,
+        "daily_page": page,
+        "daily_page_count": page_count,
+        "daily_page_label": persian_digits(str(page)),
+        "daily_page_count_label": persian_digits(str(page_count)),
         "daily_parents": [{"id": row.id, "name": row.name} for row in parents],
         "daily_children": [
             {"id": row.id, "name": row.name, "parent_id": row.parent_id} for row in children
@@ -1321,6 +1334,7 @@ async def profile_delete_spend(
     request: Request,
     jy: str = Form(""),
     jm: str = Form(""),
+    page: str = Form(""),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -1335,7 +1349,10 @@ async def profile_delete_spend(
         db.delete(item)
         db.commit()
         flash(request, "خرج روزانه حذف شد.")
-    return RedirectResponse(f"/dashboard?tab=daily&jy={jy}&jm={jm}", status_code=303)
+    target = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
+    if page.isdigit() and int(page) > 1:
+        target += f"&page={int(page)}"
+    return RedirectResponse(target, status_code=303)
 
 
 def _parse_months_left(raw: str) -> tuple[int | None, str | None]:

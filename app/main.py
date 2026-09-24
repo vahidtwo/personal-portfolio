@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 import jdatetime
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -546,6 +546,31 @@ def market_price_refresh_wait_seconds(db: Session) -> int:
 @app.get("/health")
 async def health():
     return JSONResponse({"ok": True})
+
+
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return FileResponse(
+        BASE_DIR / "static" / "manifest.webmanifest",
+        media_type="application/manifest+json",
+    )
+
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(
+        BASE_DIR / "static" / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/offline.html")
+def offline_page():
+    return FileResponse(
+        BASE_DIR / "static" / "offline.html",
+        media_type="text/html",
+    )
 
 
 @app.get("/", response_class=HTMLResponse)

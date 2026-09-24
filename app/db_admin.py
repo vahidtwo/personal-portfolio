@@ -37,9 +37,18 @@ HOLDING_FIELDS: tuple[tuple[str, str], ...] = tuple(
 
 
 def _ui():
-    import app.main as main
+    import app.formatting as formatting
+    import app.web as web
 
-    return main
+    class _Ui:
+        persian_digits = staticmethod(formatting.persian_digits)
+        format_toman = staticmethod(formatting.format_toman)
+        format_when = staticmethod(formatting.format_when)
+        flash = staticmethod(web.flash)
+        pop_flash = staticmethod(web.pop_flash)
+        render = staticmethod(web.render)
+
+    return _Ui()
 
 
 def _require_admin(request: Request, db: Session) -> User | RedirectResponse:

@@ -278,6 +278,28 @@
   </form>
   {% endif %}
 </section>
+<section class="card auth-card wide">
+  <h2>توکن MCP</h2>
+  <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr">POST {{ request.base_url }}mcp</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
+  {% if mcp_token %}
+  <p class="field-hint">این توکن یک بار نشان داده می‌شود. همین حالا کپی کنید.</p>
+  <input readonly value="{{ mcp_token }}" dir="ltr" autocomplete="off">
+  {% elif user.mcp_token_hash %}
+  <p class="field-status">توکن ذخیره شده است.</p>
+  {% else %}
+  <p class="field-hint">هنوز توکنی ساخته نشده است.</p>
+  {% endif %}
+  <form method="post" action="/profile/mcp-token" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-primary btn-sm">{% if user.mcp_token_hash %}توکن جدید{% else %}ساخت توکن{% endif %}</button>
+  </form>
+  {% if user.mcp_token_hash %}
+  <form method="post" action="/profile/mcp-token/revoke" class="inline-form" onsubmit="return confirm('توکن MCP حذف شود؟');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-danger btn-sm">حذف توکن</button>
+  </form>
+  {% endif %}
+</section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/amount-input.js" defer></script>

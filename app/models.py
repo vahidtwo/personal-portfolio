@@ -38,6 +38,7 @@ class User(Base):
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     car_count: Mapped[int] = mapped_column(default=0)
     sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    mcp_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     car_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

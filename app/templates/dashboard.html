@@ -79,6 +79,19 @@
   </aside>
 </section>
 
+<section class="card" aria-labelledby="month-report-heading">
+  <div class="card-head">
+    <h2 id="month-report-heading">گزارش ماهانه</h2>
+    <p class="card-desc">مانده = حقوق − اقساط این ماه − خرج ماهانه. جدا از ارزش پرتفوی.</p>
+  </div>
+  <dl class="net-line">
+    <div><dt>حقوق</dt><dd class="num" dir="ltr">{{ income_month_label }} تومان</dd></div>
+    <div><dt>اقساط این ماه</dt><dd class="num" dir="ltr">{{ installment_month_label }} تومان</dd></div>
+    <div><dt>خرج ماهانه</dt><dd class="num" dir="ltr">{{ expense_month_label }} تومان</dd></div>
+    <div><dt>مانده</dt><dd class="num" dir="ltr">{{ monthly_left_label }} تومان</dd></div>
+  </dl>
+</section>
+
 <section class="card chart-card" id="chart-panel" aria-labelledby="chart-heading">
   <div class="chart-head">
     <div class="chart-head-title">

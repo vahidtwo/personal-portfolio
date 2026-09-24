@@ -189,7 +189,7 @@ def _monthly_view(
         .all()
     )
     income_rows = []
-    income_total = Decimal("0")
+    income_total = Decimal(getattr(user, "salary_toman", 0) or 0)
     for item in incomes:
         amount = Decimal(item.amount_toman)
         income_total += amount
@@ -959,6 +959,8 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         next_debt_label=next_debt_label,
         editing_id=editing["id"] if editing else None,
         debt_form=debt_form,
+        account=_account_form(user),
+        account_error=None,
         **_expense_form_for_request(db, user, request),
     )
 
@@ -1371,6 +1373,107 @@ async def profile_delete_income(
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
+def _account_form(user: User, **overrides: str) -> dict[str, str]:
+    salary = Decimal(getattr(user, "salary_toman", 0) or 0)
+    text = format(salary, "f").rstrip("0").rstrip(".")
+    data = {
+        "full_name": user.full_name or "",
+        "username": user.username,
+        "mobile": user.mobile or "",
+        "salary_toman": text,
+    }
+    data.update(overrides)
+    return data
+
+
+def _parse_mobile(raw: str) -> tuple[str | None, str | None]:
+    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits == "":
+        return "", None
+    if not 10 <= len(digits) <= 15:
+        return None, "شماره موبایل باید ۱۰ تا ۱۵ رقم باشد"
+    return digits, None
+
+
+def _render_account_error(request, db, user, message: str, account: dict):
+    return render(
+        request,
+        "profile.html",
+        db,
+        error=None,
+        flash=None,
+        form=_holdings_form(user),
+        has_sanjeh_token=bool(user.sanjeh_token),
+        car_fetched_label=format_when(user.car_fetched_at),
+        car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+        tab="assets",
+        account=account,
+        account_error=message,
+    )
+
+
+@app.post("/profile/account")
+async def profile_account(
+    request: Request,
+    full_name: str = Form(""),
+    username: str = Form(""),
+    mobile: str = Form(""),
+    salary_toman: str = Form("0"),
+    current_password: str = Form(""),
+    new_password: str = Form(""),
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    account = {
+        "full_name": full_name.strip()[:80],
+        "username": username,
+        "mobile": mobile,
+        "salary_toman": salary_toman,
+    }
+    name = normalize_username(username)
+    name_error = validate_username(name)
+    if name_error:
+        return _render_account_error(request, db, user, name_error, account)
+    taken = db.query(User).filter(User.username == name, User.id != user.id).first()
+    if taken is not None:
+        return _render_account_error(request, db, user, "این نام کاربری قبلاً ثبت شده", account)
+    phone, phone_error = _parse_mobile(mobile)
+    if phone_error:
+        return _render_account_error(request, db, user, phone_error, account)
+    try:
+        salary = parse_decimal(salary_toman, field="حقوق ماهانه")
+    except Exception as exc:
+        return _render_account_error(
+            request,
+            db,
+            user,
+            str(getattr(exc, "detail", None) or "حقوق ماهانه نامعتبر است"),
+            account,
+        )
+    password_change = new_password != ""
+    username_change = name != user.username
+    if password_change or username_change:
+        if not verify_password(current_password, user.password_hash):
+            return _render_account_error(request, db, user, "رمز فعلی نادرست است", account)
+    if password_change:
+        password_error = validate_password(new_password)
+        if password_error:
+            return _render_account_error(request, db, user, password_error, account)
+        user.password_hash = hash_password(new_password)
+    user.full_name = account["full_name"]
+    user.username = name
+    user.mobile = phone or ""
+    user.salary_toman = salary
+    db.commit()
+    flash(request, "حساب ذخیره شد")
+    return RedirectResponse("/profile", status_code=303)
+
+
 @app.post("/profile")
 async def profile_save(
     request: Request,
@@ -1440,6 +1543,7 @@ async def profile_save(
             error="یکی از مقادیر وارد شده نامعتبر است",
             flash=None,
             form=form,
+            account=_account_form(user),
             has_sanjeh_token=bool(user.sanjeh_token),
             car_fetched_label=format_when(user.car_fetched_at),
             car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
@@ -1462,6 +1566,7 @@ async def profile_save(
                 error="توکن سنجه نامعتبر است. در sanjeh.app پروفایل را تکمیل کنید و توکن درست را وارد کنید.",
                 flash=None,
                 form=form,
+            account=_account_form(user),
                 has_sanjeh_token=bool(user.sanjeh_token),
                 car_fetched_label=format_when(user.car_fetched_at),
                 car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
@@ -1475,6 +1580,7 @@ async def profile_save(
                 error="دریافت قیمت خودرو از سنجه ممکن نشد. بعداً دوباره تلاش کنید.",
                 flash=None,
                 form=form,
+            account=_account_form(user),
                 has_sanjeh_token=bool(user.sanjeh_token),
                 car_fetched_label=format_when(user.car_fetched_at),
                 car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,

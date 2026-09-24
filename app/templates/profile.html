@@ -4,8 +4,8 @@
 <section class="card auth-card wide">
   <h1>ویرایش موجودی</h1>
   <div class="tabs" role="tablist">
-    <a class="tab {% if tab != 'debts' %}is-active{% endif %}" href="/profile?tab=assets" role="tab">دارایی‌ها</a>
-    <a class="tab {% if tab == 'debts' %}is-active{% endif %}" href="/profile?tab=debts" role="tab">بدهی‌ها</a>
+    <a class="tab {% if tab != 'debts' %}is-active{% endif %}" href="/profile?tab=assets" role="tab"><img class="section-logo" src="/static/logos/section-assets.svg" alt="" width="18" height="18">دارایی‌ها</a>
+    <a class="tab {% if tab == 'debts' %}is-active{% endif %}" href="/profile?tab=debts" role="tab"><img class="section-logo" src="/static/logos/section-debts.svg" alt="" width="18" height="18">بدهی‌ها</a>
   </div>
   {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
@@ -84,7 +84,7 @@
   </form>
 
   <section class="monthly-block" aria-labelledby="monthly-heading">
-    <h2 id="monthly-heading">پرداخت ماهانه</h2>
+    <h2 id="monthly-heading"><img class="section-logo" src="/static/logos/section-expense.svg" alt="" width="20" height="20">پرداخت ماهانه</h2>
     <p class="card-desc">اجاره و خرج‌های تکرارشونده. این بخش در داشبورد و جمع بدهی حساب نمی‌شود. جمع ماهانه = مجموع قسط هر ماه + خرج ماهانه.</p>
     <dl class="net-line">
       <div><dt>اقساط این ماه</dt><dd class="num">{{ installment_month_label }} تومان</dd></div>
@@ -143,7 +143,7 @@
       </div>
     </form>
 
-    <h2 id="income-heading">حقوق ماهانه</h2>
+    <h2 id="income-heading"><img class="section-logo" src="/static/logos/section-income.svg" alt="" width="20" height="20">حقوق ماهانه</h2>
     <p class="card-desc">درآمد هر ماه. در ارزش پرتفوی و جمع بدهی حساب نمی‌شود.</p>
     {% if incomes %}
     <div class="table-wrap">
@@ -189,83 +189,116 @@
       </div>
     </form>
 
-    <h2 id="report-heading">گزارش ماهانه</h2>
+    <h2 id="report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن حقوق و مانده"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h2>
     <p class="card-desc">مانده = حقوق − اقساط این ماه − خرج ماهانه. این گزارش ارزش پرتفوی را عوض نمی‌کند.</p>
     <dl class="net-line">
-      <div><dt>حقوق</dt><dd class="num" dir="ltr">{{ income_month_label }} تومان</dd></div>
+      <div><dt>حقوق</dt><dd class="num" dir="ltr" data-mask="salary">{{ income_month_label }} تومان</dd></div>
       <div><dt>اقساط این ماه</dt><dd class="num" dir="ltr">{{ installment_month_label }} تومان</dd></div>
       <div><dt>خرج ماهانه</dt><dd class="num" dir="ltr">{{ expense_month_label }} تومان</dd></div>
-      <div><dt>مانده</dt><dd class="num" dir="ltr">{{ monthly_left_label }} تومان</dd></div>
+      <div><dt>مانده</dt><dd class="num" dir="ltr" data-mask="salary">{{ monthly_left_label }} تومان</dd></div>
     </dl>
   </section>
   {% else %}
+  <h2>حساب</h2>
+  <form method="post" action="/profile/account" class="grid-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if account_error %}<p class="toast toast-warn" role="alert">{{ account_error }}</p>{% endif %}
+    <label>
+      <span class="label-text">نام</span>
+      <input name="full_name" value="{{ account.full_name }}" maxlength="80">
+    </label>
+    <label>
+      <span class="label-text">نام کاربری</span>
+      <input name="username" value="{{ account.username }}" dir="ltr" autocomplete="username">
+    </label>
+    <label>
+      <span class="label-text">موبایل</span>
+      <input name="mobile" value="{{ account.mobile }}" inputmode="tel" dir="ltr" placeholder="0912...">
+    </label>
+    <label>
+      <span class="label-text">حقوق ماهانه (تومان)</span>
+      <input name="salary_toman" value="{{ account.salary_toman }}" inputmode="decimal" dir="ltr" data-thousands autocomplete="off">
+    </label>
+    <label>
+      <span class="label-text">رمز فعلی</span>
+      <input name="current_password" type="password" autocomplete="current-password" dir="ltr">
+    </label>
+    <label>
+      <span class="label-text">رمز جدید</span>
+      <input name="new_password" type="password" autocomplete="new-password" dir="ltr">
+      <span class="field-hint">برای نگه داشتن رمز فعلی خالی بگذارید. تغییر نام کاربری یا رمز، رمز فعلی می‌خواهد.</span>
+    </label>
+    <div class="form-actions span-2">
+      <button type="submit" class="btn btn-primary">ذخیره حساب</button>
+    </div>
+  </form>
   <p class="card-desc">مقادیر دارایی‌ها را وارد کنید. ارزش خودرو از اپ سنجه با توکن API خوانده می‌شود.</p>
   <form method="post" action="/profile" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
-      <span class="label-text">طلا ۱۸ عیار (گرم)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/gold.svg" alt="" width="22" height="22">طلا ۱۸ عیار (گرم)</span>
       <input name="gold_grams" value="{{ form.gold_grams }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">سکه امامی (عدد)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/coin_emami.svg" alt="" width="22" height="22">سکه امامی (عدد)</span>
       <input name="coin_emami" value="{{ form.coin_emami }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">سکه بهار آزادی (عدد)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/coin_bahar.svg" alt="" width="22" height="22">سکه بهار آزادی (عدد)</span>
       <input name="coin_bahar" value="{{ form.coin_bahar }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">نیم سکه (عدد)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/coin_half.svg" alt="" width="22" height="22">نیم سکه (عدد)</span>
       <input name="coin_half" value="{{ form.coin_half }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">ربع سکه (عدد)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/coin_quarter.svg" alt="" width="22" height="22">ربع سکه (عدد)</span>
       <input name="coin_quarter" value="{{ form.coin_quarter }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">سکه گرمی (عدد)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/coin_gram.svg" alt="" width="22" height="22">سکه گرمی (عدد)</span>
       <input name="coin_gram" value="{{ form.coin_gram }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">نقره (گرم)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/silver.svg" alt="" width="22" height="22">نقره (گرم)</span>
       <input name="silver_grams" value="{{ form.silver_grams }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">بیت‌کوین</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/btc.svg" alt="" width="22" height="22">بیت‌کوین</span>
       <input name="btc" value="{{ form.btc }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">کاردانو</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/ada.svg" alt="" width="22" height="22">کاردانو</span>
       <input name="ada" value="{{ form.ada }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">اتریوم</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/eth.svg" alt="" width="22" height="22">اتریوم</span>
       <input name="eth" value="{{ form.eth }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">سولانا</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/sol.svg" alt="" width="22" height="22">سولانا</span>
       <input name="sol" value="{{ form.sol }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">دوج‌کوین</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/doge.svg" alt="" width="22" height="22">دوج‌کوین</span>
       <input name="doge" value="{{ form.doge }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">پالیگان</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/matic.svg" alt="" width="22" height="22">پالیگان</span>
       <input name="matic" value="{{ form.matic }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">دلار نقد</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/usd.svg" alt="" width="22" height="22">دلار نقد</span>
       <input name="usd" value="{{ form.usd }}" inputmode="decimal">
     </label>
     <label>
-      <span class="label-text">نقد (تومان)</span>
+      <span class="label-text"><img class="asset-logo" src="/static/logos/cash.svg" alt="" width="22" height="22">نقد (تومان)</span>
       <input name="cash_toman" value="{{ form.cash_toman }}" inputmode="decimal" dir="ltr" data-thousands autocomplete="off">
     </label>
 
     <div class="span-2 sanjeh-block">
       <div class="label-row">
-        <span class="label-text">خودرو (سنجه)</span>
+        <span class="label-text"><img class="asset-logo" src="/static/logos/car.svg" alt="" width="22" height="22">خودرو (سنجه)</span>
         <a class="help-link" href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer" title="رفتن به سنجه برای تکمیل پروفایل و دریافت توکن">
           <span class="help-icon" aria-hidden="true">?</span>
           <span>راهنما: sanjeh.app</span>

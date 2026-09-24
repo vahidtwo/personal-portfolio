@@ -11,6 +11,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    try {
+      if (localStorage.getItem("privacy-portfolio") === "0") document.documentElement.dataset.showPortfolio = "1";
+      if (localStorage.getItem("privacy-salary") === "0") document.documentElement.dataset.showSalary = "1";
+    } catch (e) {}
+  </script>
   <script src="/static/theme.js" defer></script>
   {% block head %}{% endblock %}
 </head>
@@ -51,6 +57,7 @@
   <footer class="foot">
     <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> · به‌روزرسانی ساعتی</p>
   </footer>
+  <script src="/static/privacy.js" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

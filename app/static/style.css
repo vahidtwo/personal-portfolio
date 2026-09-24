@@ -1188,6 +1188,58 @@ input[readonly] { opacity: 0.75; }
 }
 .checkbox-row input { width: auto; margin: 0; }
 
+.asset-logo {
+  width: 22px;
+  height: 22px;
+  margin-inline-end: 8px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: #fff;
+  padding: 2px;
+  box-sizing: border-box;
+}
+.privacy-btn {
+  width: 28px;
+  height: 28px;
+  margin-inline-start: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  vertical-align: middle;
+  font-size: 14px;
+  line-height: 1;
+}
+.privacy-btn:hover { color: var(--text); }
+.privacy-btn[aria-pressed="false"] .privacy-icon-hide { display: none; }
+.privacy-btn[aria-pressed="true"] .privacy-icon-show { display: none; }
+[data-mask] {
+  font-size: 0 !important;
+  user-select: none;
+}
+[data-mask]::after {
+  content: "•••••";
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: 0.12em;
+}
+html[data-show-portfolio="1"] [data-mask="portfolio"],
+html[data-show-salary="1"] [data-mask="salary"] {
+  color: inherit !important;
+  user-select: auto;
+}
+html[data-show-portfolio="1"] [data-mask="portfolio"]::after,
+html[data-show-salary="1"] [data-mask="salary"]::after {
+  content: none;
+}
+.section-logo {
+  width: 18px;
+  height: 18px;
+  margin-inline-end: 6px;
+  vertical-align: -3px;
+}
 .asset-dot {
   display: inline-block;
   width: 8px;

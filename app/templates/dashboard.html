@@ -12,8 +12,8 @@
   <div class="summary-main">
     <div class="summary-text">
       <p class="eyebrow">{{ user.username }}</p>
-      <h1 id="total-heading">خالص دارایی منهای بدهی</h1>
-      <p class="total" dir="rtl" lang="fa"><span class="total-num" dir="ltr">{{ net_label }}</span><span class="total-suffix"> تومان</span></p>
+      <h1 id="total-heading">خالص دارایی منهای بدهی <button type="button" class="privacy-btn" data-privacy-toggle="portfolio" aria-pressed="true" aria-label="نمایش یا پنهان کردن ارزش پرتفوی"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h1>
+      <p class="total" dir="rtl" lang="fa"><span class="total-num" dir="ltr" data-mask="portfolio">{{ net_label }}</span><span class="total-suffix"> تومان</span></p>
       <dl class="net-line">
         <div><dt>جمع دارایی</dt><dd class="num">{{ total_label }} تومان</dd></div>
         <div><dt>جمع بدهی</dt><dd class="num">{{ debt_total_label }} تومان</dd></div>
@@ -81,14 +81,14 @@
 
 <section class="card" aria-labelledby="month-report-heading">
   <div class="card-head">
-    <h2 id="month-report-heading">گزارش ماهانه</h2>
+    <h2 id="month-report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن حقوق و مانده"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h2>
     <p class="card-desc">مانده = حقوق − اقساط این ماه − خرج ماهانه. جدا از ارزش پرتفوی.</p>
   </div>
   <dl class="net-line">
-    <div><dt>حقوق</dt><dd class="num" dir="ltr">{{ income_month_label }} تومان</dd></div>
+    <div><dt>حقوق</dt><dd class="num" dir="ltr" data-mask="salary">{{ income_month_label }} تومان</dd></div>
     <div><dt>اقساط این ماه</dt><dd class="num" dir="ltr">{{ installment_month_label }} تومان</dd></div>
     <div><dt>خرج ماهانه</dt><dd class="num" dir="ltr">{{ expense_month_label }} تومان</dd></div>
-    <div><dt>مانده</dt><dd class="num" dir="ltr">{{ monthly_left_label }} تومان</dd></div>
+    <div><dt>مانده</dt><dd class="num" dir="ltr" data-mask="salary">{{ monthly_left_label }} تومان</dd></div>
   </dl>
 </section>
 
@@ -160,7 +160,7 @@
           data-sort-max-gain="{{ row.sort_max_gain }}"
         >
           <td>
-            <span class="asset-dot asset-dot-{{ row.key }}" aria-hidden="true"></span>
+            <img class="asset-logo" src="/static/logos/{{ row.key }}.svg" alt="" width="22" height="22">
             {{ row.name_fa }}
             {% if row.sanjeh %}<span class="badge badge-sanjeh">سنجه</span>{% elif row.manual %}<span class="badge">دستی</span>{% endif %}
           </td>

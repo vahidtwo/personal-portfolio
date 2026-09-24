@@ -503,6 +503,9 @@
     const assetOptions = payload.assetOptions || [];
     if (!labels.length || !series.length) {
       chartWrap?.classList.add("hidden");
+      panel?.classList.add("is-empty");
+      const empty = document.getElementById("chart-empty");
+      if (empty) empty.hidden = false;
       return true;
     }
 

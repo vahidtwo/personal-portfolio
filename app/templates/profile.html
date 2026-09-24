@@ -143,52 +143,6 @@
       </div>
     </form>
 
-    <h2 id="income-heading"><img class="section-logo" src="/static/logos/section-income.svg" alt="" width="20" height="20">حقوق ماهانه</h2>
-    <p class="card-desc">درآمد هر ماه. در ارزش پرتفوی و جمع بدهی حساب نمی‌شود.</p>
-    {% if incomes %}
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th scope="col">عنوان</th>
-            <th scope="col">مبلغ</th>
-            <th scope="col">ویرایش</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for income in incomes %}
-          <tr>
-            <td>{{ income.title or "حقوق" }}</td>
-            <td class="num">{{ income.amount_label }}</td>
-            <td class="row-actions">
-              <a class="btn btn-ghost btn-sm" href="/profile?tab=debts&pay={{ income.id }}">ویرایش</a>
-              <form method="post" action="/profile/incomes/{{ income.id }}/delete" class="inline-form" onsubmit="return confirm('این درآمد حذف شود؟');">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-    <form method="post" action="{% if editing_income_id %}/profile/incomes/{{ editing_income_id }}{% else %}/profile/incomes{% endif %}" class="grid-form">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label class="span-2">
-        <span class="label-text">عنوان</span>
-        <input name="title" value="{{ income_form.title }}" maxlength="64" placeholder="مثلاً حقوق">
-      </label>
-      <label>
-        <span class="label-text">مبلغ ماهانه (تومان)</span>
-        <input name="amount_toman" value="{{ income_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest autocomplete="off">
-      </label>
-      <div class="form-actions span-2">
-        <a class="btn btn-ghost" href="/profile?tab=debts">انصراف</a>
-        <button type="submit" class="btn btn-primary">{% if editing_income_id %}ذخیره حقوق{% else %}افزودن حقوق{% endif %}</button>
-      </div>
-    </form>
-
     <h2 id="report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن حقوق و مانده"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h2>
     <p class="card-desc">مانده = حقوق − اقساط این ماه − خرج ماهانه. این گزارش ارزش پرتفوی را عوض نمی‌کند.</p>
     <dl class="net-line">

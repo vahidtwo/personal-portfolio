@@ -559,6 +559,13 @@ h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
   letter-spacing: 0.02em;
 }
 
+.portfolio-usd {
+  margin: 0 0 8px;
+  font-size: clamp(18px, 3.5vw, 22px);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .summary-text p.total,
 p.total {
   margin: 0 0 10px;

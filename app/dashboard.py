@@ -34,6 +34,14 @@ from app.web import flash, pop_flash, render
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+def _format_usd(value: Decimal) -> str:
+    quantized = Decimal(value).quantize(Decimal("0.01"))
+    sign = "−" if quantized < 0 else ""
+    whole, _, frac = f"{abs(quantized):,.2f}".partition(".")
+    return sign + persian_digits(whole.replace(",", "٬") + "." + frac)
+
+
 def build_chart_data(db: Session, user_id: int, view) -> dict:
     """Labels + per-asset series; chronological left→right, last point is live portfolio."""
     snaps = (
@@ -351,6 +359,12 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         db.query(Debt).filter(Debt.user_id == user.id).all()
     )
     monthly = monthly_view(db, user)
+    usd_row = next((row for row in view.rows if row.key == "usd"), None)
+    usd_price = usd_row.unit_price if usd_row is not None else None
+    if usd_price is not None and usd_price > 0:
+        usd_portfolio_label = _format_usd(view.total_toman / usd_price)
+    else:
+        usd_portfolio_label = "—"
     tab = request.query_params.get("tab", "portfolio")
     if tab not in ("portfolio", "daily"):
         tab = "portfolio"
@@ -364,6 +378,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         debt_total_label=format_toman(debt_total),
         next_debt_label=next_debt_label,
         net_label=format_toman(view.total_toman - debt_total),
+        usd_portfolio_label=usd_portfolio_label,
         income_month_label=monthly["income_month_label"],
         installment_month_label=monthly["installment_month_label"],
         expense_month_label=monthly["expense_month_label"],

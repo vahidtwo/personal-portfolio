@@ -1476,9 +1476,30 @@ input:focus {
   margin: 0 0 8px;
   font-size: 18px;
 }
-.debt-total {
+.daily-chart {
+  max-width: 440px;
+  height: 280px;
+  margin: 8px auto 16px;
+}
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 14px;
-  font-weight: 700;
+}
+.category-tree {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.category-tree li {
+  margin: 6px 0;
+}
+.category-tree ul {
+  margin: 4px 18px 0 0;
+  padding: 0;
+  list-style: disc;
 }
 .amount-suggest {
   display: flex;

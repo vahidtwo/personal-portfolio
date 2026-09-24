@@ -32,6 +32,9 @@ _USER_HOLDING_COLUMNS = (
     ("sanjeh_token", "VARCHAR(128)"),
     ("car_fetched_at", "DATETIME"),
     ("last_login_at", "DATETIME"),
+    ("full_name", "VARCHAR(80) NOT NULL DEFAULT ''"),
+    ("mobile", "VARCHAR(20) NOT NULL DEFAULT ''"),
+    ("salary_toman", "NUMERIC(20, 2) NOT NULL DEFAULT 0"),
 )
 
 

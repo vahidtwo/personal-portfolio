@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}داشبورد · موجودی من{% endblock %}
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js" defer></script>
+<script src="/static/vendor/chart.umd.min.js" defer></script>
+<script src="/static/vendor/hammer.min.js" defer></script>
+<script src="/static/vendor/chartjs-plugin-zoom.min.js" defer></script>
 {% endblock %}
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}

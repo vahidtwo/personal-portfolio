@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#050608" id="meta-theme-color">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="موجودی من">
   <title>{% block title %}موجودی من{% endblock %}</title>
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/static/style.css">
   <script>
     try {
@@ -44,6 +47,7 @@
         <a class="nav-link nav-link-accent" href="/register">ثبت‌نام</a>
         {% endblock %}
         {% endif %}
+        <button type="button" class="nav-link install-btn" id="pwa-install" hidden>نصب</button>
         <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
           <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
           <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
@@ -51,6 +55,8 @@
       </nav>
     </div>
   </header>
+  <p class="toast toast-warn pwa-offline" id="pwa-offline" hidden role="status">این نسخه ذخیره‌شده است. قیمت جدید و ذخیره نیاز به اتصال دارند.</p>
+  <p class="pwa-ios-hint" id="pwa-ios" hidden role="status">برای نصب: اشتراک‌گذاری، سپس افزودن به صفحه اصلی. <button type="button" class="btn btn-ghost" data-pwa-ios-dismiss>باشه</button></p>
   <main id="main" class="shell">
     {% block content %}{% endblock %}
   </main>
@@ -58,6 +64,7 @@
     <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> · به‌روزرسانی ساعتی</p>
   </footer>
   <script src="/static/privacy.js" defer></script>
+  <script src="/static/pwa.js" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

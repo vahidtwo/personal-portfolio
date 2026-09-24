@@ -14,6 +14,11 @@ TROY_OUNCE_GRAMS = Decimal("31.1034768")
 
 CHANDE_SYMBOLS = {
     "gold": "GOLD_18K",
+    "coin_emami": "COIN_EMAMI",
+    "coin_bahar": "COIN_BAHAR",
+    "coin_half": "COIN_HALF",
+    "coin_quarter": "COIN_QUARTER",
+    "coin_gram": "COIN_GRAM",
     "silver": "SILVER",
     "btc": "BTC",
     "ada": "ADA",

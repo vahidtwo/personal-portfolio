@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -46,6 +46,8 @@ class User(Base):
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
     debts: Mapped[list["Debt"]] = relationship(back_populates="user")
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(back_populates="user")
+    spend_categories: Mapped[list["SpendCategory"]] = relationship(back_populates="user")
+    daily_spends: Mapped[list["DailySpend"]] = relationship(back_populates="user")
 
 
 class MarketPrice(Base):
@@ -98,3 +100,39 @@ class MonthlyExpense(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="monthly_expenses")
+
+
+class SpendCategory(Base):
+    """Parent or subcategory for one-off daily spends. Seed rows stay; users may add more."""
+
+    __tablename__ = "spend_categories"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_spend_category_user_slug"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("spend_categories.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    slug: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_seed: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="spend_categories")
+    parent: Mapped["SpendCategory | None"] = relationship(remote_side="SpendCategory.id")
+
+
+class DailySpend(Base):
+    """One-off daily spend in toman. Not part of portfolio value or مانده."""
+
+    __tablename__ = "daily_spends"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("spend_categories.id"), index=True)
+    amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    spent_on: Mapped[date] = mapped_column(Date, index=True)
+    note: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="daily_spends")
+    category: Mapped[SpendCategory] = relationship()

@@ -2,7 +2,7 @@
 <html lang="fa" dir="rtl" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#050608" id="meta-theme-color">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,33 +28,46 @@
   <header class="top">
     <div class="top-inner">
       <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
-        <img class="brand-logo" src="/static/logo.svg" width="40" height="40" alt="">
+        <img class="brand-logo" src="/static/logo.svg" width="36" height="36" alt="">
         <span class="brand-name">موجودی من</span>
       </a>
-      <nav class="nav" aria-label="ناوبری اصلی">
-        {% if user %}
-        <a class="nav-link" href="/dashboard">داشبورد</a>
-        <a class="nav-link" href="/profile">پروفایل</a>
-        {% if is_admin %}<a class="nav-link" href="/admin">مدیریت</a>{% endif %}
-        <form method="post" action="/logout" class="inline">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button type="submit" class="btn btn-ghost">خروج</button>
-        </form>
-        {% else %}
-        {% block guest_nav %}
-        <a class="nav-link" href="/">معرفی</a>
-        <a class="nav-link" href="/login">ورود</a>
-        <a class="nav-link nav-link-accent" href="/register">ثبت‌نام</a>
-        {% endblock %}
-        {% endif %}
-        <button type="button" class="nav-link install-btn" id="pwa-install" hidden>نصب</button>
-        <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
-          <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
-          <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
-        </button>
+      {% if user %}
+      <nav class="top-tabs" aria-label="بخش‌های اصلی">
+        <a class="tab {% if request.url.path == '/dashboard' and request.query_params.get('tab') != 'daily' %}is-active{% endif %}" href="/dashboard">پرتفوی</a>
+        <a class="tab {% if request.url.path == '/dashboard' and request.query_params.get('tab') == 'daily' %}is-active{% endif %}" href="/dashboard?tab=daily">خرج روزانه</a>
       </nav>
+      {% endif %}
+      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
     </div>
   </header>
+  <div class="side-backdrop" id="side-backdrop" hidden></div>
+  <aside class="side-panel" id="side-panel" aria-label="منوی کناری" hidden>
+    <div class="side-panel-head">
+      <strong>منو</strong>
+      <button type="button" class="btn btn-ghost btn-sm" id="menu-close">بستن</button>
+    </div>
+    <nav class="side-nav" aria-label="ناوبری">
+      {% if user %}
+      <a class="nav-link" href="/profile">پروفایل</a>
+      {% if is_admin %}<a class="nav-link" href="/admin">مدیریت</a>{% endif %}
+      <form method="post" action="/logout" class="side-logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn btn-ghost">خروج</button>
+      </form>
+      {% else %}
+      {% block guest_nav %}
+      <a class="nav-link" href="/">معرفی</a>
+      <a class="nav-link" href="/login">ورود</a>
+      <a class="nav-link nav-link-accent" href="/register">ثبت‌نام</a>
+      {% endblock %}
+      {% endif %}
+      <button type="button" class="nav-link install-btn" id="pwa-install" hidden>نصب</button>
+      <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
+        <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
+        <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
+      </button>
+    </nav>
+  </aside>
   <p class="toast toast-warn pwa-offline" id="pwa-offline" hidden role="status">این نسخه ذخیره‌شده است. قیمت جدید و ذخیره نیاز به اتصال دارند.</p>
   <p class="pwa-ios-hint" id="pwa-ios" hidden role="status">برای نصب: اشتراک‌گذاری، سپس افزودن به صفحه اصلی. <button type="button" class="btn btn-ghost" data-pwa-ios-dismiss>باشه</button></p>
   <main id="main" class="shell">
@@ -65,6 +78,26 @@
   </footer>
   <script src="/static/privacy.js" defer></script>
   <script src="/static/pwa.js" defer></script>
+  <script>
+    (function () {
+      const panel = document.getElementById("side-panel");
+      const backdrop = document.getElementById("side-backdrop");
+      const openBtn = document.getElementById("menu-toggle");
+      const closeBtn = document.getElementById("menu-close");
+      function setOpen(open) {
+        panel.hidden = !open;
+        backdrop.hidden = !open;
+        openBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        document.body.classList.toggle("menu-open", open);
+      }
+      openBtn.addEventListener("click", function () { setOpen(panel.hidden); });
+      closeBtn.addEventListener("click", function () { setOpen(false); });
+      backdrop.addEventListener("click", function () { setOpen(false); });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") setOpen(false);
+      });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1409,6 +1409,15 @@ input:focus {
   gap: 8px;
   align-items: center;
 }
+.monthly-block {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+.monthly-block h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
 .debt-total {
   margin: 0 0 14px;
   font-weight: 700;

@@ -6,7 +6,6 @@
   <div class="tabs" role="tablist">
     <a class="tab {% if tab == 'assets' %}is-active{% endif %}" href="/profile?tab=assets" role="tab"><img class="section-logo" src="/static/logos/section-assets.svg" alt="" width="18" height="18">دارایی‌ها</a>
     <a class="tab {% if tab == 'debts' %}is-active{% endif %}" href="/profile?tab=debts" role="tab"><img class="section-logo" src="/static/logos/section-debts.svg" alt="" width="18" height="18">بدهی‌ها</a>
-    <a class="tab {% if tab == 'daily' %}is-active{% endif %}" href="/profile?tab=daily" role="tab"><img class="section-logo" src="/static/logos/section-expense.svg" alt="" width="18" height="18">خرج روزانه</a>
   </div>
   {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
@@ -152,8 +151,6 @@
       <div><dt>خرج ماهانه</dt><dd class="num" dir="ltr">{{ expense_month_label }} تومان</dd></div>
       <div><dt>مانده</dt><dd class="num" dir="ltr" data-mask="salary">{{ monthly_left_label }} تومان</dd></div>
     </dl>
-  {% elif tab == 'daily' %}
-  {% include "partials/daily_spend.html" %}
   {% else %}
   <h2>حساب</h2>
   <form method="post" action="/profile/account" class="grid-form">

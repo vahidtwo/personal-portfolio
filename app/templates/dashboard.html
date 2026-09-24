@@ -7,7 +7,14 @@
 {% endblock %}
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+{% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
 
+<div class="tabs" role="tablist">
+  <a class="tab {% if tab != 'daily' %}is-active{% endif %}" href="/dashboard" role="tab"><img class="section-logo" src="/static/logos/section-assets.svg" alt="" width="18" height="18">پرتفوی</a>
+  <a class="tab {% if tab == 'daily' %}is-active{% endif %}" href="/dashboard?tab=daily" role="tab"><img class="section-logo" src="/static/logos/section-expense.svg" alt="" width="18" height="18">خرج روزانه</a>
+</div>
+
+{% if tab != 'daily' %}
 <section class="summary summary-grid" dir="rtl" aria-labelledby="total-heading">
   <div class="summary-main">
     <div class="summary-text">
@@ -209,8 +216,15 @@
     </table>
   </div>
 </section>
+{% else %}
+<section class="card">
+  <h1>خرج روزانه</h1>
+  {% include "partials/daily_spend.html" %}
+</section>
+{% endif %}
 {% endblock %}
 {% block scripts %}
+{% if tab != 'daily' %}
 <script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
 <script id="pie-data" type="application/json">{{ pie_json | safe }}</script>
 <script src="/static/dashboard.js" defer></script>
@@ -228,4 +242,7 @@
     });
   });
 </script>
+{% else %}
+<script src="/static/amount-input.js" defer></script>
+{% endif %}
 {% endblock %}

@@ -711,6 +711,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         db.query(Debt).filter(Debt.user_id == user.id).all()
     )
     monthly = _monthly_view(db, user)
+    tab = request.query_params.get("tab", "portfolio")
+    if tab not in ("portfolio", "daily"):
+        tab = "portfolio"
     return render(
         request,
         "dashboard.html",
@@ -739,6 +742,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         refresh_wait_sec=refresh_wait_sec,
         refresh_wait_label=refresh_wait_label,
         price_refresh_minutes=persian_digits(str(PRICE_MANUAL_REFRESH_MINUTES)),
+        tab=tab,
+        error=None,
+        **(_daily_view(db, user, request) if tab == "daily" else {}),
     )
 
 
@@ -908,7 +914,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     if user is None:
         return RedirectResponse("/login", status_code=303)
     tab = request.query_params.get("tab", "assets")
-    if tab not in ("assets", "debts", "daily"):
+    if tab not in ("assets", "debts"):
         tab = "assets"
     debts, debt_total, next_debt_label = debt_rows(
         db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
@@ -966,7 +972,6 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         account=_account_form(user),
         account_error=None,
         **_expense_form_for_request(db, user, request),
-        **(_daily_view(db, user, request) if tab == "daily" else {}),
     )
 
 
@@ -1205,7 +1210,7 @@ def _save_daily_spend(
         item = db.get(DailySpend, spend_id)
         if item is None or item.user_id != user.id:
             flash(request, "خرج پیدا نشد.", error=True)
-            return RedirectResponse("/profile?tab=daily", status_code=303)
+            return RedirectResponse("/dashboard?tab=daily", status_code=303)
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
@@ -1213,7 +1218,7 @@ def _save_daily_spend(
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
     return RedirectResponse(
-        f"/profile?tab=daily&jy={spent.year}&jm={spent.month}",
+        f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}",
         status_code=303,
     )
 
@@ -1231,24 +1236,12 @@ def _render_daily_error(
 ):
     return render(
         request,
-        "profile.html",
+        "dashboard.html",
         db,
         error=error,
         flash=None,
         flash_error=False,
-        form=_holdings_form(user),
-        has_sanjeh_token=bool(user.sanjeh_token),
-        car_fetched_label=format_when(user.car_fetched_at),
-        car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
         tab="daily",
-        debts=[],
-        debt_total_label="۰",
-        next_debt_label="—",
-        editing_id=None,
-        debt_form={"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""},
-        account=_account_form(user),
-        account_error=None,
-        **_monthly_view(db, user),
         **_daily_view(
             db,
             user,
@@ -1330,7 +1323,7 @@ async def profile_delete_spend(
         db.delete(item)
         db.commit()
         flash(request, "خرج روزانه حذف شد.")
-    return RedirectResponse(f"/profile?tab=daily&jy={jy}&jm={jm}", status_code=303)
+    return RedirectResponse(f"/dashboard?tab=daily&jy={jy}&jm={jm}", status_code=303)
 
 
 @app.post("/profile/spend-categories")
@@ -1349,7 +1342,7 @@ async def profile_add_spend_category(
         return RedirectResponse("/login", status_code=303)
     ensure_spend_categories(db, user)
     label = (name or "").strip()[:64]
-    back = f"/profile?tab=daily&jy={jy}&jm={jm}"
+    back = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
     if not label:
         flash(request, "نام دسته را بنویسید.", error=True)
         return RedirectResponse(back, status_code=303)
@@ -1395,7 +1388,7 @@ async def profile_delete_spend_category(
     user = get_current_user(request, db)
     if user is None:
         return RedirectResponse("/login", status_code=303)
-    back = f"/profile?tab=daily&jy={jy}&jm={jm}"
+    back = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
     item = db.get(SpendCategory, category_id)
     if item is None or item.user_id != user.id:
         flash(request, "دسته پیدا نشد.", error=True)

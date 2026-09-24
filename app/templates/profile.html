@@ -151,6 +151,7 @@
       <div><dt>خرج ماهانه</dt><dd class="num" dir="ltr">{{ expense_month_label }} تومان</dd></div>
       <div><dt>مانده</dt><dd class="num" dir="ltr" data-mask="salary">{{ monthly_left_label }} تومان</dd></div>
     </dl>
+  </section>
   {% else %}
   <h2>حساب</h2>
   <form method="post" action="/profile/account" class="grid-form">
@@ -261,7 +262,7 @@
       {% if has_sanjeh_token %}
       <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
       {% endif %}
-      <input type="password" name="sanjeh_token" value="" autocomplete="off" placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
+      <input type="password" name="sanjeh_token" value="" autocomplete="off" dir="ltr" placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
       {% if has_sanjeh_token %}
       <label class="checkbox-row">
         <input type="checkbox" name="clear_sanjeh" value="1">

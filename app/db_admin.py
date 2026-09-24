@@ -1,4 +1,4 @@
-"""Admin-only editors for users, market prices, and portfolio snapshots."""
+"""Admin-only editors for users, market prices, portfolio snapshots, and spend categories."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import FormData
 
 from app.db import get_db
-from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
+from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER
 from app.security import (
     get_current_user,
@@ -112,12 +112,14 @@ def _field(
     hint: str = "",
     span: bool = False,
     options: list[dict[str, str]] | None = None,
+    text_dir: str = "ltr",
 ) -> dict:
     return {
         "name": name,
         "label": label,
         "value": value,
         "kind": kind,
+        "dir": text_dir,
         "hint": hint,
         "span": span,
         "options": options or [],
@@ -303,11 +305,17 @@ def catalog(db: Session) -> list[dict]:
             "description": "تاریخچه ارزش پرتفوی",
             "count": _ui().persian_digits(str(db.query(PortfolioSnapshot).count())),
         },
+        {
+            "slug": "spend-categories",
+            "label": "دسته‌های خرج",
+            "description": "گروه و زیردسته خرج روزانه",
+            "count": _ui().persian_digits(str(db.query(SpendCategory).count())),
+        },
     ]
 
 
 def _known_slug(slug: str) -> bool:
-    return slug in {"users", "market-prices", "snapshots"}
+    return slug in {"users", "market-prices", "snapshots", "spend-categories"}
 
 
 def list_view(db: Session, slug: str, query: str) -> dict:
@@ -357,6 +365,39 @@ def list_view(db: Session, slug: str, query: str) -> dict:
                 for row in rows
             ],
         }
+    if slug == "spend-categories":
+        rows = (
+            db.query(SpendCategory, User.username)
+            .join(User, User.id == SpendCategory.user_id)
+            .order_by(User.username.asc(), SpendCategory.parent_id.asc(), SpendCategory.sort_order.asc(), SpendCategory.id.asc())
+            .all()
+        )
+        names = {row.id: row.name for row, _username in rows}
+        if needle:
+            rows = [
+                pair
+                for pair in rows
+                if needle in pair[1].lower()
+                or needle in pair[0].name.lower()
+                or needle in names.get(pair[0].parent_id, "").lower()
+            ]
+        return {
+            "label": "دسته‌های خرج",
+            "columns": ["شناسه", "کاربر", "نام", "والد", "نوع"],
+            "rows": [
+                {
+                    "pk": str(row.id),
+                    "cells": [
+                        ui.persian_digits(str(row.id)),
+                        username,
+                        row.name,
+                        names.get(row.parent_id, "—"),
+                        "زیردسته" if row.parent_id else "گروه",
+                    ],
+                }
+                for row, username in rows
+            ],
+        }
     rows = (
         db.query(PortfolioSnapshot, User.username)
         .join(User, User.id == PortfolioSnapshot.user_id)
@@ -391,6 +432,10 @@ def _load(db: Session, slug: str, pk: str):
         return db.get(User, int(pk))
     if slug == "market-prices":
         return db.get(MarketPrice, pk)
+    if slug == "spend-categories":
+        if not pk.isdigit():
+            return None
+        return db.get(SpendCategory, int(pk))
     if pk.isdigit():
         return db.get(PortfolioSnapshot, int(pk))
     return None
@@ -401,6 +446,8 @@ def fields_for(db: Session, slug: str, obj, form: FormData | None) -> list[dict]
         return _user_fields(obj, form)
     if slug == "market-prices":
         return _price_fields(obj, form, creating=obj is None)
+    if slug == "spend-categories":
+        return _category_fields(db, obj, form)
     return _snapshot_fields(db, obj, form)
 
 
@@ -508,11 +555,118 @@ def _save_snapshot(db: Session, row: PortfolioSnapshot | None, form: FormData) -
     return None
 
 
+def _category_fields(db: Session, row: SpendCategory | None, form: FormData | None) -> list[dict]:
+    def val(name: str, current: str) -> str:
+        if form is not None and name in form:
+            return _posted(form, name)
+        return current
+
+    users = db.query(User).order_by(User.username.asc()).all()
+    user_options = [{"value": str(account.id), "label": account.username} for account in users]
+    user_id = val("user_id", str(row.user_id) if row else (user_options[0]["value"] if user_options else ""))
+    parents = (
+        db.query(SpendCategory)
+        .filter(SpendCategory.parent_id.is_(None))
+        .order_by(SpendCategory.name.asc())
+        .all()
+    )
+    usernames = {account.id: account.username for account in users}
+    parent_options = [{"value": "", "label": "بدون والد (گروه)"}]
+    for parent in parents:
+        if row is not None and parent.id == row.id:
+            continue
+        owner = usernames.get(parent.user_id, str(parent.user_id))
+        parent_options.append({"value": str(parent.id), "label": f"{owner} — {parent.name}"})
+    fields = []
+    if row is None:
+        fields.append(_field("user_id", "کاربر", user_id, kind="select", options=user_options))
+    else:
+        fields.append(_field("user_label", "کاربر", usernames.get(row.user_id, str(row.user_id)), kind="readonly"))
+    fields.append(
+        _field(
+            "name",
+            "نام",
+            val("name", row.name if row else ""),
+            text_dir="rtl",
+        )
+    )
+    fields.append(
+        _field(
+            "parent_id",
+            "والد",
+            val("parent_id", str(row.parent_id) if row and row.parent_id else ""),
+            kind="select",
+            options=parent_options,
+            hint="خالی یعنی گروه اصلی. والد باید مال همان کاربر باشد.",
+        )
+    )
+    fields.append(
+        _field(
+            "sort_order",
+            "ترتیب",
+            val("sort_order", str(row.sort_order) if row else "0"),
+            kind="int",
+        )
+    )
+    if row is not None:
+        fields.append(_field("seed_label", "دسته آماده", "بله" if row.is_seed else "خیر", kind="readonly"))
+    return fields
+
+
+def _save_category(db: Session, row: SpendCategory | None, form: FormData) -> str | None:
+    name = _posted(form, "name").strip()[:64]
+    if not name:
+        return "نام دسته را بنویسید."
+    if row is None:
+        user_raw = _posted(form, "user_id").strip()
+        if not user_raw.isdigit() or db.get(User, int(user_raw)) is None:
+            return "کاربر را انتخاب کنید"
+        user_id = int(user_raw)
+    else:
+        user_id = row.user_id
+    parent_raw = _posted(form, "parent_id").strip()
+    parent_id = None
+    if parent_raw:
+        if not parent_raw.isdigit():
+            return "والد نامعتبر است"
+        parent = db.get(SpendCategory, int(parent_raw))
+        if parent is None or parent.user_id != user_id or parent.parent_id is not None:
+            return "والد باید یک گروه از همین کاربر باشد"
+        if row is not None and parent.id == row.id:
+            return "دسته نمی‌تواند والد خودش باشد"
+        parent_id = parent.id
+    if row is not None and parent_id is not None:
+        has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == row.id).first() is not None
+        if has_child:
+            return "این گروه زیردسته دارد و نمی‌تواند زیر گروه دیگری برود"
+    sort_order, sort_error = _parse_int(_posted(form, "sort_order"), field="ترتیب")
+    if sort_error:
+        return sort_error
+    if row is None:
+        db.add(
+            SpendCategory(
+                user_id=user_id,
+                parent_id=parent_id,
+                name=name,
+                slug=None,
+                is_seed=False,
+                sort_order=sort_order or 0,
+            )
+        )
+    else:
+        row.name = name
+        row.parent_id = parent_id
+        row.sort_order = sort_order or 0
+    return None
+
+
 def save_record(db: Session, slug: str, obj, form: FormData) -> str | None:
     if slug == "users":
         return _save_user(db, obj, form)
     if slug == "market-prices":
         return _save_price(db, obj, form)
+    if slug == "spend-categories":
+        return _save_category(db, obj, form)
     return _save_snapshot(db, obj, form)
 
 
@@ -521,6 +675,16 @@ def delete_record(db: Session, slug: str, obj, actor_id: int) -> str | None:
         if obj.id == actor_id:
             return "نمی‌توانید حساب خودتان را حذف کنید."
         db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == obj.id).delete(synchronize_session=False)
+        db.query(DailySpend).filter(DailySpend.user_id == obj.id).delete(synchronize_session=False)
+        db.query(SpendCategory).filter(
+            SpendCategory.user_id == obj.id, SpendCategory.parent_id.is_not(None)
+        ).delete(synchronize_session=False)
+        db.query(SpendCategory).filter(SpendCategory.user_id == obj.id).delete(synchronize_session=False)
+    if slug == "spend-categories":
+        has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == obj.id).first() is not None
+        has_spend = db.query(DailySpend.id).filter(DailySpend.category_id == obj.id).first() is not None
+        if has_child or has_spend:
+            return "این دسته خرج یا زیردسته دارد و حذف نمی‌شود."
     db.delete(obj)
     return None
 
@@ -628,6 +792,7 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
     if obj is None:
         ui.flash(request, "رکورد پیدا نشد.", error=True)
         return RedirectResponse(f"/admin/db/{slug}", status_code=303)
+    flash_message, flash_error = ui.pop_flash(request)
     return ui.render(
         request,
         "admin_db_form.html",
@@ -638,6 +803,8 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
         table_label=list_view(db, slug, "")["label"],
         fields=fields_for(db, slug, obj, None),
         error=None,
+        flash=flash_message,
+        flash_error=flash_error,
         can_delete=not (slug == "users" and obj.id == admin.id),
     )
 

@@ -142,18 +142,3 @@ This app is not affiliated with chande.net or Sanjeh.
 ## License
 
 [Beerware](LICENSE) (Revision 42). Keep the notice, do what you want with the code, and buy vahidtwo a beer if you meet and think it was worth it.
-
----
-
-## Suggested GitHub repository names
-
-If you rename from `my-inventory`, these fit the project:
-
-| Name | Notes |
-|------|--------|
-| **`toman-portfolio`** | Clear, searchable, matches this README title |
-| **`mojoodi`** | Short; aligns with UI brand «موجودی من» |
-| **`iran-portfolio-tracker`** | Descriptive for English search |
-| **`porrfolio-tehran`** | Avoid — typo |
-
-Recommended: **`toman-portfolio`** for GitHub; keep **موجودی من** as the product name in the UI.

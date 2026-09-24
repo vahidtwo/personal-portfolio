@@ -1215,20 +1215,26 @@ input[readonly] { opacity: 0.75; }
 .privacy-btn:hover { color: var(--text); }
 .privacy-btn[aria-pressed="false"] .privacy-icon-hide { display: none; }
 .privacy-btn[aria-pressed="true"] .privacy-icon-show { display: none; }
+.privacy-icon { width: 18px; height: 18px; display: block; margin: auto; }
 [data-mask] {
   font-size: 0 !important;
   user-select: none;
 }
 [data-mask]::after {
-  content: "•••••";
+  content: "******";
   font-size: 22px;
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
 }
 html[data-show-portfolio="1"] [data-mask="portfolio"],
 html[data-show-salary="1"] [data-mask="salary"] {
+  font-size: inherit !important;
   color: inherit !important;
   user-select: auto;
+}
+html[data-show-portfolio="1"] [data-mask="portfolio"].total-num {
+  font-size: clamp(32px, 6vw, 48px) !important;
 }
 html[data-show-portfolio="1"] [data-mask="portfolio"]::after,
 html[data-show-salary="1"] [data-mask="salary"]::after {

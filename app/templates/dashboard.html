@@ -12,7 +12,7 @@
   <div class="summary-main">
     <div class="summary-text">
       <p class="eyebrow">{{ user.username }}</p>
-      <h1 id="total-heading">خالص دارایی منهای بدهی <button type="button" class="privacy-btn" data-privacy-toggle="portfolio" aria-pressed="true" aria-label="نمایش یا پنهان کردن ارزش پرتفوی"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h1>
+      <h1 id="total-heading">خالص دارایی منهای بدهی <button type="button" class="privacy-btn" data-privacy-toggle="portfolio" aria-pressed="true" aria-label="نمایش یا پنهان کردن ارزش پرتفوی"><svg class="privacy-icon privacy-icon-hide" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9.5 4.5 10.5 7-.4 1-1.2 2.3-2.3 3.5M6.1 6.1C4.2 7.5 2.8 9.4 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="privacy-icon privacy-icon-show" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></button></h1>
       <p class="total" dir="rtl" lang="fa"><span class="total-num" dir="ltr" data-mask="portfolio">{{ net_label }}</span><span class="total-suffix"> تومان</span></p>
       <dl class="net-line">
         <div><dt>جمع دارایی</dt><dd class="num">{{ total_label }} تومان</dd></div>
@@ -81,7 +81,7 @@
 
 <section class="card" aria-labelledby="month-report-heading">
   <div class="card-head">
-    <h2 id="month-report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن حقوق و مانده"><span class="privacy-icon privacy-icon-hide" aria-hidden="true">◉</span><span class="privacy-icon privacy-icon-show" aria-hidden="true">◌</span></button></h2>
+    <h2 id="month-report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن حقوق و مانده"><svg class="privacy-icon privacy-icon-hide" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9.5 4.5 10.5 7-.4 1-1.2 2.3-2.3 3.5M6.1 6.1C4.2 7.5 2.8 9.4 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="privacy-icon privacy-icon-show" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></button></h2>
     <p class="card-desc">مانده = حقوق − اقساط این ماه − خرج ماهانه. جدا از ارزش پرتفوی.</p>
   </div>
   <dl class="net-line">

@@ -54,7 +54,7 @@
     </label>
     <label>
       <span class="label-text">مبلغ ماهانه (تومان)</span>
-      <input name="monthly_toman" value="{{ debt_form.monthly_toman }}" inputmode="numeric" dir="ltr">
+      <input name="monthly_toman" value="{{ debt_form.monthly_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest autocomplete="off">
     </label>
     <label>
       <span class="label-text">ماه مانده</span>
@@ -144,7 +144,7 @@
     </label>
     <label>
       <span class="label-text">نقد (تومان)</span>
-      <input name="cash_toman" value="{{ form.cash_toman }}" inputmode="numeric">
+      <input name="cash_toman" value="{{ form.cash_toman }}" inputmode="decimal" dir="ltr" data-thousands autocomplete="off">
     </label>
 
     <div class="span-2 sanjeh-block">
@@ -175,4 +175,7 @@
   </form>
   {% endif %}
 </section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/amount-input.js" defer></script>
 {% endblock %}

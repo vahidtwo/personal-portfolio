@@ -1,0 +1,43 @@
+---
+description: Base context for the Toman portfolio app (موجودی من)
+alwaysApply: true
+---
+
+# Toman portfolio
+
+Self-hosted tracker. Values are **Toman**. UI is **Persian, RTL**. App title: موجودی من.
+
+Stack: FastAPI, SQLAlchemy, SQLite (`DATA_DIR/inventory.db`), Jinja2, vanilla JS, Chart.js. One uvicorn worker (in-process scheduler).
+
+## Prices
+
+- Live prices: `CHANDE_URL` (default `https://chande.net/api/v1/prices/current`). Map internal key → Chande `symbol` in `app/chande.py` `CHANDE_SYMBOLS`.
+- Confirm a symbol on the live API before adding it. Use `priceToman` as toman. Do not divide by 10.
+- Silver is the exception: Chande `SILVER` is per troy ounce. `normalize_price_toman` converts it to per gram.
+- Stored `MarketPrice.symbol` is the internal key (`gold`, `coin_emami`), not the Chande symbol.
+- Cash is a manual toman amount. Car value and count come from the Sanjeh token, not Chande.
+
+## Adding an asset
+
+Wire every priced holding in all of these. Skip one and the dashboard, profile, or price job drifts.
+
+1. `CHANDE_SYMBOLS` in `app/chande.py`
+2. Column on `User` in `app/models.py`
+3. Matching `ALTER` in `_USER_HOLDING_COLUMNS` in `app/db.py` (`create_all` does not add columns to an existing SQLite DB)
+4. `ASSET_ORDER`, `ASSET_LABEL_FA`, and `ASSET_META` in `app/portfolio.py`
+5. Profile form: `app/templates/profile.html` plus the `/profile` handler and `_holdings_form` in `app/main.py`
+6. Chart color in `ASSET_SPARKLINE_COLORS` (`app/main.py`) and `ASSET_COLORS` (`app/static/dashboard.js`)
+
+Gold and silver quantities are grams. Coins are a count (`عدد`): امامی `COIN_EMAMI`, بهار `COIN_BAHAR`, نیم `COIN_HALF`, ربع `COIN_QUARTER`, گرمی `COIN_GRAM`. Value = quantity × unit price.
+
+```python
+# ❌ BAD — new key only in CHANDE_SYMBOLS
+"coin_half": "COIN_HALF",
+
+# ✅ GOOD — same key in chande, User column, db migration, ASSET_META
+"coin_half": "COIN_HALF",  # chande.py
+# models.py: coin_half: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
+# db.py: ("coin_half", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
+```
+
+Dashboard, admin, and snapshots already loop `ASSET_ORDER`. Do not hardcode a second asset list.

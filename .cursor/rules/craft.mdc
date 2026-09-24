@@ -1,0 +1,53 @@
+---
+description: Keep موجودی من clean, secure, and usable on a phone
+alwaysApply: true
+---
+
+# Craft
+
+Apply this before editing the app. Domain facts stay in `project.mdc`.
+
+## Clean
+
+- Put code in the feature module that already owns it: `auth_routes`, `dashboard`, `profile`, `debts`, `expenses`, `spends`, `admin_users`, `db_admin`, `formatting`, `web`.
+- Reuse `format_toman`, `persian_digits`, `render`, and `flash`. Do not add a second formatter or a new CSS framework.
+- Change only what the task needs. Do not leave unused files, routes, or helpers.
+- New priced holdings still follow the asset checklist in `project.mdc`.
+
+```text
+# ❌ BAD — a new assets list inside a template
+# ✅ GOOD — loop ASSET_ORDER, same as the dashboard
+```
+
+## Security
+
+- Every state-changing form uses `require_csrf` and a hidden `csrf` field.
+- Rows belong to the logged-in user (`user_id`). Admin pages check `is_admin`.
+- Do not log, render, or commit passwords, `SECRET_KEY`, Sanjeh tokens, or MCP tokens.
+- Show a short Persian error. Do not send exception text or a stack trace to the page.
+- Do not add a route that skips the session check.
+
+```text
+# ❌ BAD — db.query(Debt).all()
+# ✅ GOOD — filter Debt.user_id == user.id
+```
+
+## UI
+
+- Persian, RTL, existing classes: `card`, `btn`, `tabs`, `grid-form`, `data-table`, `toast`.
+- Money is Toman, formatted with `format_toman`. Quantities use `format_qty`.
+- Keep the current type (Vazirmatn) and colors. A new screen should look like the dashboard and profile, not a new product.
+
+## Mobile
+
+The stylesheet already breaks at 900px, 720px, and 520px. A layout change must still work at 520px wide.
+
+- Stack forms and toolbars; do not force a wide horizontal layout.
+- Put wide tables in `table-wrap` so the page itself does not scroll sideways.
+- Number fields stay `dir="ltr"` with `inputmode`. Buttons stay full width when the existing mobile rules do that.
+- Do not shrink tap targets below the current `.btn` size.
+
+```text
+# ❌ BAD — a new table with no table-wrap and a fixed 800px width
+# ✅ GOOD — table-wrap plus a 520px check of the same screen
+```

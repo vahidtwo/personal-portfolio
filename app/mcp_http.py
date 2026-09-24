@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
-from app.models import Debt, PortfolioSnapshot, User
+from app.models import Debt, MonthlyExpense, PortfolioSnapshot, User
 from app.portfolio import build_portfolio, load_prices
 
 router = APIRouter()
@@ -109,6 +109,54 @@ def _debts(db: Session, user: User) -> dict:
     return {"username": user.username, "total_toman": _money(total), "debts": rows}
 
 
+def _monthly_expenses(db: Session, user: User) -> dict:
+    from app.main import next_jalali_due
+
+    rows = []
+    total = Decimal("0")
+    items = (
+        db.query(MonthlyExpense)
+        .filter(MonthlyExpense.user_id == user.id)
+        .order_by(MonthlyExpense.id.asc())
+        .all()
+    )
+    for item in items:
+        amount = Decimal(item.amount_toman)
+        total += amount
+        nxt = next_jalali_due(item.due_day)
+        rows.append(
+            {
+                "id": item.id,
+                "title": (item.title or "").strip(),
+                "amount_toman": _money(amount),
+                "due_day": item.due_day,
+                "next_due_jalali": f"{nxt.year}/{nxt.month:02d}/{nxt.day:02d}" if nxt else None,
+            }
+        )
+    return {"username": user.username, "total_toman": _money(total), "expenses": rows}
+
+
+def _monthly_left(db: Session, user: User) -> dict:
+    """Same figure as the dashboard مانده: salary − installments − monthly expenses."""
+    loans = db.query(Debt).filter(Debt.user_id == user.id).all()
+    installment = sum((Decimal(row.monthly_toman) for row in loans), Decimal("0"))
+    expense_total = sum(
+        (
+            Decimal(row.amount_toman)
+            for row in db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
+        ),
+        Decimal("0"),
+    )
+    salary = Decimal(user.salary_toman or 0)
+    return {
+        "username": user.username,
+        "salary_toman": _money(salary),
+        "installment_toman": _money(installment),
+        "expense_toman": _money(expense_total),
+        "left_toman": _money(salary - installment - expense_total),
+    }
+
+
 def _snapshot_row(snap: PortfolioSnapshot, *, include_breakdown: bool) -> dict:
     row = {
         "id": snap.id,
@@ -175,6 +223,19 @@ _TOOLS = [
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "list_monthly_expenses",
+        "description": "Recurring monthly expenses for the token's user, such as rent. Read only.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "get_monthly_left",
+        "description": (
+            "Money left this month for the token's user: salary minus this month's "
+            "installments minus monthly expenses. Same figure as the dashboard مانده. Read only."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "list_snapshots",
         "description": "Recent portfolio snapshots for the token's user, newest first. Read only.",
         "inputSchema": {
@@ -218,6 +279,10 @@ def _call_tool(db: Session, user: User, name: str, arguments: dict) -> dict:
         return _tool_result(_salary(user))
     if name == "list_debts":
         return _tool_result(_debts(db, user))
+    if name == "list_monthly_expenses":
+        return _tool_result(_monthly_expenses(db, user))
+    if name == "get_monthly_left":
+        return _tool_result(_monthly_left(db, user))
     if name == "list_snapshots":
         return _list_snapshots(db, user, arguments)
     if name == "get_snapshot":

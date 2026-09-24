@@ -67,7 +67,7 @@
 </section>
 
 <section class="card daily-section" aria-labelledby="daily-add-heading">
-  <h1 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}افزودن خرج روزانه{% endif %}</h1>
+  <h2 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}افزودن خرج روزانه{% endif %}</h2>
   <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="jy" value="{{ daily_year }}">

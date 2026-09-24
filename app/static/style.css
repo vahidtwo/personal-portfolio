@@ -139,7 +139,7 @@ a:hover { color: var(--accent-hover); }
   border-radius: 8px;
   z-index: 100;
 }
-.skip-link:focus { top: 12px; }
+.skip-link:focus { top: calc(12px + env(safe-area-inset-top)); }
 
 .top {
   position: sticky;
@@ -296,13 +296,17 @@ body.menu-open { overflow: hidden; }
 .tab:focus-visible,
 .nav-link:focus-visible,
 .chart-tool-btn:focus-visible,
-.menu-toggle:focus-visible {
+.menu-toggle:focus-visible,
+.privacy-btn:focus-visible,
+.theme-toggle:focus-visible,
+.th-sort:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 .chart-card.is-empty .chart-stage,
-.chart-card.is-empty .chart-head-actions {
+.chart-card.is-empty .chart-head-actions,
+.chart-card.is-empty .chart-hint {
   display: none;
 }
 .chart-card.is-empty #chart-empty {
@@ -834,9 +838,13 @@ p.total {
     text-align: center;
     padding: 10px 8px;
   }
-  .menu-toggle {
+  .menu-toggle,
+  .side-panel-head .btn,
+  .top-tabs .tab {
     min-height: 44px;
-    min-width: 44px;
+  }
+  .pwa-offline {
+    top: calc(env(safe-area-inset-top) + 7.5rem);
   }
   .debt-total {
     display: flex;
@@ -1093,8 +1101,8 @@ p.total {
     justify-content: space-between;
   }
   .chart-tools .chart-tool-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -1346,8 +1354,8 @@ input[readonly] { opacity: 0.75; }
   box-sizing: border-box;
 }
 .privacy-btn {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   margin-inline-start: 8px;
   padding: 0;
   border-radius: 50%;

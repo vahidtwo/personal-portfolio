@@ -25,8 +25,8 @@ Wire every priced holding in all of these. Skip one and the dashboard, profile, 
 2. Column on `User` in `app/models.py`
 3. Matching `ALTER` in `_USER_HOLDING_COLUMNS` in `app/db.py` (`create_all` does not add columns to an existing SQLite DB)
 4. `ASSET_ORDER`, `ASSET_LABEL_FA`, and `ASSET_META` in `app/portfolio.py`
-5. Profile form: `app/templates/profile.html` plus the `/profile` handler and `_holdings_form` in `app/main.py`
-6. Chart color in `ASSET_SPARKLINE_COLORS` (`app/main.py`) and `ASSET_COLORS` (`app/static/dashboard.js`)
+5. Profile form: `app/templates/profile.html` plus the `/profile` handler and `holdings_form` in `app/profile.py`
+6. Chart color in `ASSET_SPARKLINE_COLORS` (`app/dashboard.py`) and `ASSET_COLORS` (`app/static/dashboard.js`)
 
 Gold and silver quantities are grams. Coins are a count (`عدد`): امامی `COIN_EMAMI`, بهار `COIN_BAHAR`, نیم `COIN_HALF`, ربع `COIN_QUARTER`, گرمی `COIN_GRAM`. Value = quantity × unit price.
 

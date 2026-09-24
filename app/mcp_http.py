@@ -87,7 +87,7 @@ def _salary(user: User) -> dict:
 
 
 def _debts(db: Session, user: User) -> dict:
-    from app.main import next_jalali_due
+    from app.formatting import next_jalali_due
 
     rows = []
     total = Decimal("0")
@@ -110,7 +110,7 @@ def _debts(db: Session, user: User) -> dict:
 
 
 def _monthly_expenses(db: Session, user: User) -> dict:
-    from app.main import next_jalali_due
+    from app.formatting import next_jalali_due
 
     rows = []
     total = Decimal("0")

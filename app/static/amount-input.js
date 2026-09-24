@@ -75,7 +75,7 @@
     var box = document.createElement("div");
     box.className = "amount-suggest";
     box.hidden = true;
-    var factors = [3, 6, 9];
+    var factors = [3, 4, 5];
     var buttons = factors.map(function (zeros) {
       var button = document.createElement("button");
       button.type = "button";

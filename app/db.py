@@ -46,11 +46,22 @@ def _migrate_user_holdings() -> None:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
 
 
+def _migrate_debts() -> None:
+    inspector = inspect(engine)
+    if "debts" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("debts")}
+    if "title" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE debts ADD COLUMN title VARCHAR(64) NOT NULL DEFAULT ''"))
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _migrate_user_holdings()
+    _migrate_debts()
 
 
 def get_db():

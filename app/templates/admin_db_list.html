@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} · پایگاه داده{% endblock %}
+{% block content %}
+{% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+
+<section class="summary admin-summary" aria-labelledby="list-heading">
+  <div class="summary-text">
+    <p class="eyebrow"><a href="/admin/db">پایگاه داده</a></p>
+    <h1 id="list-heading">{{ label }}</h1>
+  </div>
+  <a class="btn btn-primary" href="/admin/db/{{ slug }}/new">رکورد جدید</a>
+</section>
+
+<section class="card">
+  <form method="get" action="/admin/db/{{ slug }}" class="db-search">
+    <label class="db-search-label">
+      <span class="label-text">جستجو</span>
+      <input name="q" value="{{ query }}" placeholder="نام کاربر یا نماد">
+    </label>
+    <button type="submit" class="btn btn-ghost">بگرد</button>
+  </form>
+  {% if truncated %}<p class="field-hint">فقط ۳۰۰ رکورد اخیر نشان داده می‌شود. برای محدود کردن، جستجو کنید.</p>{% endif %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          {% for column in columns %}
+          <th scope="col">{{ column }}</th>
+          {% endfor %}
+          <th scope="col">ویرایش</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for cell in row.cells %}
+          <td {% if loop.index0 == 0 %}dir="ltr"{% endif %}>{{ cell }}</td>
+          {% endfor %}
+          <td><a class="btn btn-ghost btn-sm" href="/admin/db/{{ slug }}/{{ row.pk }}">ویرایش</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ columns|length + 1 }}" class="text-muted">رکوردی نیست</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

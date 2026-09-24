@@ -12,8 +12,13 @@
   <div class="summary-main">
     <div class="summary-text">
       <p class="eyebrow">{{ user.username }}</p>
-      <h1 id="total-heading">ارزش کل پرتفوی</h1>
-      <p class="total" dir="rtl" lang="fa"><span class="total-num">{{ total_label }}</span><span class="total-suffix"> تومان</span></p>
+      <h1 id="total-heading">خالص دارایی منهای بدهی</h1>
+      <p class="total" dir="rtl" lang="fa"><span class="total-num" dir="ltr">{{ net_label }}</span><span class="total-suffix"> تومان</span></p>
+      <dl class="net-line">
+        <div><dt>جمع دارایی</dt><dd class="num">{{ total_label }} تومان</dd></div>
+        <div><dt>جمع بدهی</dt><dd class="num">{{ debt_total_label }} تومان</dd></div>
+        <div><dt>قسط بعدی</dt><dd>{{ next_debt_label }}</dd></div>
+      </dl>
       <div class="market-bar" role="group" aria-label="وضعیت قیمت بازار">
       <div class="market-bar-status">
         <span class="market-bar-dot" aria-hidden="true"></span>
@@ -114,7 +119,7 @@
 <section class="card" aria-labelledby="table-heading">
   <div class="card-head">
     <h2 id="table-heading">پرتفوی فعلی</h2>
-    <p class="card-desc">مرتب‌سازی فقط روی «سهم» و «بیشترین رشد» · بیشترین رشد: درصد تغییر ارزش از اولین نقطه ۷ روز پیش تا الان</p>
+    <p class="card-desc">مرتب‌سازی فقط روی «سهم» و «بیشترین رشد» · بیشترین رشد: درصد تغییر قیمت واحد از اولین نقطه ۷ روز پیش تا الان</p>
   </div>
   <div class="table-wrap">
     <table class="data-table" id="portfolio-table" data-sort-default="share" data-sort-desc="1">
@@ -162,7 +167,7 @@
               height="26"
               viewBox="0 0 72 26"
               role="img"
-              aria-label="روند ارزش هفت روز{% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
+              aria-label="روند قیمت واحد هفت روز{% if row.trend_change_label %} · تغییر {{ row.trend_change_label }}{% endif %}"
             >
               <path
                 d="{{ row.sparkline_path }}"

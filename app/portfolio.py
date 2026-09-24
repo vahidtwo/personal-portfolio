@@ -316,6 +316,9 @@ def snapshot_user(db: Session, user: User, prices: dict[str, MarketPrice], taken
         row.key: str(row.value_toman) for row in view.rows
     }
     breakdown["total"] = str(view.total_toman)
+    breakdown["unit_price"] = {
+        row.key: str(row.unit_price) for row in view.rows if row.unit_price is not None
+    }
     db.add(
         PortfolioSnapshot(
             user_id=user.id,

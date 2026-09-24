@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ table_label }}{% endblock %}
+{% block content %}
+<section class="card auth-card wide">
+  <p class="eyebrow"><a href="/admin/db/{{ slug }}">{{ table_label }}</a></p>
+  <h1>{{ title }}</h1>
+  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="{% if pk %}/admin/db/{{ slug }}/{{ pk }}{% else %}/admin/db/{{ slug }}/new{% endif %}" class="grid-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for field in fields %}
+    <label class="{% if field.span %}span-2{% endif %}">
+      <span class="label-text">{{ field.label }}</span>
+      {% if field.hint %}<span class="field-hint">{{ field.hint }}</span>{% endif %}
+      {% if field.kind == "textarea" %}
+      <textarea name="{{ field.name }}" rows="12" dir="ltr">{{ field.value }}</textarea>
+      {% elif field.kind == "select" %}
+      <select name="{{ field.name }}">
+        {% for option in field.options %}
+        <option value="{{ option.value }}" {% if option.value == field.value %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+      {% elif field.kind == "readonly" %}
+      <input value="{{ field.value }}" readonly>
+      {% elif field.kind == "password" %}
+      <input name="{{ field.name }}" type="password" autocomplete="new-password" dir="ltr">
+      {% elif field.kind == "datetime" %}
+      <input name="{{ field.name }}" type="datetime-local" value="{{ field.value }}" dir="ltr">
+      {% elif field.kind == "decimal" or field.kind == "int" %}
+      <input name="{{ field.name }}" value="{{ field.value }}" inputmode="decimal" dir="ltr">
+      {% else %}
+      <input name="{{ field.name }}" value="{{ field.value }}" dir="ltr">
+      {% endif %}
+    </label>
+    {% endfor %}
+    <div class="span-2 form-actions">
+      <a class="btn btn-ghost" href="/admin/db/{{ slug }}">انصراف</a>
+      <button type="submit" class="btn btn-primary">ذخیره</button>
+    </div>
+  </form>
+  {% if can_delete %}
+  <form method="post" action="/admin/db/{{ slug }}/{{ pk }}/delete" class="db-delete" onsubmit="return confirm('این رکورد حذف شود؟ این عمل برگشت‌پذیر نیست.');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-danger">حذف</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

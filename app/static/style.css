@@ -1515,12 +1515,22 @@ input:focus {
   height: 280px;
   margin: 8px auto 16px;
 }
+.daily-section + .daily-section {
+  margin-top: 16px;
+}
 .month-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 14px;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
 }
 .category-tree {
   margin: 8px 0 0;

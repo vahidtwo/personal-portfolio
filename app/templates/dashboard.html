@@ -217,10 +217,7 @@
   </div>
 </section>
 {% else %}
-<section class="card">
-  <h1>خرج روزانه</h1>
-  {% include "partials/daily_spend.html" %}
-</section>
+{% include "partials/daily_spend.html" %}
 {% endif %}
 {% endblock %}
 {% block scripts %}

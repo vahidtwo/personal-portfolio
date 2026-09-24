@@ -282,8 +282,10 @@
   <h2>توکن MCP</h2>
   <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr">POST {{ request.base_url }}mcp</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
   {% if mcp_token %}
-  <p class="field-hint">این توکن یک بار نشان داده می‌شود. همین حالا کپی کنید.</p>
-  <input readonly value="{{ mcp_token }}" dir="ltr" autocomplete="off">
+  <p class="field-hint">این توکن یک بار نشان داده می‌شود. دستور زیر را در همین رایانه اجرا کنید تا سرور به Cursor اضافه شود.</p>
+  <input id="mcp-token" readonly value="{{ mcp_token }}" dir="ltr" autocomplete="off">
+  <textarea id="mcp-cursor-cmd" readonly rows="3" dir="ltr">python scripts/add_cursor_mcp.py --token '{{ mcp_token }}' --url '{{ request.base_url }}mcp'</textarea>
+  <button type="button" class="btn btn-ghost btn-sm" id="mcp-copy-cmd">کپی دستور</button>
   {% elif user.mcp_token_hash %}
   <p class="field-status">توکن ذخیره شده است.</p>
   {% else %}
@@ -303,4 +305,14 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/amount-input.js" defer></script>
+<script>
+  const copyCmd = document.getElementById("mcp-copy-cmd");
+  const cmdBox = document.getElementById("mcp-cursor-cmd");
+  if (copyCmd && cmdBox) {
+    copyCmd.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(cmdBox.value);
+      copyCmd.textContent = "کپی شد";
+    });
+  }
+</script>
 {% endblock %}

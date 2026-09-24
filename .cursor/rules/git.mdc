@@ -1,0 +1,24 @@
+---
+description: Commit and push after every change in this repo
+alwaysApply: true
+---
+
+# Commit and push
+
+After any change to files in this repo, commit that change and push it to the tracked remote branch. Do this before you tell the user the task is done.
+
+```text
+# ❌ BAD — edit files, then stop
+# leave the work uncommitted
+
+# ✅ GOOD — same turn, after the edit
+git add <the files you changed>
+git commit
+git push
+```
+
+- One commit per change. Message in English, about why.
+- Push the current branch. Do not force-push.
+- Do not commit secrets (`.env`, tokens, credentials).
+- If the user says not to commit or not to push, skip it for that turn.
+- If the hook rejects the commit, fix the problem and make a new commit. Do not amend unless the user asked.

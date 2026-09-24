@@ -85,3 +85,53 @@ async def fetch_chande_prices() -> list[FetchedPrice]:
     if missing:
         raise ValueError("Missing symbols from chande.net: " + ", ".join(missing))
     return result
+
+
+def _num(value: object) -> str | None:
+    if value is None or value == "":
+        return None
+    return format(Decimal(str(value)), "f")
+
+
+async def fetch_chande_currencies() -> dict:
+    """Live currency rows from Chande. price_toman is priceToman, not divided."""
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "my-inventory/1.0 (+https://chande.net/)",
+    }
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        response = await client.get(CHANDE_URL, headers=headers)
+        response.raise_for_status()
+        payload = response.json()
+
+    items = payload.get("prices") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
+        raise ValueError("Unexpected chande.net payload")
+
+    rows = []
+    for row in items:
+        if not isinstance(row, dict) or row.get("category") != "currency":
+            continue
+        raw = row.get("priceToman")
+        if raw is None:
+            continue
+        rows.append(
+            {
+                "symbol": row.get("symbol"),
+                "name_en": row.get("nameEn"),
+                "name_fa": row.get("nameFa"),
+                "price_toman": _num(raw),
+                "price_usd": _num(row.get("priceUsd")),
+                "price_buy": _num(row.get("priceBuy")),
+                "price_sell": _num(row.get("priceSell")),
+                "bubble": _num(row.get("bubble")),
+                "bubble_toman": _num(row.get("bubbleToman")),
+                "change_24h": _num(row.get("change24h")),
+                "change_direction": row.get("changeDirection"),
+                "updated_at": row.get("updatedAt"),
+                "source": row.get("source"),
+            }
+        )
+    rows.sort(key=lambda item: (item.get("symbol") or ""))
+    updated_at = payload.get("updated_at") if isinstance(payload, dict) else None
+    return {"updated_at": updated_at, "count": len(rows), "currencies": rows}

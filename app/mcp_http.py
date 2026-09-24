@@ -200,6 +200,14 @@ _TOOLS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "get_chande_currencies",
+        "description": (
+            "Live currency prices from chande.net (category currency only). "
+            "price_toman is the API priceToman value and is not divided. Read only."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 ]
 
 
@@ -217,7 +225,16 @@ def _call_tool(db: Session, user: User, name: str, arguments: dict) -> dict:
     return _tool_result({"error": f"unknown tool: {name}"}, error=True)
 
 
-def _rpc(body: dict, db: Session, user: User) -> Response:
+async def _chande_currencies() -> dict:
+    from app.chande import fetch_chande_currencies
+
+    try:
+        return _tool_result(await fetch_chande_currencies())
+    except Exception as exc:
+        return _tool_result({"error": f"chande request failed: {exc}"}, error=True)
+
+
+async def _rpc(body: dict, db: Session, user: User) -> Response:
     method = body.get("method")
     req_id = body.get("id")
     if not isinstance(method, str) or "id" not in body and not method.startswith("notifications/"):
@@ -245,6 +262,8 @@ def _rpc(body: dict, db: Session, user: User) -> Response:
         arguments = params.get("arguments") or {}
         if not isinstance(name, str) or not isinstance(arguments, dict):
             return _error(req_id, -32602, "Invalid params")
+        if name == "get_chande_currencies":
+            return _ok(req_id, await _chande_currencies())
         return _ok(req_id, _call_tool(db, user, name, arguments))
     return _error(req_id, -32601, "Method not found")
 
@@ -281,7 +300,7 @@ async def mcp_post(request: Request):
             return _error(None, -32700, "Parse error")
         if not isinstance(body, dict):
             return _error(None, -32600, "Invalid Request")
-        return _rpc(body, db, user)
+        return await _rpc(body, db, user)
     finally:
         db.close()
 

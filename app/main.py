@@ -916,11 +916,27 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     )
     flash_message, flash_error = pop_flash(request)
     mcp_token = request.session.pop("mcp_token_once", None)
+    mcp_cursor_config = None
+    if mcp_token:
+        mcp_url = str(request.base_url).rstrip("/") + "/mcp"
+        mcp_cursor_config = json.dumps(
+            {
+                "mcpServers": {
+                    "my-inventory": {
+                        "url": mcp_url,
+                        "headers": {"Authorization": f"Bearer {mcp_token}"},
+                    }
+                }
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
     return render(
         request,
         "profile.html",
         db,
         mcp_token=mcp_token,
+        mcp_cursor_config=mcp_cursor_config,
         error=None,
         flash=flash_message,
         flash_error=flash_error,

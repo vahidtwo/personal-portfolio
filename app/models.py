@@ -40,6 +40,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
+    debts: Mapped[list["Debt"]] = relationship(back_populates="user")
 
 
 class MarketPrice(Base):
@@ -61,3 +62,19 @@ class PortfolioSnapshot(Base):
     breakdown_json: Mapped[str] = mapped_column(Text, default="{}")
 
     user: Mapped[User] = relationship(back_populates="snapshots")
+
+
+class Debt(Base):
+    __tablename__ = "debts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(64), default="")
+    monthly_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    months_left: Mapped[int] = mapped_column()
+    due_year: Mapped[int] = mapped_column()
+    due_month: Mapped[int] = mapped_column()
+    due_day: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="debts")

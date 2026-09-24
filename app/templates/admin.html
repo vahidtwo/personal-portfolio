@@ -9,6 +9,7 @@
     <h1 id="admin-heading">داشبورد ادمین</h1>
     <p class="meta">کاربران و ارزش پرتفوی · قیمت‌های ذخیره‌شده در پایگاه داده</p>
   </div>
+  <a class="btn btn-primary" href="/admin/db">ویرایش پایگاه داده</a>
 </section>
 
 <section class="admin-stats" aria-label="خلاصه">
@@ -60,7 +61,7 @@
           data-sort-{{ key }}="{{ row[sk] }}"
           {% endfor %}
         >
-          <td><span dir="ltr">{{ row.username }}</span></td>
+          <td><a href="/admin/db/users/{{ row.id }}" dir="ltr">{{ row.username }}</a></td>
           <td>{{ row.created_label }}</td>
           <td>{{ row.last_login_label }}</td>
           <td class="num">{{ row.total_label }}</td>
@@ -113,7 +114,7 @@
           data-sort-price="{{ row.sort_price }}"
           data-sort-fetched="{{ row.sort_fetched }}"
         >
-          <td dir="ltr">{{ row.symbol }}</td>
+          <td dir="ltr"><a href="/admin/db/market-prices/{{ row.symbol }}">{{ row.symbol }}</a></td>
           <td>{{ row.name_fa }}</td>
           <td class="num">{{ row.price_label }}</td>
           <td>{{ row.fetched_label }}</td>

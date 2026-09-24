@@ -34,7 +34,7 @@ from app.jobs import (
 )
 from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
 from app.sanjeh import SanjehAuthError
-from app.models import PortfolioSnapshot, User, utcnow
+from app.models import Debt, PortfolioSnapshot, User, utcnow
 from app.portfolio import (
     ASSET_LABEL_FA,
     ASSET_META,
@@ -88,8 +88,9 @@ def format_toman(value: Decimal | None) -> str:
     if value is None:
         return "—"
     quantized = Decimal(value).quantize(Decimal("1"))
-    formatted = f"{int(quantized):,}".replace(",", "٬")
-    return persian_digits(formatted)
+    sign = "−" if quantized < 0 else ""
+    formatted = f"{abs(int(quantized)):,}".replace(",", "٬")
+    return sign + persian_digits(formatted)
 
 
 def format_qty(value: Decimal, places: int) -> str:
@@ -115,6 +116,59 @@ def _to_tehran(value: datetime) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(TEHRAN)
+
+
+def next_jalali_due(day: int, today: jdatetime.date | None = None) -> jdatetime.date | None:
+    """First Jalali date on or after today whose day-of-month is `day`."""
+    today = today or jdatetime.date.today()
+    year, month = today.year, today.month
+    for _ in range(26):
+        try:
+            candidate = jdatetime.date(year, month, day)
+        except ValueError:
+            candidate = None
+        if candidate is not None and candidate >= today:
+            return candidate
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    return None
+
+
+def format_jalali_date(value: jdatetime.date) -> str:
+    return persian_digits(f"{value.year}/{value.month:02d}/{value.day:02d}")
+
+
+def debt_rows(debts: list[Debt]) -> tuple[list[dict], Decimal, str]:
+    rows = []
+    total = Decimal("0")
+    soonest: jdatetime.date | None = None
+    for debt in debts:
+        amount = Decimal(debt.monthly_toman) * Decimal(debt.months_left)
+        total += amount
+        nxt = next_jalali_due(debt.due_day)
+        if nxt is not None and (soonest is None or nxt < soonest):
+            soonest = nxt
+        rows.append(
+            {
+                "id": debt.id,
+                "title": (debt.title or "").strip(),
+                "monthly_raw": format(Decimal(debt.monthly_toman), "f").rstrip("0").rstrip("."),
+                "months_raw": str(debt.months_left),
+                "due_year": str(debt.due_year),
+                "due_month": str(debt.due_month),
+                "due_day": str(debt.due_day),
+                "monthly_label": format_toman(debt.monthly_toman),
+                "months_label": persian_digits(str(debt.months_left)),
+                "entered_label": format_jalali_date(
+                    jdatetime.date(debt.due_year, debt.due_month, debt.due_day)
+                ),
+                "total_label": format_toman(amount),
+                "next_label": format_jalali_date(nxt) if nxt else "—",
+            }
+        )
+    return rows, total, format_jalali_date(soonest) if soonest else "—"
 
 
 def format_chart_jalali(value: datetime) -> str:
@@ -214,32 +268,46 @@ ASSET_SPARKLINE_COLORS = {
 }
 
 
-def build_asset_value_history(
-    db: Session,
-    user_id: int,
-    view,
-    *,
-    days: int | None = None,
-    max_snaps: int = 720,
-) -> dict[str, list[float]]:
-    """Per-asset value (toman), chronological snapshots + current."""
-    q = db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == user_id)
-    if days is not None:
-        q = q.filter(PortfolioSnapshot.taken_at >= utcnow() - timedelta(days=days))
-    snaps = q.order_by(PortfolioSnapshot.taken_at.asc()).limit(max_snaps).all()
-    current = {row.key: float(row.value_toman) for row in view.rows}
-    trends: dict[str, list[float]] = {key: [] for key in ASSET_ORDER}
-    for snap in snaps:
-        bd = json.loads(snap.breakdown_json)
-        for key in ASSET_ORDER:
-            trends[key].append(float(bd.get(key, 0)))
-    for key in ASSET_ORDER:
-        trends[key].append(current.get(key, 0.0))
-    return trends
+def _snapshot_unit_price(bd: dict, key: str, quantity: Decimal) -> float | None:
+    """Unit price from the snapshot, or holding value ÷ today's quantity."""
+    stored = bd.get("unit_price")
+    if isinstance(stored, dict) and stored.get(key) not in (None, ""):
+        return float(stored[key])
+    if key == "cash" or quantity <= 0:
+        return None
+    try:
+        value = Decimal(str(bd.get(key, 0)))
+    except Exception:
+        return None
+    return float(value / quantity)
 
 
 def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
-    return build_asset_value_history(db, user_id, view, days=7)
+    """Unit price (toman) over 7 days, plus the live unit price."""
+    snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(
+            PortfolioSnapshot.user_id == user_id,
+            PortfolioSnapshot.taken_at >= utcnow() - timedelta(days=7),
+        )
+        .order_by(PortfolioSnapshot.taken_at.asc())
+        .limit(720)
+        .all()
+    )
+    qty = {row.key: row.quantity for row in view.rows}
+    live = {row.key: row.unit_price for row in view.rows}
+    trends: dict[str, list[float]] = {}
+    for key in ASSET_ORDER:
+        points: list[float] = []
+        for snap in snaps:
+            price = _snapshot_unit_price(json.loads(snap.breakdown_json), key, qty.get(key, Decimal("0")))
+            if price is not None:
+                points.append(price)
+        current = live.get(key)
+        if current is not None:
+            points.append(float(current))
+        trends[key] = points
+    return trends
 
 
 def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> str:
@@ -571,6 +639,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     total_max_gain_label, total_max_gain_sort, total_max_gain_positive = max_gain_labels(
         build_week_total_values(db, user.id, view)
     )
+    _debt_list, debt_total, next_debt_label = debt_rows(
+        db.query(Debt).filter(Debt.user_id == user.id).all()
+    )
     return render(
         request,
         "dashboard.html",
@@ -578,6 +649,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         view=view,
         rows=rows,
         total_label=format_toman(view.total_toman),
+        debt_total_label=format_toman(debt_total),
+        next_debt_label=next_debt_label,
+        net_label=format_toman(view.total_toman - debt_total),
         total_max_gain_label=total_max_gain_label,
         total_max_gain_positive=total_max_gain_positive,
         fetched_label=format_when(view.prices_fetched_at),
@@ -735,10 +809,16 @@ async def admin_delete_user(
     db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == user_id).delete(
         synchronize_session=False
     )
+    db.query(Debt).filter(Debt.user_id == user_id).delete(synchronize_session=False)
     db.delete(target)
     db.commit()
     flash(request, f"کاربر «{username}» و تمام داده‌هایش حذف شد.")
     return RedirectResponse("/admin", status_code=303)
+
+
+from app.db_admin import router as db_admin_router
+
+app.include_router(db_admin_router)
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -746,17 +826,228 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user is None:
         return RedirectResponse("/login", status_code=303)
+    tab = request.query_params.get("tab", "assets")
+    if tab not in ("assets", "debts"):
+        tab = "assets"
+    debts, debt_total, next_debt_label = debt_rows(
+        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
+    )
+    edit_raw = request.query_params.get("edit", "")
+    editing = next((row for row in debts if edit_raw.isdigit() and row["id"] == int(edit_raw)), None)
+    debt_form = (
+        {
+            "title": editing["title"],
+            "monthly_toman": editing["monthly_raw"],
+            "months_left": editing["months_raw"],
+            "due_year": editing["due_year"],
+            "due_month": editing["due_month"],
+            "due_day": editing["due_day"],
+        }
+        if editing
+        else {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""}
+    )
+    flash_message, flash_error = pop_flash(request)
     return render(
         request,
         "profile.html",
         db,
         error=None,
-        flash=pop_flash(request)[0],
+        flash=flash_message,
+        flash_error=flash_error,
         form=_holdings_form(user),
         has_sanjeh_token=bool(user.sanjeh_token),
         car_fetched_label=format_when(user.car_fetched_at),
         car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+        tab=tab,
+        debts=debts,
+        debt_total_label=format_toman(debt_total),
+        next_debt_label=next_debt_label,
+        editing_id=editing["id"] if editing else None,
+        debt_form=debt_form,
     )
+
+
+def _parse_months_left(raw: str) -> tuple[int | None, str | None]:
+    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+    try:
+        value = int(text)
+    except ValueError:
+        return None, "تعداد ماه مانده باید عدد باشد"
+    if value < 1:
+        return None, "تعداد ماه مانده باید حداقل ۱ باشد"
+    return value, None
+
+
+def _parse_jalali_parts(year: str, month: str, day: str) -> tuple[jdatetime.date | None, str | None]:
+    trans = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    try:
+        parsed = jdatetime.date(int(year.strip().translate(trans)), int(month.strip().translate(trans)), int(day.strip().translate(trans)))
+    except (TypeError, ValueError):
+        return None, "تاریخ جلالی نامعتبر است"
+    return parsed, None
+
+
+@app.post("/profile/debts")
+async def profile_add_debt(
+    request: Request,
+    title: str = Form(""),
+    monthly_toman: str = Form(""),
+    months_left: str = Form(""),
+    due_year: str = Form(""),
+    due_month: str = Form(""),
+    due_day: str = Form(""),
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    form = {
+        "title": title.strip()[:64],
+        "monthly_toman": monthly_toman,
+        "months_left": months_left,
+        "due_year": due_year,
+        "due_month": due_month,
+        "due_day": due_day,
+    }
+    try:
+        monthly = parse_decimal(monthly_toman, field="مبلغ ماهانه")
+    except Exception as exc:
+        error = str(getattr(exc, "detail", None) or "مبلغ ماهانه نامعتبر است")
+        monthly = None
+    else:
+        error = "مبلغ ماهانه باید بیشتر از صفر باشد" if monthly <= 0 else None
+    months, months_error = _parse_months_left(months_left)
+    due, due_error = _parse_jalali_parts(due_year, due_month, due_day)
+    error = error or months_error or due_error
+    if error or monthly is None or months is None or due is None:
+        debts, debt_total, next_debt_label = debt_rows(
+        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
+    )
+        return render(
+            request,
+            "profile.html",
+            db,
+            error=error,
+            flash=None,
+            form=_holdings_form(user),
+            has_sanjeh_token=bool(user.sanjeh_token),
+            car_fetched_label=format_when(user.car_fetched_at),
+            car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+            tab="debts",
+            debts=debts,
+            debt_total_label=format_toman(debt_total),
+            next_debt_label=next_debt_label,
+            editing_id=None,
+            debt_form=form,
+        )
+    db.add(
+        Debt(
+            user_id=user.id,
+            title=form["title"],
+            monthly_toman=monthly,
+            months_left=months,
+            due_year=due.year,
+            due_month=due.month,
+            due_day=due.day,
+        )
+    )
+    db.commit()
+    flash(request, "بدهی ذخیره شد")
+    return RedirectResponse("/profile?tab=debts", status_code=303)
+
+
+@app.post("/profile/debts/{debt_id}")
+async def profile_update_debt(
+    debt_id: int,
+    request: Request,
+    title: str = Form(""),
+    monthly_toman: str = Form(""),
+    months_left: str = Form(""),
+    due_year: str = Form(""),
+    due_month: str = Form(""),
+    due_day: str = Form(""),
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    debt = db.get(Debt, debt_id)
+    if debt is None or debt.user_id != user.id:
+        flash(request, "بدهی پیدا نشد.", error=True)
+        return RedirectResponse("/profile?tab=debts", status_code=303)
+    form = {
+        "title": title.strip()[:64],
+        "monthly_toman": monthly_toman,
+        "months_left": months_left,
+        "due_year": due_year,
+        "due_month": due_month,
+        "due_day": due_day,
+    }
+    try:
+        monthly = parse_decimal(monthly_toman, field="مبلغ ماهانه")
+    except Exception as exc:
+        error = str(getattr(exc, "detail", None) or "مبلغ ماهانه نامعتبر است")
+        monthly = None
+    else:
+        error = "مبلغ ماهانه باید بیشتر از صفر باشد" if monthly <= 0 else None
+    months, months_error = _parse_months_left(months_left)
+    due, due_error = _parse_jalali_parts(due_year, due_month, due_day)
+    error = error or months_error or due_error
+    if error or monthly is None or months is None or due is None:
+        debts, debt_total, next_debt_label = debt_rows(
+            db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
+        )
+        return render(
+            request,
+            "profile.html",
+            db,
+            error=error,
+            flash=None,
+            form=_holdings_form(user),
+            has_sanjeh_token=bool(user.sanjeh_token),
+            car_fetched_label=format_when(user.car_fetched_at),
+            car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+            tab="debts",
+            debts=debts,
+            debt_total_label=format_toman(debt_total),
+            next_debt_label=next_debt_label,
+            editing_id=debt_id,
+            debt_form=form,
+        )
+    debt.title = form["title"]
+    debt.monthly_toman = monthly
+    debt.months_left = months
+    debt.due_year = due.year
+    debt.due_month = due.month
+    debt.due_day = due.day
+    db.commit()
+    flash(request, "بدهی به‌روز شد")
+    return RedirectResponse("/profile?tab=debts", status_code=303)
+
+
+@app.post("/profile/debts/{debt_id}/delete")
+async def profile_delete_debt(
+    debt_id: int,
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    require_csrf(request, csrf)
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    debt = db.get(Debt, debt_id)
+    if debt is None or debt.user_id != user.id:
+        flash(request, "بدهی پیدا نشد.", error=True)
+        return RedirectResponse("/profile?tab=debts", status_code=303)
+    db.delete(debt)
+    db.commit()
+    flash(request, "بدهی حذف شد")
+    return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
 @app.post("/profile")

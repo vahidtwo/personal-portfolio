@@ -3,9 +3,87 @@
 {% block content %}
 <section class="card auth-card wide">
   <h1>ویرایش موجودی</h1>
-  <p class="card-desc">مقادیر دارایی‌ها را وارد کنید. ارزش خودرو از اپ سنجه با توکن API خوانده می‌شود.</p>
-  {% if flash %}<p class="toast toast-ok" role="status">{{ flash }}</p>{% endif %}
+  <div class="tabs" role="tablist">
+    <a class="tab {% if tab != 'debts' %}is-active{% endif %}" href="/profile?tab=assets" role="tab">دارایی‌ها</a>
+    <a class="tab {% if tab == 'debts' %}is-active{% endif %}" href="/profile?tab=debts" role="tab">بدهی‌ها</a>
+  </div>
+  {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  {% if tab == 'debts' %}
+  <p class="card-desc">مبلغ هر قسط، تعداد ماه مانده، و یک تاریخ جلالی. روز همان تاریخ، موعد قسط بعدی است. جمع بدهی = مبلغ ماهانه × ماه مانده.</p>
+  <p class="debt-total">جمع بدهی: <span class="num">{{ debt_total_label }}</span> تومان · قسط بعدی: {{ next_debt_label }}</p>
+  {% if debts %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">عنوان</th>
+          <th scope="col">مبلغ ماهانه</th>
+          <th scope="col">ماه مانده</th>
+          <th scope="col">جمع</th>
+          <th scope="col">قسط بعدی</th>
+          <th scope="col">ویرایش</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for debt in debts %}
+        <tr>
+          <td>{{ debt.title or "بدهی" }}</td>
+          <td class="num">{{ debt.monthly_label }}</td>
+          <td class="num">{{ debt.months_label }}</td>
+          <td class="num">{{ debt.total_label }}</td>
+          <td>{{ debt.next_label }}</td>
+          <td class="row-actions">
+            <a class="btn btn-ghost btn-sm" href="/profile?tab=debts&edit={{ debt.id }}">ویرایش</a>
+            <form method="post" action="/profile/debts/{{ debt.id }}/delete" class="inline-form" onsubmit="return confirm('این بدهی حذف شود؟');">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <form method="post" action="{% if editing_id %}/profile/debts/{{ editing_id }}{% else %}/profile/debts{% endif %}" class="grid-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="span-2">
+      <span class="label-text">عنوان</span>
+      <input name="title" value="{{ debt_form.title }}" maxlength="64" placeholder="مثلاً وام مسکن">
+    </label>
+    <label>
+      <span class="label-text">مبلغ ماهانه (تومان)</span>
+      <input name="monthly_toman" value="{{ debt_form.monthly_toman }}" inputmode="numeric" dir="ltr">
+    </label>
+    <label>
+      <span class="label-text">ماه مانده</span>
+      <input name="months_left" value="{{ debt_form.months_left }}" inputmode="numeric" dir="ltr">
+    </label>
+    <div class="span-2">
+      <span class="label-text">تاریخ جلالی قسط</span>
+      <div class="jalali-row">
+        <label>
+          <span class="label-text">سال</span>
+          <input name="due_year" value="{{ debt_form.due_year }}" inputmode="numeric" placeholder="۱۴۰۴" dir="ltr">
+        </label>
+        <label>
+          <span class="label-text">ماه</span>
+          <input name="due_month" value="{{ debt_form.due_month }}" inputmode="numeric" placeholder="۷" dir="ltr">
+        </label>
+        <label>
+          <span class="label-text">روز</span>
+          <input name="due_day" value="{{ debt_form.due_day }}" inputmode="numeric" placeholder="۱۵" dir="ltr">
+        </label>
+      </div>
+    </div>
+    <div class="form-actions span-2">
+      <a class="btn btn-ghost" href="{% if editing_id %}/profile?tab=debts{% else %}/dashboard{% endif %}">انصراف</a>
+      <button type="submit" class="btn btn-primary">{% if editing_id %}ذخیره تغییرات{% else %}افزودن بدهی{% endif %}</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="card-desc">مقادیر دارایی‌ها را وارد کنید. ارزش خودرو از اپ سنجه با توکن API خوانده می‌شود.</p>
   <form method="post" action="/profile" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
@@ -95,5 +173,6 @@
       <button type="submit" class="btn btn-primary">ذخیره</button>
     </div>
   </form>
+  {% endif %}
 </section>
 {% endblock %}

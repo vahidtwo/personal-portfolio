@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}پایگاه داده · موجودی من{% endblock %}
+{% block content %}
+{% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+
+<section class="summary admin-summary" aria-labelledby="db-heading">
+  <div class="summary-text">
+    <p class="eyebrow">مدیریت</p>
+    <h1 id="db-heading">پایگاه داده</h1>
+    <p class="meta">ویرایش رکوردهای کاربران، قیمت‌ها و اسنپ‌شات‌ها</p>
+  </div>
+  <a class="btn btn-ghost" href="/admin">بازگشت به مدیریت</a>
+</section>
+
+<section class="admin-stats" aria-label="جدول‌ها">
+  {% for table in tables %}
+  <a class="stat-card db-table-card" href="/admin/db/{{ table.slug }}">
+    <p class="stat-label">{{ table.label }}</p>
+    <p class="stat-value">{{ table.count }}</p>
+    <p class="card-desc">{{ table.description }}</p>
+  </a>
+  {% endfor %}
+</section>
+{% endblock %}

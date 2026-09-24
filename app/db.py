@@ -30,6 +30,7 @@ _USER_HOLDING_COLUMNS = (
     ("coin_gram", "NUMERIC(20, 8) NOT NULL DEFAULT 0"),
     ("car_count", "INTEGER NOT NULL DEFAULT 0"),
     ("sanjeh_token", "VARCHAR(128)"),
+    ("mcp_token_hash", "VARCHAR(64)"),
     ("car_fetched_at", "DATETIME"),
     ("last_login_at", "DATETIME"),
     ("full_name", "VARCHAR(80) NOT NULL DEFAULT ''"),
@@ -47,6 +48,12 @@ def _migrate_user_holdings() -> None:
         for name, ddl in _USER_HOLDING_COLUMNS:
             if name not in existing:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_mcp_token_hash "
+                "ON users (mcp_token_hash)"
+            )
+        )
 
 
 def _migrate_debts() -> None:

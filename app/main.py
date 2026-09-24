@@ -883,8 +883,10 @@ async def admin_delete_user(
 
 
 from app.db_admin import router as db_admin_router
+from app.mcp_http import hash_mcp_token, router as mcp_router
 
 app.include_router(db_admin_router)
+app.include_router(mcp_router)
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -913,10 +915,12 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         else {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""}
     )
     flash_message, flash_error = pop_flash(request)
+    mcp_token = request.session.pop("mcp_token_once", None)
     return render(
         request,
         "profile.html",
         db,
+        mcp_token=mcp_token,
         error=None,
         flash=flash_message,
         flash_error=flash_error,
@@ -934,6 +938,40 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         account_error=None,
         **_expense_form_for_request(db, user, request),
     )
+
+
+@app.post("/profile/mcp-token")
+async def issue_mcp_token(
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    require_csrf(request, csrf)
+    raw = secrets.token_urlsafe(32)
+    user.mcp_token_hash = hash_mcp_token(raw)
+    db.commit()
+    request.session["mcp_token_once"] = raw
+    flash(request, "توکن MCP ساخته شد. همین حالا کپی کنید.")
+    return RedirectResponse("/profile", status_code=303)
+
+
+@app.post("/profile/mcp-token/revoke")
+async def revoke_mcp_token(
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    require_csrf(request, csrf)
+    user.mcp_token_hash = None
+    db.commit()
+    flash(request, "توکن MCP حذف شد.")
+    return RedirectResponse("/profile", status_code=303)
 
 
 def _parse_months_left(raw: str) -> tuple[int | None, str | None]:

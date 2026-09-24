@@ -1124,19 +1124,6 @@ def _daily_view(
         "daily_month": month,
         "spend_form": spend_form,
         "editing_spend_id": editing["id"] if editing else editing_spend_id,
-        "daily_groups": [
-            {
-                "id": parent.id,
-                "name": parent.name,
-                "is_seed": parent.is_seed,
-                "children": [
-                    {"id": child.id, "name": child.name, "is_seed": child.is_seed}
-                    for child in children
-                    if child.parent_id == parent.id
-                ],
-            }
-            for parent in parents
-        ],
     }
 
 
@@ -1324,92 +1311,6 @@ async def profile_delete_spend(
         db.commit()
         flash(request, "خرج روزانه حذف شد.")
     return RedirectResponse(f"/dashboard?tab=daily&jy={jy}&jm={jm}", status_code=303)
-
-
-@app.post("/profile/spend-categories")
-async def profile_add_spend_category(
-    request: Request,
-    name: str = Form(""),
-    parent_id: str = Form(""),
-    jy: str = Form(""),
-    jm: str = Form(""),
-    csrf: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    require_csrf(request, csrf)
-    user = get_current_user(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    ensure_spend_categories(db, user)
-    label = (name or "").strip()[:64]
-    back = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
-    if not label:
-        flash(request, "نام دسته را بنویسید.", error=True)
-        return RedirectResponse(back, status_code=303)
-    parent = None
-    if parent_id.strip():
-        if not parent_id.isdigit():
-            flash(request, "دستهٔ والد نامعتبر است.", error=True)
-            return RedirectResponse(back, status_code=303)
-        parent = db.get(SpendCategory, int(parent_id))
-        if parent is None or parent.user_id != user.id or parent.parent_id is not None:
-            flash(request, "دستهٔ والد نامعتبر است.", error=True)
-            return RedirectResponse(back, status_code=303)
-    siblings = db.query(SpendCategory).filter(
-        SpendCategory.user_id == user.id,
-        SpendCategory.parent_id == (parent.id if parent else None),
-    )
-    sort_order = max((row.sort_order for row in siblings), default=-1) + 1
-    db.add(
-        SpendCategory(
-            user_id=user.id,
-            parent_id=parent.id if parent else None,
-            name=label,
-            slug=None,
-            is_seed=False,
-            sort_order=sort_order,
-        )
-    )
-    db.commit()
-    flash(request, "دسته اضافه شد.")
-    return RedirectResponse(back, status_code=303)
-
-
-@app.post("/profile/spend-categories/{category_id}/delete")
-async def profile_delete_spend_category(
-    category_id: int,
-    request: Request,
-    jy: str = Form(""),
-    jm: str = Form(""),
-    csrf: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    require_csrf(request, csrf)
-    user = get_current_user(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    back = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
-    item = db.get(SpendCategory, category_id)
-    if item is None or item.user_id != user.id:
-        flash(request, "دسته پیدا نشد.", error=True)
-        return RedirectResponse(back, status_code=303)
-    if item.is_seed:
-        flash(request, "دسته‌های آماده حذف نمی‌شوند.", error=True)
-        return RedirectResponse(back, status_code=303)
-    has_child = (
-        db.query(SpendCategory.id)
-        .filter(SpendCategory.parent_id == item.id)
-        .first()
-        is not None
-    )
-    has_spend = db.query(DailySpend.id).filter(DailySpend.category_id == item.id).first() is not None
-    if has_child or has_spend:
-        flash(request, "این دسته خرج یا زیردسته دارد و حذف نمی‌شود.", error=True)
-        return RedirectResponse(back, status_code=303)
-    db.delete(item)
-    db.commit()
-    flash(request, "دسته حذف شد.")
-    return RedirectResponse(back, status_code=303)
 
 
 def _parse_months_left(raw: str) -> tuple[int | None, str | None]:

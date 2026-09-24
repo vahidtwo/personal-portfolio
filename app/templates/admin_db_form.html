@@ -4,6 +4,7 @@
 <section class="card auth-card wide">
   <p class="eyebrow"><a href="/admin/db/{{ slug }}">{{ table_label }}</a></p>
   <h1>{{ title }}</h1>
+  {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
   <form method="post" action="{% if pk %}/admin/db/{{ slug }}/{{ pk }}{% else %}/admin/db/{{ slug }}/new{% endif %}" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -28,7 +29,7 @@
       {% elif field.kind == "decimal" or field.kind == "int" %}
       <input name="{{ field.name }}" value="{{ field.value }}" inputmode="decimal" dir="ltr">
       {% else %}
-      <input name="{{ field.name }}" value="{{ field.value }}" dir="ltr">
+      <input name="{{ field.name }}" value="{{ field.value }}" dir="{{ field.dir }}">
       {% endif %}
     </label>
     {% endfor %}

@@ -96,60 +96,6 @@
     <button type="submit" class="btn btn-primary">{% if editing_spend_id %}ذخیره خرج{% else %}افزودن خرج{% endif %}</button>
   </div>
 </form>
-
-<h2 class="monthly-block">دسته‌ها</h2>
-<p class="card-desc">دستهٔ جدید بدون والد، یک گروه تازه است. با انتخاب والد، زیردسته ساخته می‌شود. دسته‌های آماده حذف نمی‌شوند.</p>
-<form method="post" action="/profile/spend-categories" class="grid-form">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <input type="hidden" name="jy" value="{{ daily_year }}">
-  <input type="hidden" name="jm" value="{{ daily_month }}">
-  <label>
-    <span class="label-text">نام</span>
-    <input name="name" maxlength="64" required placeholder="مثلاً قهوه">
-  </label>
-  <label>
-    <span class="label-text">والد</span>
-    <select name="parent_id">
-      <option value="">گروه جدید</option>
-      {% for parent in daily_parents %}
-      <option value="{{ parent.id }}">{{ parent.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <div class="form-actions span-2">
-    <button type="submit" class="btn btn-primary">افزودن دسته</button>
-  </div>
-</form>
-<ul class="category-tree">
-  {% for group in daily_groups %}
-  <li>
-    <span>{{ group.name }}</span>
-    {% if not group.is_seed %}
-    <form method="post" action="/profile/spend-categories/{{ group.id }}/delete" class="inline-form" onsubmit="return confirm('این دسته حذف شود؟');">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="jy" value="{{ daily_year }}">
-      <input type="hidden" name="jm" value="{{ daily_month }}">
-      <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-    </form>
-    {% endif %}
-    <ul>
-      {% for child in group.children %}
-      <li>
-        {{ child.name }}
-        {% if not child.is_seed %}
-        <form method="post" action="/profile/spend-categories/{{ child.id }}/delete" class="inline-form" onsubmit="return confirm('این زیردسته حذف شود؟');">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="jy" value="{{ daily_year }}">
-          <input type="hidden" name="jm" value="{{ daily_month }}">
-          <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-        </form>
-        {% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-  </li>
-  {% endfor %}
-</ul>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 (function () {

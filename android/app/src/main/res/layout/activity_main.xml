@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#050608">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ScrollView
+        android:id="@+id/trustPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="20dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="موجودی من"
+                android:textColor="#3ee0b8"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:lineSpacingExtra="4dp"
+                android:text="این اپ فقط پیامک‌هایی را می‌خواند که عبارت «برداشت» (یا عبارت دلخواه شما) را دارند. مبلغ و بخشی از متن به سرور خودتان ارسال می‌شود. کل پیامک‌ها یا مخاطبین آپلود نمی‌شوند."
+                android:textColor="#f4f6fb"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/trustContinue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="متوجه شدم" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/setupPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#0c0e14"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="تنظیم سرور"
+            android:textColor="#f4f6fb"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/siteUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="https://your-server.example"
+            android:inputType="textUri"
+            android:importantForAutofill="no"
+            android:textColor="#f4f6fb"
+            android:textColorHint="#8b93a8" />
+
+        <EditText
+            android:id="@+id/smsPhrase"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="عبارت لازم در پیامک (پیش‌فرض: برداشت)"
+            android:importantForAutofill="no"
+            android:textColor="#f4f6fb"
+            android:textColorHint="#8b93a8" />
+
+        <Button
+            android:id="@+id/saveSite"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ذخیره و باز کردن" />
+
+        <Button
+            android:id="@+id/openWeb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="بستن تنظیمات" />
+    </LinearLayout>
+</FrameLayout>

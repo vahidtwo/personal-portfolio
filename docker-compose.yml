@@ -25,5 +25,24 @@ services:
   #     - inventory-data:/app/data
   #   restart: unless-stopped
 
+  # One-off: docker compose --profile build-android run --rm android-build
+  android-build:
+    profiles: ["build-android"]
+    build:
+      context: .
+      dockerfile: android/Dockerfile
+      target: builder
+      args:
+        BASE_IMAGE: ${ANDROID_DOCKER_BASE:-hub.hamdocker.ir/eclipse-temurin:17-jdk-jammy}
+    image: my-inventory-android-builder
+    volumes:
+      - ./app/static:/out
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "cp /src/android/app/build/outputs/apk/debug/app-debug.apk /out/my-inventory.apk && sha256sum /out/my-inventory.apk",
+      ]
+
 volumes:
   inventory-data:

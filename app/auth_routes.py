@@ -1,5 +1,8 @@
 """Landing, register, login, and logout."""
 
+import hashlib
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -15,15 +18,27 @@ from app.security import (
     validate_username,
     verify_password,
 )
-from app.web import flash, render
+from app.web import BASE_DIR, flash, render
 
 router = APIRouter()
+
+_APK_PATH = BASE_DIR / "static" / "my-inventory.apk"
+
+
+def _apk_sha256() -> str | None:
+    if not _APK_PATH.is_file():
+        return None
+    digest = hashlib.sha256()
+    with _APK_PATH.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
     if get_current_user(request, db):
         return RedirectResponse("/dashboard", status_code=303)
-    return render(request, "landing.html", db)
+    return render(request, "landing.html", db, apk_sha256=_apk_sha256())
 
 
 @router.get("/register", response_class=HTMLResponse)

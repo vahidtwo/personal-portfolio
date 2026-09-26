@@ -1,37 +1,45 @@
 (function () {
-  if (!("serviceWorker" in navigator)) return;
-
-  navigator.serviceWorker.register("/sw.js").catch(function () {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  }
 
   const installBtn = document.getElementById("pwa-install");
+  const installLanding = document.getElementById("pwa-install-landing");
   const iosHint = document.getElementById("pwa-ios");
   const offlineBanner = document.getElementById("pwa-offline");
+  const retryBtn = document.getElementById("pwa-retry");
   const standalone =
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
   let deferredPrompt = null;
 
+  function showInstallButtons(show) {
+    if (installBtn) installBtn.hidden = !show;
+    if (installLanding) installLanding.hidden = !show;
+  }
+
   window.addEventListener("beforeinstallprompt", function (event) {
     event.preventDefault();
     if (standalone) return;
     deferredPrompt = event;
-    if (installBtn) installBtn.hidden = false;
+    showInstallButtons(true);
   });
 
-  if (installBtn) {
-    installBtn.addEventListener("click", function () {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.finally(function () {
-        deferredPrompt = null;
-        installBtn.hidden = true;
-      });
+  function promptInstall() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function () {
+      deferredPrompt = null;
+      showInstallButtons(false);
     });
   }
 
+  if (installBtn) installBtn.addEventListener("click", promptInstall);
+  if (installLanding) installLanding.addEventListener("click", promptInstall);
+
   window.addEventListener("appinstalled", function () {
     deferredPrompt = null;
-    if (installBtn) installBtn.hidden = true;
+    showInstallButtons(false);
     if (iosHint) iosHint.hidden = true;
   });
 
@@ -51,9 +59,33 @@
     }
   }
 
+  function showOfflineToast() {
+    let toast = document.getElementById("pwa-offline-toast");
+    if (!toast) {
+      toast = document.createElement("p");
+      toast.id = "pwa-offline-toast";
+      toast.className = "toast toast-warn pwa-offline-toast";
+      toast.setAttribute("role", "alert");
+      document.body.appendChild(toast);
+    }
+    toast.textContent = "ذخیره نشد — اتصال نیست.";
+    toast.hidden = false;
+    clearTimeout(showOfflineToast._t);
+    showOfflineToast._t = setTimeout(function () {
+      toast.hidden = true;
+    }, 4000);
+  }
+
   function syncOffline() {
     const offline = !navigator.onLine;
     if (offlineBanner) offlineBanner.hidden = !offline;
+  }
+
+  if (retryBtn) {
+    retryBtn.addEventListener("click", function () {
+      if (navigator.onLine) location.reload();
+      else showOfflineToast();
+    });
   }
 
   window.addEventListener("online", syncOffline);
@@ -66,6 +98,7 @@
       if (navigator.onLine) return;
       event.preventDefault();
       syncOffline();
+      showOfflineToast();
     },
     true
   );

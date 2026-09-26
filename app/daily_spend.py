@@ -82,6 +82,11 @@ DAILY_SPEND_TREE: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "سایر",
         (("other_misc", "سایر"),),
     ),
+    (
+        "sms",
+        "پیامک",
+        (("sms_bank", "بانک"),),
+    ),
 )
 
 PARENT_COLORS = {
@@ -93,6 +98,7 @@ PARENT_COLORS = {
     "fun": "#d97706",
     "bills": "#0f766e",
     "other": "#64748b",
+    "sms": "#0f766e",
 }
 _EXTRA_COLORS = ("#0369a1", "#b45309", "#4d7c0f", "#9333ea", "#be123c", "#0e7490")
 

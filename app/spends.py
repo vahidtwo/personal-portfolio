@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import jdatetime
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.daily_spend import (
@@ -344,3 +344,60 @@ async def profile_delete_spend(
     if page.isdigit() and int(page) > 1:
         target += f"&page={int(page)}"
     return RedirectResponse(target, status_code=303)
+
+
+@router.post("/api/sms-spend")
+async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login"}, status_code=401)
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid"}, status_code=400)
+    if not isinstance(payload, dict):
+        return JSONResponse({"ok": False, "error": "invalid"}, status_code=400)
+    try:
+        amount = parse_decimal(str(payload.get("amount_toman", "")), field="مبلغ")
+    except Exception:
+        return JSONResponse({"ok": False, "error": "amount"}, status_code=400)
+    if amount <= 0:
+        return JSONResponse({"ok": False, "error": "amount"}, status_code=400)
+    raw_note = str(payload.get("note") or "").strip()
+    idem = str(payload.get("idempotency_key") or "").strip()[:64]
+    note = raw_note[:120]
+    if idem:
+        note = f"[{idem}] {note}".strip()[:120]
+    ensure_spend_categories(db, user)
+    child = (
+        db.query(SpendCategory)
+        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == "sms_bank")
+        .one_or_none()
+    )
+    if child is None:
+        return JSONResponse({"ok": False, "error": "category"}, status_code=500)
+    today = jdatetime.date.today()
+    spent_on = today.togregorian()
+    duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
+    if idem:
+        duplicate = duplicate_query.filter(DailySpend.note.like(f"[{idem}]%")).first()
+    else:
+        duplicate = duplicate_query.filter(
+            DailySpend.category_id == child.id,
+            DailySpend.amount_toman == amount,
+            DailySpend.spent_on == spent_on,
+            DailySpend.note == note,
+        ).first()
+    if duplicate is not None:
+        return JSONResponse({"ok": True, "id": duplicate.id, "duplicate": True})
+    item = DailySpend(
+        user_id=user.id,
+        category_id=child.id,
+        amount_toman=amount,
+        spent_on=spent_on,
+        note=note,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return JSONResponse({"ok": True, "id": item.id})

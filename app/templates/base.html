@@ -27,6 +27,7 @@
   <a class="skip-link" href="#main">رفتن به محتوا</a>
   <header class="top">
     <div class="top-inner">
+      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
       <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
         <img class="brand-logo" src="/static/logo.svg" width="36" height="36" alt="">
         <span class="brand-name">موجودی من</span>
@@ -37,11 +38,10 @@
         <a class="tab {% if request.url.path == '/dashboard' and request.query_params.get('tab') == 'daily' %}is-active{% endif %}" href="/dashboard?tab=daily" {% if request.url.path == '/dashboard' and request.query_params.get('tab') == 'daily' %}aria-current="page"{% endif %}>خرج روزانه</a>
       </nav>
       {% endif %}
-      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
     </div>
   </header>
-  <div class="side-backdrop" id="side-backdrop" hidden></div>
-  <aside class="side-panel" id="side-panel" aria-label="منوی کناری" hidden>
+  <div class="side-backdrop" id="side-backdrop" aria-hidden="true"></div>
+  <aside class="side-panel" id="side-panel" aria-label="منوی کناری" aria-hidden="true" inert>
     <div class="side-panel-head">
       <strong>منو</strong>
       <button type="button" class="btn btn-ghost btn-sm" id="menu-close">بستن</button>
@@ -68,8 +68,14 @@
       </button>
     </nav>
   </aside>
-  <p class="toast toast-warn pwa-offline" id="pwa-offline" hidden role="status">این نسخه ذخیره‌شده است. قیمت جدید و ذخیره نیاز به اتصال دارند.</p>
-  <p class="pwa-ios-hint" id="pwa-ios" hidden role="status">برای نصب: اشتراک‌گذاری، سپس افزودن به صفحه اصلی. <button type="button" class="btn btn-ghost" data-pwa-ios-dismiss>باشه</button></p>
+  <div class="pwa-offline-bar" id="pwa-offline" hidden role="status">
+    <span class="pwa-offline-text"><strong>بدون اتصال.</strong> نسخه ذخیره‌شده — قیمت و ذخیره نیاز به شبکه دارند.</span>
+    <button type="button" class="btn btn-ghost btn-sm" id="pwa-retry">تلاش مجدد</button>
+  </div>
+  <div class="pwa-ios-hint card" id="pwa-ios" hidden role="status">
+    <p>برای نصب در iPhone: دکمه <strong>Share</strong> سپس <strong>Add to Home Screen</strong>. پیامک خودکار فقط در اندروید است.</p>
+    <button type="button" class="btn btn-ghost btn-sm" data-pwa-ios-dismiss>باشه</button>
+  </div>
   <main id="main" class="shell">
     {% block content %}{% endblock %}
   </main>
@@ -84,22 +90,32 @@
       const backdrop = document.getElementById("side-backdrop");
       const openBtn = document.getElementById("menu-toggle");
       const closeBtn = document.getElementById("menu-close");
+      function isOpen() {
+        return panel.classList.contains("is-open");
+      }
       function setOpen(open) {
-        panel.hidden = !open;
-        backdrop.hidden = !open;
+        panel.classList.toggle("is-open", open);
+        backdrop.classList.toggle("is-visible", open);
+        panel.setAttribute("aria-hidden", open ? "false" : "true");
+        backdrop.setAttribute("aria-hidden", open ? "false" : "true");
+        panel.inert = !open;
         openBtn.setAttribute("aria-expanded", open ? "true" : "false");
         document.body.classList.toggle("menu-open", open);
         ["main", "top", "foot"].forEach(function (id) {
           const el = document.getElementById(id) || document.querySelector("." + id);
           if (el) el.inert = open;
         });
-        if (!open) openBtn.focus();
+        if (open) closeBtn.focus();
+        else openBtn.focus();
       }
-      openBtn.addEventListener("click", function () { setOpen(panel.hidden); });
+      openBtn.addEventListener("click", function () { setOpen(!isOpen()); });
       closeBtn.addEventListener("click", function () { setOpen(false); });
       backdrop.addEventListener("click", function () { setOpen(false); });
+      panel.querySelectorAll("a[href]").forEach(function (link) {
+        link.addEventListener("click", function () { setOpen(false); });
+      });
       document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") setOpen(false);
+        if (event.key === "Escape" && isOpen()) setOpen(false);
       });
     })();
   </script>

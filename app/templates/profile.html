@@ -278,6 +278,20 @@
   </form>
   {% endif %}
 </section>
+<section class="card auth-card wide" id="android-app-settings" hidden>
+  <h2>اپ اندروید (پیامک)</h2>
+  <p class="card-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>
+  <form id="android-phrase-form" class="grid-form">
+    <label>
+      <span class="label-text">عبارت لازم در پیامک</span>
+      <input type="text" id="android-sms-phrase" autocomplete="off">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">ذخیره در اپ</button>
+    </div>
+    <p id="android-phrase-status" class="field-hint" role="status" hidden></p>
+  </form>
+</section>
 <section class="card auth-card wide">
   <h2>توکن MCP</h2>
   <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr">POST {{ request.base_url }}mcp</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
@@ -311,6 +325,31 @@
     copyConfig.addEventListener("click", async () => {
       await navigator.clipboard.writeText(configBox.value);
       copyConfig.textContent = "کپی شد";
+    });
+  }
+  const androidCard = document.getElementById("android-app-settings");
+  const androidForm = document.getElementById("android-phrase-form");
+  const androidPhrase = document.getElementById("android-sms-phrase");
+  const androidStatus = document.getElementById("android-phrase-status");
+  if (window.AndroidBridge && androidCard && androidForm && androidPhrase) {
+    androidCard.hidden = false;
+    try {
+      androidPhrase.value = AndroidBridge.getSmsPhrase() || "برداشت";
+    } catch (e) {}
+    androidForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      try {
+        AndroidBridge.setSmsPhrase((androidPhrase.value || "").trim() || "برداشت");
+        if (androidStatus) {
+          androidStatus.textContent = "در اپ ذخیره شد.";
+          androidStatus.hidden = false;
+        }
+      } catch (e) {
+        if (androidStatus) {
+          androidStatus.textContent = "ذخیره نشد.";
+          androidStatus.hidden = false;
+        }
+      }
     });
   }
 </script>

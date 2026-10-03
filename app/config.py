@@ -20,4 +20,4 @@ PRICE_REFRESH_HOURS = int(os.environ.get("PRICE_REFRESH_HOURS", "1"))
 PRICE_MANUAL_REFRESH_MINUTES = int(os.environ.get("PRICE_MANUAL_REFRESH_MINUTES", "5"))
 ENABLE_INTERNAL_SCHEDULER = os.environ.get("ENABLE_INTERNAL_SCHEDULER", "1") == "1"
 # Bump when static JS/CSS change so browsers and the service worker pick up new assets.
-STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20260303")
+STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20260303a")

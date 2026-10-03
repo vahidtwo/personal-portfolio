@@ -84,6 +84,10 @@
   </footer>
   <script src="/static/privacy.js?v={{ static_v }}" defer></script>
   <script src="/static/android-bridge.js?v={{ static_v }}" defer></script>
+  {% if user and push_enabled %}
+  <script id="firebase-config" type="application/json">{{ firebase_web_config_json }}</script>
+  <script src="/static/push.js?v={{ static_v }}" defer></script>
+  {% endif %}
   <script src="/static/pwa.js?v={{ static_v }}" defer></script>
   <script>
     (function () {

@@ -16,6 +16,7 @@ from app.debts import debt_rows
 from app.expenses import expense_form_for_request
 from app.formatting import format_qty, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
+from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
 from app.models import Debt, User, utcnow
 from app.sanjeh import SanjehAuthError
@@ -116,6 +117,33 @@ async def issue_mcp_token(
     db.commit()
     request.session["mcp_token_once"] = raw
     flash(request, "توکن MCP ساخته شد. همین حالا کپی کنید.")
+    return RedirectResponse("/profile", status_code=303)
+
+
+@router.post("/profile/push-test")
+async def push_test_notification(
+    request: Request,
+    csrf: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    require_csrf(request, csrf)
+    if not firebase_admin_ready():
+        flash(request, "Firebase پیکربندی نشده است.", error=True)
+        return RedirectResponse("/profile", status_code=303)
+    sent = send_push_to_user(
+        db,
+        user.id,
+        title="موجودی من",
+        body="اعلان آزمایشی",
+        data={"type": "test"},
+    )
+    if sent:
+        flash(request, f"اعلان به {sent} دستگاه ارسال شد.")
+    else:
+        flash(request, "توکن push ثبت نشده یا ارسال ناموفق بود.", error=True)
     return RedirectResponse("/profile", status_code=303)
 
 

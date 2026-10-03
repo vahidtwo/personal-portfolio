@@ -37,6 +37,7 @@ WORKDIR /src
 COPY android ./android
 COPY app/static ./app/static
 
-RUN printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
+RUN if [ ! -f android/app/google-services.json ]; then cp android/app/google-services.json.example android/app/google-services.json; fi \
+    && printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
     && chmod +x android/gradlew \
     && cd android && ./gradlew assembleDebug --no-daemon

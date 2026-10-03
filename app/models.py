@@ -48,6 +48,19 @@ class User(Base):
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(back_populates="user")
     spend_categories: Mapped[list["SpendCategory"]] = relationship(back_populates="user")
     daily_spends: Mapped[list["DailySpend"]] = relationship(back_populates="user")
+    push_tokens: Mapped[list["PushDeviceToken"]] = relationship(back_populates="user")
+
+
+class PushDeviceToken(Base):
+    __tablename__ = "push_device_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    platform: Mapped[str] = mapped_column(String(16), default="web")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="push_tokens")
 
 
 class MarketPrice(Base):

@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
                     AndroidBridge.normalizeBaseUrl(url)?.let { origin ->
                         saveBaseUrl(origin)
                     }
+                    PushRegistrar.registerFcmToken(this@MainActivity)
                 }
             }
         }

@@ -7,5 +7,6 @@ __pycache__/
 .mypy_cache/
 .env
 data/
+**/firebase-service-account.json
 *.db
 .DS_Store

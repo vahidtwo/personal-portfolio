@@ -1,3 +1,7 @@
 <resources>
-    <style name="Theme.MyInventory" parent="Theme.AppCompat.DayNight.NoActionBar" />
+    <style name="Theme.MyInventory" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">#050608</item>
+        <item name="android:statusBarColor">#050608</item>
+        <item name="android:navigationBarColor">#050608</item>
+    </style>
 </resources>

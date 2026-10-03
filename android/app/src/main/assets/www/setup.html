@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#050608">
+  <title>موجودی من — اتصال به سرور</title>
+  <link rel="stylesheet" href="static/style.css">
+  <script src="static/theme.js" defer></script>
+</head>
+<body class="app-body">
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="#">
+        <img class="brand-logo" src="static/logo.svg" width="36" height="36" alt="">
+        <span class="brand-name">موجودی من</span>
+      </a>
+    </div>
+  </header>
+  <main id="main" class="shell shell-wide">
+    <div class="landing shell-wide">
+      <section class="landing-android card" aria-labelledby="android-heading">
+        <div class="card-head">
+          <h1 id="android-heading" class="card-title">اتصال اپ به سرور شما</h1>
+        </div>
+        <p class="card-desc">بعد از این مرحله همان وب‌اپ (داشبورد، پروفایل، خرج روزانه) داخل اپ باز می‌شود. فقط یک بار آدرس <strong>https</strong> سرور را وارد کنید.</p>
+        <ul class="landing-steps landing-steps-compact">
+          <li>پیامک‌های دارای عبارت «برداشت» به‌صورت خرج روزانه ذخیره می‌شوند</li>
+          <li>کل صندوق پیامک خوانده نمی‌شود</li>
+          <li>برای ذخیره خودکار پیامک باید در اپ وارد حساب شوید</li>
+        </ul>
+        <form id="setup-form" class="grid-form">
+          <label>
+            <span class="label-text">آدرس سرور (https)</span>
+            <input type="url" id="site-url" dir="ltr" inputmode="url" autocomplete="url" placeholder="https://example.com" required>
+          </label>
+          <label>
+            <span class="label-text">عبارت لازم در پیامک</span>
+            <input type="text" id="sms-phrase" value="برداشت" autocomplete="off">
+          </label>
+          <p id="setup-error" class="form-error" hidden role="alert"></p>
+          <button type="submit" class="btn btn-primary btn-block">ادامه به داشبورد</button>
+        </form>
+      </section>
+    </div>
+  </main>
+  <footer class="foot">
+    <p>همان رابط وب · self-hosted</p>
+  </footer>
+  <script>
+    (function () {
+      var form = document.getElementById("setup-form");
+      var urlInput = document.getElementById("site-url");
+      var phraseInput = document.getElementById("sms-phrase");
+      var errorEl = document.getElementById("setup-error");
+      if (window.AndroidBridge) {
+        var saved = AndroidBridge.getServerUrl();
+        if (saved) urlInput.value = saved;
+        phraseInput.value = AndroidBridge.getSmsPhrase() || "برداشت";
+      }
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        errorEl.hidden = true;
+        var url = (urlInput.value || "").trim().replace(/\/+$/, "");
+        var phrase = (phraseInput.value || "").trim() || "برداشت";
+        if (!url.startsWith("https://")) {
+          errorEl.textContent = "آدرس باید با https:// شروع شود.";
+          errorEl.hidden = false;
+          return;
+        }
+        if (!window.AndroidBridge) {
+          errorEl.textContent = "پل اندروید در دسترس نیست.";
+          errorEl.hidden = false;
+          return;
+        }
+        AndroidBridge.setSmsPhrase(phrase);
+        AndroidBridge.setServerUrl(url);
+      });
+    })();
+  </script>
+</body>
+</html>

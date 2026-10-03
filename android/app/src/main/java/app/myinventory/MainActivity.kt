@@ -3,98 +3,133 @@ package app.myinventory
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ScrollView
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import androidx.core.view.WindowCompat
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
-    private lateinit var setupPanel: View
-    private lateinit var trustPanel: ScrollView
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = Color.parseColor("#050608")
+        window.navigationBarColor = Color.parseColor("#050608")
         setContentView(R.layout.activity_main)
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         web = findViewById(R.id.web)
-        setupPanel = findViewById(R.id.setupPanel)
-        trustPanel = findViewById(R.id.trustPanel)
-        val urlField = findViewById<EditText>(R.id.siteUrl)
-        val phraseField = findViewById<EditText>(R.id.smsPhrase)
-        urlField.setText(prefs.getString(KEY_URL, "") ?: "")
-        phraseField.setText(prefs.getString(KEY_PHRASE, DEFAULT_PHRASE) ?: DEFAULT_PHRASE)
 
-        CookieManager.getInstance().setAcceptCookie(true)
-        web.settings.javaScriptEnabled = true
-        web.settings.domStorageEnabled = true
-        web.settings.allowFileAccess = false
-        web.settings.allowContentAccess = false
-        web.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            web.settings.safeBrowsingEnabled = true
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(web, true)
+
+        web.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            allowFileAccess = true
+            allowContentAccess = false
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            builtInZoomControls = false
+            displayZoomControls = false
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                safeBrowsingEnabled = true
+            }
         }
+
+        web.addJavascriptInterface(
+            AndroidBridge(this) { base -> loadRemote(base, "/dashboard") },
+            "AndroidBridge",
+        )
+
+        web.webChromeClient = WebChromeClient()
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val base = (prefs.getString(KEY_URL, "") ?: "").trimEnd('/')
-                val host = runCatching { Uri.parse(base).host }.getOrNull()
-                val reqHost = request.url.host
-                if (host != null && reqHost != null && host == reqHost) return false
+                if (!request.isForMainFrame) return false
+                val target = request.url ?: return false
+                if (target.scheme == "file") return false
+                if (isAllowedRemoteUrl(target)) return false
                 return true
             }
-        }
 
-        findViewById<Button>(R.id.trustContinue).setOnClickListener {
-            prefs.edit { putBoolean(KEY_TRUST, true) }
-            trustPanel.visibility = View.GONE
-            refreshPanels(prefs)
-        }
-
-        findViewById<Button>(R.id.saveSite).setOnClickListener {
-            val url = urlField.text.toString().trim().trimEnd('/')
-            val phrase = phraseField.text.toString().trim().ifEmpty { DEFAULT_PHRASE }
-            prefs.edit {
-                putString(KEY_URL, url)
-                putString(KEY_PHRASE, phrase)
-            }
-            askSmsPermission()
-            if (url.startsWith("https://")) {
-                web.loadUrl(url)
-                setupPanel.visibility = View.GONE
+            override fun onPageFinished(view: WebView, url: String?) {
+                super.onPageFinished(view, url)
+                url ?: return
+                if (url.startsWith("https://")) {
+                    AndroidBridge.normalizeBaseUrl(url)?.let { origin ->
+                        saveBaseUrl(origin)
+                    }
+                }
             }
         }
 
-        findViewById<Button>(R.id.openWeb).setOnClickListener {
-            setupPanel.visibility = View.GONE
+        onBackPressedDispatcher.addCallback(this) {
+            if (web.canGoBack()) {
+                web.goBack()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
         }
 
-        if (!prefs.getBoolean(KEY_TRUST, false)) {
-            trustPanel.visibility = View.VISIBLE
-        }
-        refreshPanels(prefs)
         askSmsPermission()
+        restoreOrSetup(savedInstanceState)
     }
 
-    private fun refreshPanels(prefs: android.content.SharedPreferences) {
-        if (!prefs.getBoolean(KEY_TRUST, false)) return
-        val saved = prefs.getString(KEY_URL, "") ?: ""
-        if (saved.startsWith("https://")) {
-            web.loadUrl(saved)
-            setupPanel.visibility = View.GONE
-        } else {
-            setupPanel.visibility = View.VISIBLE
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        web.saveState(outState)
+    }
+
+    private fun restoreOrSetup(savedInstanceState: Bundle?) {
+        if (savedInstanceState != null) {
+            web.restoreState(savedInstanceState)
+            return
         }
+        val saved = savedBaseUrl()
+        if (saved != null) {
+            loadRemote(saved, "/dashboard")
+        } else {
+            web.loadUrl(SETUP_ASSET)
+        }
+    }
+
+    fun loadRemote(base: String, path: String) {
+        val normalized = AndroidBridge.normalizeBaseUrl(base) ?: return
+        saveBaseUrl(normalized)
+        val suffix = if (path.startsWith("/")) path else "/$path"
+        web.loadUrl("$normalized$suffix")
+    }
+
+    private fun savedBaseUrl(): String? {
+        val raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, "") ?: ""
+        return AndroidBridge.normalizeBaseUrl(raw)
+    }
+
+    private fun saveBaseUrl(url: String) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit {
+            putString(KEY_URL, url)
+        }
+    }
+
+    private fun isAllowedRemoteUrl(uri: Uri): Boolean {
+        if (uri.scheme != "https") return false
+        val base = savedBaseUrl() ?: return true
+        val baseHost = runCatching { Uri.parse(base).host }.getOrNull() ?: return false
+        return uri.host == baseHost
     }
 
     private fun askSmsPermission() {
@@ -114,7 +149,7 @@ class MainActivity : AppCompatActivity() {
         const val PREFS = "app.myinventory"
         const val KEY_URL = "base_url"
         const val KEY_PHRASE = "sms_phrase"
-        const val KEY_TRUST = "trust_ok"
         const val DEFAULT_PHRASE = "برداشت"
+        private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
     }
 }

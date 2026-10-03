@@ -35,6 +35,7 @@ RUN mkdir -p "${ANDROID_HOME}" \
 
 WORKDIR /src
 COPY android ./android
+COPY app/static ./app/static
 
 RUN printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
     && chmod +x android/gradlew \

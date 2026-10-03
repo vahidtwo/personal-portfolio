@@ -223,6 +223,20 @@ def _qty(user: User, key: str) -> Decimal:
     return Decimal(getattr(user, attr) or 0)
 
 
+def user_has_assets(user: User) -> bool:
+    """True if the user has any non-zero holding (quantity or manual toman amount)."""
+    for key in ASSET_ORDER:
+        if key == "car":
+            if (user.car_count or 0) > 0:
+                return True
+            if Decimal(user.car_toman or 0) > 0:
+                return True
+            continue
+        if _qty(user, key) > 0:
+            return True
+    return False
+
+
 def build_portfolio(user: User, prices: dict[str, MarketPrice]) -> PortfolioView:
     rows: list[AssetRow] = []
     missing: list[str] = []
@@ -310,7 +324,9 @@ def build_portfolio(user: User, prices: dict[str, MarketPrice]) -> PortfolioView
     )
 
 
-def snapshot_user(db: Session, user: User, prices: dict[str, MarketPrice], taken_at: datetime) -> None:
+def snapshot_user(db: Session, user: User, prices: dict[str, MarketPrice], taken_at: datetime) -> bool:
+    if not user_has_assets(user):
+        return False
     view = build_portfolio(user, prices)
     breakdown = {
         row.key: str(row.value_toman) for row in view.rows
@@ -327,11 +343,14 @@ def snapshot_user(db: Session, user: User, prices: dict[str, MarketPrice], taken
             breakdown_json=json.dumps(breakdown, ensure_ascii=False),
         )
     )
+    return True
 
 
 def snapshot_all_users(db: Session, prices: dict[str, MarketPrice]) -> int:
     taken_at = utcnow()
     users = db.query(User).all()
+    count = 0
     for user in users:
-        snapshot_user(db, user, prices, taken_at)
-    return len(users)
+        if snapshot_user(db, user, prices, taken_at):
+            count += 1
+    return count

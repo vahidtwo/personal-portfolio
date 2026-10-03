@@ -8,4 +8,5 @@ python-multipart==0.0.20
 itsdangerous==2.2.0
 tzdata==2025.2
 jdatetime==5.2.0
+firebase-admin==6.6.0
 

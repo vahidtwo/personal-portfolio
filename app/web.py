@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.config import STATIC_ASSET_VERSION
+import json
+
+from app.config import STATIC_ASSET_VERSION, firebase_web_config
 from app.formatting import format_toman, format_when, persian_digits
 from app.security import csrf_token, get_current_user, is_admin
 
@@ -23,12 +25,15 @@ templates.env.filters["fa"] = persian_digits
 
 def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
     current = get_current_user(request, db)
+    push_cfg = firebase_web_config()
     context.update(
         {
             "request": request,
             "user": current,
             "is_admin": is_admin(current),
             "csrf": csrf_token(request),
+            "push_enabled": push_cfg is not None,
+            "firebase_web_config_json": json.dumps(push_cfg, ensure_ascii=False) if push_cfg else "",
         }
     )
     return templates.TemplateResponse(request, name, context)

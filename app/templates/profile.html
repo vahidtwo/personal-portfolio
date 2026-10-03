@@ -278,6 +278,20 @@
   </form>
   {% endif %}
 </section>
+{% if push_enabled %}
+<section class="card auth-card wide" id="push-settings">
+  <h2>اعلان push (Firebase)</h2>
+  <p class="card-desc">روی مرورگر یا اندروید (با Firebase) اعلان دریافت کنید. برای وب باید HTTPS باشد.</p>
+  <div class="landing-actions">
+    <button type="button" class="btn btn-primary" id="push-enable">فعال‌سازی اعلان</button>
+  </div>
+  <p id="push-status" class="toast toast-ok" role="status" hidden></p>
+  <form method="post" action="/profile/push-test" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-ghost btn-sm">ارسال آزمایشی</button>
+  </form>
+</section>
+{% endif %}
 <section class="card auth-card wide" id="android-app-settings" hidden>
   <h2>اپ اندروید (پیامک)</h2>
   <p class="card-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>

@@ -4,3 +4,4 @@ build/
 app/build/
 *.apk
 app/src/main/assets/www/static/
+app/google-services.json

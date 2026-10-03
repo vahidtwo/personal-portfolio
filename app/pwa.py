@@ -1,8 +1,9 @@
 """PWA static routes."""
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
+from app.firebase_push import service_worker_firebase_snippet
 from app.web import BASE_DIR
 
 router = APIRouter()
@@ -32,8 +33,10 @@ def download_android_apk():
 
 @router.get("/sw.js")
 def service_worker():
-    return FileResponse(
-        BASE_DIR / "static" / "sw.js",
+    body = (BASE_DIR / "static" / "sw.js").read_text(encoding="utf-8")
+    body += service_worker_firebase_snippet()
+    return Response(
+        content=body,
         media_type="application/javascript",
         headers={"Cache-Control": "no-cache"},
     )

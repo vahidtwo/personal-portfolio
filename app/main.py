@@ -22,6 +22,7 @@ from app.expenses import router as expenses_router
 from app.jobs import run_hourly_job
 from app.mcp_http import router as mcp_router
 from app.profile import router as profile_router
+from app.push_routes import router as push_router
 from app.pwa import router as pwa_router
 from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
 from app.spends import router as spends_router
@@ -74,6 +75,7 @@ async def health():
 
 
 app.include_router(pwa_router)
+app.include_router(push_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(admin_users_router)

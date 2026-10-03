@@ -303,7 +303,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/amount-input.js" defer></script>
+<script src="/static/amount-input.js?v={{ static_v }}" defer></script>
 <script>
   const copyConfig = document.getElementById("mcp-copy-config");
   const configBox = document.getElementById("mcp-cursor-config");

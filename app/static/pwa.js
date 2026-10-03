@@ -1,6 +1,17 @@
 (function () {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(function () {});
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(function (registration) {
+        registration.update();
+      })
+      .catch(function () {});
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   }
 
   const installBtn = document.getElementById("pwa-install");

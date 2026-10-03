@@ -9,11 +9,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.config import STATIC_ASSET_VERSION
 from app.formatting import format_toman, format_when, persian_digits
 from app.security import csrf_token, get_current_user, is_admin
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.globals["static_v"] = STATIC_ASSET_VERSION
 templates.env.filters["toman"] = format_toman
 templates.env.filters["when"] = format_when
 templates.env.filters["fa"] = persian_digits

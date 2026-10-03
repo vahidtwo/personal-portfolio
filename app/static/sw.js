@@ -1,4 +1,4 @@
-const VERSION = "inventory-v1";
+const VERSION = "inventory-v20260303";
 const STATIC_CACHE = VERSION + "-static";
 const PAGE_CACHE = VERSION + "-pages";
 
@@ -46,9 +46,32 @@ const PRECACHE = [
   "/static/onboarding/dashboard.svg",
 ];
 
+function bypassServiceWorker(url) {
+  if (url.pathname === "/download/my-inventory.apk") return true;
+  if (url.pathname.endsWith(".apk")) return true;
+  return false;
+}
+
+function isMutableStatic(pathname) {
+  return pathname.endsWith(".js") || pathname.endsWith(".css");
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches
+      .open(STATIC_CACHE)
+      .then(async (cache) => {
+        await Promise.all(
+          PRECACHE.map(async (path) => {
+            try {
+              await cache.add(path);
+            } catch (err) {
+              console.warn("precache skip", path, err);
+            }
+          })
+        );
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -76,6 +99,19 @@ async function cacheFirstStatic(request) {
   const response = await fetch(request);
   if (response.ok) await cache.put(request, response.clone());
   return response;
+}
+
+async function networkFirstStatic(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch (err) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 async function networkFirstDashboard(request) {
@@ -125,8 +161,14 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
+  if (bypassServiceWorker(url)) return;
+
   if (url.pathname.startsWith("/static/")) {
-    event.respondWith(cacheFirstStatic(request));
+    if (isMutableStatic(url.pathname)) {
+      event.respondWith(networkFirstStatic(request));
+    } else {
+      event.respondWith(cacheFirstStatic(request));
+    }
     return;
   }
 

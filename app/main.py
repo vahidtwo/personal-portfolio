@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.admin_users import router as admin_users_router
 from app.auth_routes import router as auth_router
-from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY
+from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY, SESSION_COOKIE_NAME
 from app.dashboard import router as dashboard_router
 from app.db import init_db
 from app.db_admin import router as db_admin_router
@@ -61,7 +61,7 @@ app = FastAPI(title="My Inventory", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=_secret_key(),
-    session_cookie="inventory_session",
+    session_cookie=SESSION_COOKIE_NAME,
     same_site="lax",
     https_only=HTTPS_ONLY,
     max_age=60 * 60 * 24 * 30,

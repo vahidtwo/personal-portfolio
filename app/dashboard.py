@@ -27,7 +27,7 @@ from app.portfolio import (
     load_prices,
 )
 from app.sanjeh import SanjehAuthError
-from app.security import get_current_user, require_csrf
+from app.security import get_authenticated_user, redirect_to_login, require_csrf
 from app.spends import daily_view
 from app.web import flash, pop_flash, render
 
@@ -283,9 +283,9 @@ CAR_REFRESH = timedelta(hours=1)
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     if user.sanjeh_token:
         fetched = user.car_fetched_at
         if fetched is not None and fetched.tzinfo is None:
@@ -410,9 +410,9 @@ async def dashboard_refresh_prices(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     wait_sec = market_price_refresh_wait_seconds(db)
     if wait_sec > 0:
         minutes = max(1, wait_sec // 60)

@@ -21,7 +21,8 @@ from app.mcp_http import hash_mcp_token
 from app.models import Debt, User, utcnow
 from app.sanjeh import SanjehAuthError
 from app.security import (
-    get_current_user,
+    get_authenticated_user,
+    redirect_to_login,
     hash_password,
     normalize_username,
     parse_decimal,
@@ -37,9 +38,9 @@ router = APIRouter()
 
 @router.get("/profile", response_class=HTMLResponse)
 async def profile_form(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     tab = request.query_params.get("tab", "assets")
     if tab not in ("assets", "debts"):
         tab = "assets"
@@ -108,9 +109,9 @@ async def issue_mcp_token(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     require_csrf(request, csrf)
     raw = secrets.token_urlsafe(32)
     user.mcp_token_hash = hash_mcp_token(raw)
@@ -126,9 +127,9 @@ async def push_test_notification(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     require_csrf(request, csrf)
     if not firebase_admin_ready():
         flash(request, "Firebase پیکربندی نشده است.", error=True)
@@ -153,9 +154,9 @@ async def revoke_mcp_token(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     require_csrf(request, csrf)
     user.mcp_token_hash = None
     db.commit()
@@ -214,9 +215,9 @@ async def profile_account(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     account = {
         "full_name": full_name.strip()[:80],
         "username": username,
@@ -286,9 +287,9 @@ async def profile_save(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     form = {
         "gold_grams": gold_grams,
         "coin_emami": coin_emami,

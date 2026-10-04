@@ -11,7 +11,7 @@ from app.db import get_db
 from app.formatting import format_toman, format_when, persian_digits
 from app.models import DailySpend, Debt, MonthlyExpense, PortfolioSnapshot, SpendCategory, User
 from app.portfolio import ASSET_LABEL_FA, ASSET_ORDER, build_portfolio, latest_market_prices_fetched_at, load_prices
-from app.security import get_current_user, is_admin, require_csrf
+from app.security import get_authenticated_user, is_admin, redirect_to_login, require_csrf
 from app.web import flash, pop_flash, render
 
 router = APIRouter()
@@ -53,9 +53,9 @@ def _build_admin_user_rows(
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     if not is_admin(user):
         flash(request, "دسترسی مدیریت ندارید.", error=True)
         return RedirectResponse("/dashboard", status_code=303)
@@ -107,9 +107,9 @@ async def admin_delete_user(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    admin = get_current_user(request, db)
+    admin = get_authenticated_user(request, db)
     if admin is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     if not is_admin(admin):
         flash(request, "دسترسی مدیریت ندارید.", error=True)
         return RedirectResponse("/dashboard", status_code=303)

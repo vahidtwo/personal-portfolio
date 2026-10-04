@@ -10,9 +10,12 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import User, utcnow
 from app.security import (
-    get_current_user,
+    attach_session_cookie_deletion,
+    get_authenticated_user,
     hash_password,
+    invalidate_session,
     normalize_username,
+    redirect_to_dashboard_if_authenticated,
     require_csrf,
     validate_password,
     validate_username,
@@ -36,15 +39,15 @@ def _apk_sha256() -> str | None:
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
-    if get_current_user(request, db):
-        return RedirectResponse("/dashboard", status_code=303)
+    if redirect := redirect_to_dashboard_if_authenticated(request, db):
+        return redirect
     return render(request, "landing.html", db, apk_sha256=_apk_sha256())
 
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_form(request: Request, db: Session = Depends(get_db)):
-    if get_current_user(request, db):
-        return RedirectResponse("/dashboard", status_code=303)
+    if redirect := redirect_to_dashboard_if_authenticated(request, db):
+        return redirect
     return render(request, "register.html", db, error=None, form={"username": ""})
 
 
@@ -79,8 +82,8 @@ async def register(
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request, db: Session = Depends(get_db)):
-    if get_current_user(request, db):
-        return RedirectResponse("/dashboard", status_code=303)
+    if redirect := redirect_to_dashboard_if_authenticated(request, db):
+        return redirect
     return render(request, "login.html", db, error=None, form={"username": ""})
 
 
@@ -112,5 +115,6 @@ async def login(
 @router.post("/logout")
 async def logout(request: Request, csrf: str = Form("")):
     require_csrf(request, csrf)
-    request.session.clear()
-    return RedirectResponse("/login", status_code=303)
+    invalidate_session(request)
+    response = RedirectResponse("/login", status_code=303)
+    return attach_session_cookie_deletion(response)

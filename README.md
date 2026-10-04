@@ -75,6 +75,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `PRICE_MANUAL_REFRESH_MINUTES` | `5` | Minimum time between dashboard price refreshes |
 | `ENABLE_INTERNAL_SCHEDULER` | `1` | Set `0` if you run `scripts/create_snapshot.py` via cron instead |
 | `ADMIN_USERNAMES` | *(empty)* | Comma-separated usernames that can open `/admin` (user list + market prices) |
+| `FIREBASE_*` (client) | *(empty)* | Web push: `FIREBASE_API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `MESSAGING_SENDER_ID`, `APP_ID`, `VAPID_KEY` |
+| `FIREBASE_CLIENT_EMAIL` | *(empty)* | **Server only** — FCM Admin service account email |
+| `FIREBASE_PRIVATE_KEY` | *(empty)* | **Server only** — PEM on one line; use `\n` for newlines |
+| `FIREBASE_PRIVATE_KEY_ID` | *(empty)* | Optional service account key id |
+
+Validate Admin credentials: `python scripts/test_firebase_admin.py` (FCM dry-run, no message delivered).
 
 ---
 

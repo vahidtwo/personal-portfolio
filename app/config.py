@@ -30,17 +30,10 @@ FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
 FIREBASE_MESSAGING_SENDER_ID = os.environ.get("FIREBASE_MESSAGING_SENDER_ID", "")
 FIREBASE_APP_ID = os.environ.get("FIREBASE_APP_ID", "")
 FIREBASE_VAPID_KEY = os.environ.get("FIREBASE_VAPID_KEY", "")
-FIREBASE_CREDENTIALS_PATH = os.environ.get(
-    "FIREBASE_CREDENTIALS_PATH",
-    str(DATA_DIR / "firebase-service-account.json"),
-)
-
-
-def _firebase_credentials_json_raw() -> str:
-    return os.environ.get("FIREBASE_CREDENTIALS_JSON", "")
-
-
-FIREBASE_CREDENTIALS_JSON = _firebase_credentials_json_raw()
+# Server-only (FCM Admin SDK). Never expose in templates or static assets.
+FIREBASE_CLIENT_EMAIL = os.environ.get("FIREBASE_CLIENT_EMAIL", "")
+FIREBASE_PRIVATE_KEY = os.environ.get("FIREBASE_PRIVATE_KEY", "")
+FIREBASE_PRIVATE_KEY_ID = os.environ.get("FIREBASE_PRIVATE_KEY_ID", "")
 
 
 def firebase_web_config() -> dict[str, str] | None:

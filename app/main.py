@@ -19,6 +19,7 @@ from app.db import init_db
 from app.db_admin import router as db_admin_router
 from app.debts import router as debts_router
 from app.expenses import router as expenses_router
+from app.firebase_push import validate_firebase_admin_at_startup
 from app.jobs import run_hourly_job
 from app.mcp_http import router as mcp_router
 from app.profile import router as profile_router
@@ -48,6 +49,7 @@ def _secret_key() -> str:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    validate_firebase_admin_at_startup()
     await run_hourly_job(take_snapshots=False)
     if ENABLE_INTERNAL_SCHEDULER:
         start_hourly_scheduler()

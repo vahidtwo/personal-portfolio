@@ -20,7 +20,7 @@ from app.daily_spend import (
 from app.db import get_db
 from app.formatting import format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
-from app.security import get_current_user, parse_decimal, require_csrf
+from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
 router = APIRouter()
@@ -286,9 +286,9 @@ async def profile_add_spend(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     return _save_daily_spend(
         request, db, user, None, amount_toman, year, month, day, category_id, note, parent_id, jy, jm
     )
@@ -311,9 +311,9 @@ async def profile_edit_spend(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     return _save_daily_spend(
         request, db, user, spend_id, amount_toman, year, month, day, category_id, note, parent_id, jy, jm
     )
@@ -330,9 +330,9 @@ async def profile_delete_spend(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     item = db.get(DailySpend, spend_id)
     if item is None or item.user_id != user.id:
         flash(request, "خرج پیدا نشد.", error=True)
@@ -348,7 +348,7 @@ async def profile_delete_spend(
 
 @router.post("/api/sms-spend")
 async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
         return JSONResponse({"ok": False, "error": "login"}, status_code=401)
     try:

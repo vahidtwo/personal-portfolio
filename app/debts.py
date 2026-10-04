@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.formatting import format_jalali_date, format_toman, format_when, next_jalali_due, parse_jalali_parts, persian_digits
 from app.models import Debt, User
-from app.security import get_current_user, parse_decimal, require_csrf
+from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
 router = APIRouter()
@@ -90,9 +90,9 @@ async def profile_add_debt(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     form = {
         "title": title.strip()[:64],
         "monthly_toman": monthly_toman,
@@ -163,9 +163,9 @@ async def profile_update_debt(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     debt = db.get(Debt, debt_id)
     if debt is None or debt.user_id != user.id:
         flash(request, "بدهی پیدا نشد.", error=True)
@@ -229,9 +229,9 @@ async def profile_delete_debt(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     debt = db.get(Debt, debt_id)
     if debt is None or debt.user_id != user.id:
         flash(request, "بدهی پیدا نشد.", error=True)

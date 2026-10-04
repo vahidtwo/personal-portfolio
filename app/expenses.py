@@ -10,7 +10,7 @@ from app.db import get_db
 from app.debts import debt_rows
 from app.formatting import format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
 from app.models import Debt, MonthlyExpense, User
-from app.security import get_current_user, parse_decimal, require_csrf
+from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
 router = APIRouter()
@@ -137,9 +137,9 @@ async def profile_add_expense(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     form, amount, day, error = _read_expense_fields(title, amount_toman, due_day)
     if error or amount is None or day is None:
         return _render_expense_error(request, db, user, error or "مقادیر نامعتبر است", form, None)
@@ -160,9 +160,9 @@ async def profile_update_expense(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
         flash(request, "خرج ماهانه پیدا نشد.", error=True)
@@ -186,9 +186,9 @@ async def profile_delete_expense(
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
         flash(request, "خرج ماهانه پیدا نشد.", error=True)

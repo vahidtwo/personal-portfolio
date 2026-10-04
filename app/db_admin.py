@@ -16,7 +16,8 @@ from app.db import get_db
 from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER
 from app.security import (
-    get_current_user,
+    get_authenticated_user,
+    redirect_to_login,
     hash_password,
     is_admin,
     normalize_username,
@@ -52,10 +53,10 @@ def _ui():
 
 
 def _require_admin(request: Request, db: Session) -> User | RedirectResponse:
-    user = get_current_user(request, db)
+    user = get_authenticated_user(request, db)
     ui = _ui()
     if user is None:
-        return RedirectResponse("/login", status_code=303)
+        return redirect_to_login(request)
     if not is_admin(user):
         ui.flash(request, "دسترسی مدیریت ندارید.", error=True)
         return RedirectResponse("/dashboard", status_code=303)

@@ -39,12 +39,12 @@ _USER_HOLDING_COLUMNS = (
 )
 
 
-def _migrate_user_holdings() -> None:
-    inspector = inspect(engine)
-    if "users" not in inspector.get_table_names():
-        return
-    existing = {c["name"] for c in inspector.get_columns("users")}
-    with engine.begin() as conn:
+def legacy_column_migrations(conn) -> None:
+    """Pre-Alembic ad-hoc column adds. Idempotent; used by the baseline migration."""
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    if "users" in tables:
+        existing = {c["name"] for c in inspector.get_columns("users")}
         for name, ddl in _USER_HOLDING_COLUMNS:
             if name not in existing:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
@@ -54,24 +54,27 @@ def _migrate_user_holdings() -> None:
                 "ON users (mcp_token_hash)"
             )
         )
-
-
-def _migrate_debts() -> None:
-    inspector = inspect(engine)
-    if "debts" not in inspector.get_table_names():
-        return
-    existing = {c["name"] for c in inspector.get_columns("debts")}
-    if "title" not in existing:
-        with engine.begin() as conn:
+    if "debts" in tables:
+        existing = {c["name"] for c in inspector.get_columns("debts")}
+        if "title" not in existing:
             conn.execute(text("ALTER TABLE debts ADD COLUMN title VARCHAR(64) NOT NULL DEFAULT ''"))
 
 
 def init_db() -> None:
+    """Bring the database to the latest schema via Alembic (safe on existing DBs)."""
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
     from app import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
-    _migrate_user_holdings()
-    _migrate_debts()
+    root = Path(__file__).resolve().parent
+    cfg = Config()
+    cfg.set_main_option("script_location", str(root / "migrations"))
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")
 
 
 def get_db():

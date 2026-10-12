@@ -10,3 +10,4 @@ tzdata==2025.2
 jdatetime==5.2.0
 firebase-admin==6.6.0
 
+alembic==1.14.1

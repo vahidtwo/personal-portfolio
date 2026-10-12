@@ -14,7 +14,7 @@ def _register_and_login(client: TestClient, username: str = "testuser") -> None:
     token = _csrf_from_page(page.text)
     response = client.post(
         "/register",
-        data={"username": username, "password": "password123", "csrf": token},
+        data={"username": username, "password": "password123", "password_confirm": "password123", "csrf": token},
         follow_redirects=False,
     )
     assert response.status_code == 303

@@ -11,3 +11,6 @@ data/
 **/*firebase*service*account*.json
 *.db
 .DS_Store
+
+# Android SDK archives (downloaded by android/Dockerfile)
+/*.zip

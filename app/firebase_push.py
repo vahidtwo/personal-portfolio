@@ -163,11 +163,17 @@ def service_worker_firebase_snippet() -> str:
     cfg_json = json.dumps(cfg, ensure_ascii=False)
     return f"""
 
-importScripts("https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js");
-firebase.initializeApp({cfg_json});
-const firebaseMessaging = firebase.messaging();
-firebaseMessaging.onBackgroundMessage(function (payload) {{
+// Firebase is optional here: if gstatic cannot load, offline caching must still work.
+let firebaseMessaging = null;
+try {{
+  importScripts("https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js");
+  importScripts("https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js");
+  firebase.initializeApp({cfg_json});
+  firebaseMessaging = firebase.messaging();
+}} catch (err) {{
+  firebaseMessaging = null;
+}}
+if (firebaseMessaging) firebaseMessaging.onBackgroundMessage(function (payload) {{
   const title = (payload.notification && payload.notification.title) || "موجودی من";
   const body = (payload.notification && payload.notification.body) || "";
   const options = {{

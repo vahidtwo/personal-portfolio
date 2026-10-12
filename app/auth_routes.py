@@ -4,11 +4,12 @@ import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import User, utcnow
+from app import rate_limit
 from app.security import (
     attach_session_cookie_deletion,
     get_authenticated_user,
@@ -44,6 +45,11 @@ async def home(request: Request, db: Session = Depends(get_db)):
     return render(request, "landing.html", db, apk_sha256=_apk_sha256())
 
 
+@router.head("/")
+async def home_head():
+    return Response(status_code=200, media_type="text/html")
+
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_form(request: Request, db: Session = Depends(get_db)):
     if redirect := redirect_to_dashboard_if_authenticated(request, db):
@@ -56,12 +62,24 @@ async def register(
     request: Request,
     username: str = Form(""),
     password: str = Form(""),
+    password_confirm: str = Form(""),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
     require_csrf(request, csrf)
     username = normalize_username(username)
+    ip_key = f"register:ip:{rate_limit.client_ip(request)}"
+    if rate_limit.is_limited(ip_key, rate_limit.REGISTER_PER_IP, rate_limit.REGISTER_WINDOW_SECONDS):
+        return render(
+            request,
+            "register.html",
+            db,
+            error="تعداد ثبت‌نام زیاد است. کمی بعد دوباره تلاش کنید",
+            form={"username": username},
+        )
     error = validate_username(username) or validate_password(password)
+    if not error and password != password_confirm:
+        error = "رمز عبور و تکرار آن یکسان نیستند"
     if error:
         return render(request, "register.html", db, error=error, form={"username": username})
     if db.query(User).filter(User.username == username).first():
@@ -75,6 +93,7 @@ async def register(
     user = User(username=username, password_hash=hash_password(password), last_login_at=utcnow())
     db.add(user)
     db.commit()
+    rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session["user_id"] = user.id
     flash(request, "حساب شما ساخته شد. موجودی را در پروفایل وارد کنید.")
     return RedirectResponse("/profile", status_code=303)
@@ -97,8 +116,23 @@ async def login(
 ):
     require_csrf(request, csrf)
     username = normalize_username(username)
+    user_key = f"login:user:{username}"
+    ip_key = f"login:ip:{rate_limit.client_ip(request)}"
+    window = rate_limit.LOGIN_WINDOW_SECONDS
+    if rate_limit.is_limited(user_key, rate_limit.LOGIN_FAILS_PER_USER, window) or rate_limit.is_limited(
+        ip_key, rate_limit.LOGIN_FAILS_PER_IP, window
+    ):
+        return render(
+            request,
+            "login.html",
+            db,
+            error="تلاش‌های ناموفق زیاد بود. ۱۵ دقیقه دیگر دوباره امتحان کنید",
+            form={"username": username},
+        )
     user = db.query(User).filter(User.username == username).first()
     if user is None or not verify_password(password, user.password_hash):
+        rate_limit.record(user_key, window)
+        rate_limit.record(ip_key, window)
         return render(
             request,
             "login.html",
@@ -106,6 +140,7 @@ async def login(
             error="نام کاربری یا رمز عبور نادرست است",
             form={"username": username},
         )
+    rate_limit.clear(user_key)
     user.last_login_at = utcnow()
     db.commit()
     request.session["user_id"] = user.id

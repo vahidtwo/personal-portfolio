@@ -97,3 +97,11 @@ def test_client_ip_ignores_spoofed_cf_header_off_cloudflare():
     assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "9.9.9.9"})) == "9.9.9.9"
     assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.5.5.5, 162.158.1.1"})) == "1.2.3.4"
     assert client_ip(req({"cf-connecting-ip": "1.2.3.4"})) == "10.0.0.5"
+
+
+def test_sw_version_matches_static_asset_version(client: TestClient):
+    from app.config import STATIC_ASSET_VERSION
+
+    body = client.get("/sw.js").text
+    assert f'const VERSION = "inventory-v{STATIC_ASSET_VERSION}";' in body
+    assert "__STATIC_ASSET_VERSION__" not in body

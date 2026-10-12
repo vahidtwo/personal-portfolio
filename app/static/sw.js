@@ -1,4 +1,4 @@
-const VERSION = "inventory-v20261012a";
+const VERSION = "inventory-v__STATIC_ASSET_VERSION__";
 const STATIC_CACHE = VERSION + "-static";
 const PAGE_CACHE = VERSION + "-pages";
 

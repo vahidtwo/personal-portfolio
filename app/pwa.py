@@ -6,6 +6,8 @@ from fastapi.responses import FileResponse, Response
 from app.firebase_push import service_worker_firebase_snippet
 from app.web import BASE_DIR
 
+from app.config import STATIC_ASSET_VERSION
+
 router = APIRouter()
 
 _APK_PATH = BASE_DIR / "static" / "my-inventory.apk"
@@ -34,6 +36,7 @@ def download_android_apk():
 @router.get("/sw.js")
 def service_worker():
     body = (BASE_DIR / "static" / "sw.js").read_text(encoding="utf-8")
+    body = body.replace("__STATIC_ASSET_VERSION__", STATIC_ASSET_VERSION)
     body += service_worker_firebase_snippet()
     return Response(
         content=body,

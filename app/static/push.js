@@ -62,6 +62,9 @@
           })
           .then(function (cfg) {
             if (!cfg.enabled) return null;
+            if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+              throw new Error("push-unsupported");
+            }
             var messaging = firebase.messaging();
             messaging.onMessage(function (payload) {
               var title = (payload.notification && payload.notification.title) || "موجودی من";
@@ -81,7 +84,8 @@
               .then(function (token) {
                 if (!token) return null;
                 currentToken = token;
-                return registerToken(token).then(function () {
+                return registerToken(token).then(function (res) {
+                  if (!res || !res.ok) throw new Error("register-" + ((res && res.error) || "failed"));
                   setStatus("اعلان‌ها فعال شد.", false);
                   return token;
                 });
@@ -102,14 +106,22 @@
           setStatus("اجازه اعلان داده نشد.", true);
           return;
         }
-        initMessaging().catch(function () {
-          setStatus("فعال‌سازی اعلان ممکن نشد.", true);
-        });
+        initMessaging()
+          .then(function (token) {
+            if (!token) setStatus("توکن اعلان دریافت نشد. دوباره امتحان کنید.", true);
+          })
+          .catch(function (err) {
+            var detail = (err && (err.code || err.message)) || "unknown";
+            if (window.console) console.error("push init failed", err);
+            setStatus("فعال‌سازی اعلان ممکن نشد (" + detail + ")", true);
+          });
       });
     });
   }
 
-  if (Notification.permission === "granted") {
-    initMessaging().catch(function () {});
+  if (typeof Notification !== "undefined" && Notification.permission === "granted" && "serviceWorker" in navigator) {
+    initMessaging().catch(function (err) {
+      if (window.console) console.warn("push refresh failed", err);
+    });
   }
 })();

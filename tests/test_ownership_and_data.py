@@ -127,3 +127,94 @@ def test_owner_can_delete_own_rows(client: TestClient, victim_rows):
     client.post(f"/profile/spends/{victim_rows['spend']}/delete", data={"csrf": token})
     debts, expenses, spends, *_ = _counts()
     assert (debts, expenses, spends) == (0, 0, 0)
+
+
+def _login(client: TestClient, username: str) -> None:
+    _logout(client)
+    client.post("/login", data={"username": username, "password": "password123", "csrf": _csrf(client, "/login")})
+
+
+def test_owner_can_edit_own_rows(client: TestClient, victim_rows):
+    from app.db import SessionLocal
+    from app.models import DailySpend, Debt, MonthlyExpense, SpendCategory
+
+    _login(client, "alice")
+    token = _csrf(client)
+    with SessionLocal() as db:
+        spend = db.get(DailySpend, victim_rows["spend"])
+        child = db.get(SpendCategory, spend.category_id)
+        parent_id, child_id = child.parent_id, child.id
+    client.post(f"/profile/debts/{victim_rows['debt']}", data={"title": "loan2", "monthly_toman": "150", "months_left": "2", "due_year": "1405", "due_month": "2", "due_day": "3", "csrf": token})
+    client.post(f"/profile/expenses/{victim_rows['expense']}", data={"title": "rent2", "amount_toman": "250", "due_day": "6", "csrf": token})
+    client.post(f"/profile/spends/{victim_rows['spend']}", data={"amount_toman": "350", "year": "1405", "month": "1", "day": "1", "parent_id": str(parent_id), "category_id": str(child_id), "note": "y", "csrf": token})
+    with SessionLocal() as db:
+        debt = db.get(Debt, victim_rows["debt"])
+        exp = db.get(MonthlyExpense, victim_rows["expense"])
+        spend = db.get(DailySpend, victim_rows["spend"])
+        assert (debt.title, debt.monthly_toman, debt.months_left) == ("loan2", Decimal("150"), 2)
+        assert (exp.title, exp.amount_toman, exp.due_day) == ("rent2", Decimal("250"), 6)
+        assert (spend.amount_toman, spend.note) == (Decimal("350"), "y")
+
+
+def test_cannot_file_spend_under_another_users_category(client: TestClient, victim_rows):
+    from app.db import SessionLocal
+    from app.models import DailySpend, SpendCategory, User
+
+    with SessionLocal() as db:
+        alice_id = db.query(User).filter_by(username="alice").one().id
+        alice_child = db.query(SpendCategory).filter(SpendCategory.user_id == alice_id, SpendCategory.parent_id.isnot(None)).first()
+        ids = (alice_child.parent_id, alice_child.id)
+    client.post("/profile/spends", data={"amount_toman": "999", "year": "1405", "month": "1", "day": "1", "parent_id": str(ids[0]), "category_id": str(ids[1]), "note": "", "csrf": _csrf(client)})
+    with SessionLocal() as db:
+        assert db.query(DailySpend).filter(DailySpend.category_id == ids[1], DailySpend.user_id != alice_id).count() == 0
+
+
+def test_same_idempotency_key_is_per_user(client: TestClient):
+    body = {"amount_toman": "5000", "note": "bank", "idempotency_key": "shared-key"}
+    _register(client, "smsa")
+    a = client.post("/api/sms-spend", json=body).json()
+    _logout(client)
+    _register(client, "smsb")
+    b = client.post("/api/sms-spend", json=body).json()
+    assert a["ok"] and b["ok"]
+    assert not b.get("duplicate")
+    assert a["id"] != b["id"]
+
+
+def _mcp(client: TestClient, token: str, name: str):
+    return client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json, text/event-stream"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": {}}},
+    )
+
+
+def test_mcp_token_only_sees_own_data_and_revoke_works(client: TestClient, victim_rows):
+    from app.db import SessionLocal
+    from app.mcp_http import hash_mcp_token
+    from app.models import User
+
+    with SessionLocal() as db:
+        db.query(User).filter_by(username="alice").one().mcp_token_hash = hash_mcp_token("alice-tok")
+        db.query(User).filter_by(username="mallory").one().mcp_token_hash = hash_mcp_token("mallory-tok")
+        db.commit()
+    assert "loan" in _mcp(client, "alice-tok", "list_debts").text
+    assert "loan" not in _mcp(client, "mallory-tok", "list_debts").text
+    assert _mcp(client, "wrong-tok", "list_debts").status_code == 401
+    client.post("/profile/mcp-token/revoke", data={"csrf": _csrf(client)})
+    assert _mcp(client, "mallory-tok", "list_debts").status_code == 401
+    assert "loan" in _mcp(client, "alice-tok", "list_debts").text
+
+
+def test_push_register_stores_token_for_current_user(client: TestClient):
+    from app.db import SessionLocal
+    from app.models import PushDeviceToken, User
+
+    _register(client, "pushy")
+    assert client.post("/api/push/register", json={"token": "tok-123", "platform": "web"}).json()["ok"]
+    _logout(client)
+    assert client.post("/api/push/register", json={"token": "tok-999"}).status_code == 401
+    with SessionLocal() as db:
+        uid = db.query(User).filter_by(username="pushy").one().id
+        rows = db.query(PushDeviceToken).all()
+        assert [(r.user_id, r.token) for r in rows] == [(uid, "tok-123")]

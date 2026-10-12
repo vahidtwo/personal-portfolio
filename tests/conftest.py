@@ -32,3 +32,11 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import app.db as db_module
 
     db_module.engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    yield
+    import app.rate_limit as rate_limit
+
+    rate_limit.reset_all()

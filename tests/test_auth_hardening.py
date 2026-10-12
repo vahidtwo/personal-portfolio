@@ -84,3 +84,16 @@ def test_register_limited_per_ip(client: TestClient):
     resp = _register(client, "bulk5")
     assert resp.status_code == 200
     assert "تعداد ثبت‌نام زیاد" in resp.text
+
+
+def test_client_ip_ignores_spoofed_cf_header_off_cloudflare():
+    from starlette.requests import Request
+
+    from app.rate_limit import client_ip
+
+    def req(headers):
+        return Request({"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers.items()], "client": ("10.0.0.5", 1)})
+
+    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "9.9.9.9"})) == "9.9.9.9"
+    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.5.5.5, 162.158.1.1"})) == "1.2.3.4"
+    assert client_ip(req({"cf-connecting-ip": "1.2.3.4"})) == "10.0.0.5"

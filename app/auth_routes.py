@@ -116,8 +116,9 @@ async def login(
 ):
     require_csrf(request, csrf)
     username = normalize_username(username)
-    user_key = f"login:user:{username}"
-    ip_key = f"login:ip:{rate_limit.client_ip(request)}"
+    ip = rate_limit.client_ip(request)
+    user_key = f"login:user:{username}:{ip}"
+    ip_key = f"login:ip:{ip}"
     window = rate_limit.LOGIN_WINDOW_SECONDS
     if rate_limit.is_limited(user_key, rate_limit.LOGIN_FAILS_PER_USER, window) or rate_limit.is_limited(
         ip_key, rate_limit.LOGIN_FAILS_PER_IP, window

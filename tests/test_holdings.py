@@ -77,7 +77,7 @@ def test_0002_copies_existing_amounts(tmp_path):
             "import sys; command.upgrade(cfg, sys.argv[1])")
     subprocess.run([sys.executable, "-c", code, "0001_baseline"], env=env, check=True)
     c = sqlite3.connect(db)
-    vals = {"id": 1, "username": "a", "password_hash": "h", "btc": 0.123456789, "usd": 0,
+    vals = {"id": 1, "username": "a", "password_hash": "h", "btc": 0.12345678, "usd": 0,
             "gold_grams": 2.5, "car_count": 1, "created_at": "2026-01-01"}
     for _, name, typ, notnull, default, _pk in c.execute("pragma table_info(users)").fetchall():
         if notnull and default is None and name not in vals:
@@ -87,4 +87,4 @@ def test_0002_copies_existing_amounts(tmp_path):
     subprocess.run([sys.executable, "-c", code, "head"], env=env, check=True)
     rows = dict(sqlite3.connect(db).execute("select asset_key, quantity from holdings where user_id=1"))
     assert rows["gold_grams"] == 2.5 and rows["car_count"] == 1 and "usd" not in rows
-    assert abs(rows["btc"] - 0.123456789) < 1e-9
+    assert abs(rows["btc"] - 0.12345678) < 1e-9  # NUMERIC(20, 8): 8 decimal places

@@ -159,43 +159,13 @@ def _user_fields(user: User | None, form: FormData | None) -> list[dict]:
             hint="برای نگه داشتن رمز فعلی خالی بگذارید" if user else "حداقل ۸ کاراکتر",
         ),
     ]
+    ro_hint = "دادهٔ کاربر؛ فقط خود کاربر از پروفایل تغییرش می‌دهد"
     for attr, label in HOLDING_FIELDS:
-        current = _plain_decimal(getattr(user, attr) if user else 0)
-        fields.append(_field(attr, label, val(attr, current), kind="decimal"))
-    fields.append(
-        _field(
-            "car_toman",
-            "ارزش خودرو (تومان)",
-            val("car_toman", _plain_decimal(user.car_toman if user else 0)),
-            kind="decimal",
-            hint="اگر توکن سنجه باشد، کار ساعتی این مقدار را دوباره می‌نویسد",
-        )
-    )
-    fields.append(
-        _field(
-            "car_count",
-            "تعداد خودرو",
-            val("car_count", str(int(user.car_count or 0) if user else 0)),
-            kind="int",
-        )
-    )
-    fields.append(
-        _field(
-            "sanjeh_token",
-            "توکن سنجه",
-            val("sanjeh_token", (user.sanjeh_token or "") if user else ""),
-            hint="خالی یعنی بدون اتصال به سنجه",
-            span=True,
-        )
-    )
-    fields.append(
-        _field(
-            "car_fetched_at",
-            "زمان دریافت خودرو",
-            val("car_fetched_at", _datetime_input(user.car_fetched_at if user else None)),
-            kind="datetime",
-        )
-    )
+        fields.append(_field(attr, label, _plain_decimal(getattr(user, attr) if user else 0), kind="readonly", hint=ro_hint))
+    fields.append(_field("car_toman", "ارزش خودرو (تومان)", _plain_decimal(user.car_toman if user else 0), kind="readonly", hint=ro_hint))
+    fields.append(_field("car_count", "تعداد خودرو", str(int(user.car_count or 0) if user else 0), kind="readonly", hint=ro_hint))
+    fields.append(_field("sanjeh_token", "توکن سنجه", "متصل" if user and user.sanjeh_token else "ندارد", kind="readonly", text_dir="rtl"))
+    fields.append(_field("car_fetched_at", "زمان دریافت خودرو", _ui().format_when(user.car_fetched_at) if user and user.car_fetched_at else "—", kind="readonly"))
     if user is not None:
         fields.append(_field("created_at", "عضویت", _ui().format_when(user.created_at), kind="readonly"))
         fields.append(_field("last_login_at", "آخرین ورود", _ui().format_when(user.last_login_at), kind="readonly"))
@@ -322,6 +292,11 @@ def catalog(db: Session) -> list[dict]:
             "count": _ui().persian_digits(str(db.query(SpendCategory).count())),
         },
     ]
+
+
+# Vahid's rule (Oct 13 2026): user data is never removed or overwritten from the DB editor.
+READ_ONLY_SLUGS = frozenset({"snapshots", "spend-categories"})
+READ_ONLY_ERROR = "این جدول دادهٔ کاربران است و در ویرایشگر فقط‌خواندنی است."
 
 
 def _known_slug(slug: str) -> bool:
@@ -485,27 +460,7 @@ def _save_user(db: Session, user: User | None, form: FormData) -> str | None:
             if password_error:
                 return password_error
             user.password_hash = hash_password(password)
-    for attr, label in HOLDING_FIELDS:
-        try:
-            value = parse_decimal(_posted(form, attr), field=label)
-        except Exception as exc:
-            detail = getattr(exc, "detail", None)
-            return str(detail or f"عدد نامعتبر: {label}")
-        setattr(user, attr, value)
-    try:
-        user.car_toman = parse_decimal(_posted(form, "car_toman"), field="ارزش خودرو")
-    except Exception as exc:
-        return str(getattr(exc, "detail", None) or "عدد نامعتبر: ارزش خودرو")
-    count, count_error = _parse_int(_posted(form, "car_count"), field="تعداد خودرو")
-    if count_error:
-        return count_error
-    user.car_count = count or 0
-    token = _posted(form, "sanjeh_token").strip()
-    user.sanjeh_token = token or None
-    fetched, fetched_error = _parse_datetime(_posted(form, "car_fetched_at"), field="زمان دریافت خودرو", required=False)
-    if fetched_error:
-        return fetched_error
-    user.car_fetched_at = fetched
+    # Assets, car value and Sanjeh fields are user data: read-only here.
     return None
 
 
@@ -770,6 +725,9 @@ async def admin_db_create(slug: str, request: Request, db: Session = Depends(get
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug in READ_ONLY_SLUGS:
+        _ui().flash(request, READ_ONLY_ERROR, error=True)
+        return RedirectResponse(f"/admin/db/{slug}", status_code=303)
     if not _known_slug(slug):
         return RedirectResponse("/admin/db", status_code=303)
     form = await request.form()
@@ -819,7 +777,7 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
         error=None,
         flash=flash_message,
         flash_error=flash_error,
-        can_delete=not (slug == "users" and obj.id == admin.id),
+        can_delete=slug not in READ_ONLY_SLUGS and not (slug == "users" and obj.id == admin.id),
     )
 
 
@@ -828,6 +786,9 @@ async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depe
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug in READ_ONLY_SLUGS:
+        _ui().flash(request, READ_ONLY_ERROR, error=True)
+        return RedirectResponse(f"/admin/db/{slug}", status_code=303)
     if not _known_slug(slug) or pk == "new":
         return RedirectResponse("/admin/db", status_code=303)
     form = await request.form()
@@ -849,7 +810,7 @@ async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depe
             table_label=list_view(db, slug, "")["label"],
             fields=fields_for(db, slug, obj, form),
             error=error,
-            can_delete=not (slug == "users" and obj.id == admin.id),
+            can_delete=slug not in READ_ONLY_SLUGS and not (slug == "users" and obj.id == admin.id),
         )
     db.commit()
     ui.flash(request, "تغییرات ذخیره شد")
@@ -861,6 +822,9 @@ async def admin_db_delete(slug: str, pk: str, request: Request, db: Session = De
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug in READ_ONLY_SLUGS:
+        _ui().flash(request, READ_ONLY_ERROR, error=True)
+        return RedirectResponse(f"/admin/db/{slug}", status_code=303)
     form = await request.form()
     require_csrf(request, str(form.get("csrf") or ""))
     ui = _ui()

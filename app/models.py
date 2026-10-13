@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship
 
 from app.db import Base
 
@@ -20,23 +20,23 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(80), default="")
     mobile: Mapped[str] = mapped_column(String(20), default="")
     salary_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
-    gold_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    coin_emami: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    coin_bahar: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    coin_half: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    coin_quarter: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    coin_gram: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    silver_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    btc: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    ada: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    eth: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    sol: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    doge: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    matic: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    usd: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
-    cash_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
+    _legacy_gold_grams: Mapped[Decimal] = mapped_column("gold_grams", Numeric(20, 8), default=Decimal("0"))
+    _legacy_coin_emami: Mapped[Decimal] = mapped_column("coin_emami", Numeric(20, 8), default=Decimal("0"))
+    _legacy_coin_bahar: Mapped[Decimal] = mapped_column("coin_bahar", Numeric(20, 8), default=Decimal("0"))
+    _legacy_coin_half: Mapped[Decimal] = mapped_column("coin_half", Numeric(20, 8), default=Decimal("0"))
+    _legacy_coin_quarter: Mapped[Decimal] = mapped_column("coin_quarter", Numeric(20, 8), default=Decimal("0"))
+    _legacy_coin_gram: Mapped[Decimal] = mapped_column("coin_gram", Numeric(20, 8), default=Decimal("0"))
+    _legacy_silver_grams: Mapped[Decimal] = mapped_column("silver_grams", Numeric(20, 8), default=Decimal("0"))
+    _legacy_btc: Mapped[Decimal] = mapped_column("btc", Numeric(20, 8), default=Decimal("0"))
+    _legacy_ada: Mapped[Decimal] = mapped_column("ada", Numeric(20, 8), default=Decimal("0"))
+    _legacy_eth: Mapped[Decimal] = mapped_column("eth", Numeric(20, 8), default=Decimal("0"))
+    _legacy_sol: Mapped[Decimal] = mapped_column("sol", Numeric(20, 8), default=Decimal("0"))
+    _legacy_doge: Mapped[Decimal] = mapped_column("doge", Numeric(20, 8), default=Decimal("0"))
+    _legacy_matic: Mapped[Decimal] = mapped_column("matic", Numeric(20, 8), default=Decimal("0"))
+    _legacy_usd: Mapped[Decimal] = mapped_column("usd", Numeric(20, 8), default=Decimal("0"))
+    _legacy_cash_toman: Mapped[Decimal] = mapped_column("cash_toman", Numeric(20, 2), default=Decimal("0"))
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
-    car_count: Mapped[int] = mapped_column(default=0)
+    _legacy_car_count: Mapped[int] = mapped_column("car_count", default=0)
     sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     mcp_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     car_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -49,6 +49,54 @@ class User(Base):
     spend_categories: Mapped[list["SpendCategory"]] = relationship(back_populates="user")
     daily_spends: Mapped[list["DailySpend"]] = relationship(back_populates="user")
     push_tokens: Mapped[list["PushDeviceToken"]] = relationship(back_populates="user")
+    holdings: Mapped[dict[str, "Holding"]] = relationship(
+        back_populates="user",
+        collection_class=attribute_keyed_dict("asset_key"),
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    def get_holding(self, key: str):
+        row = self.holdings.get(key)
+        qty = Decimal(row.quantity) if row is not None else Decimal("0")
+        return int(qty) if key in INT_HOLDING_KEYS else qty
+
+    def set_holding(self, key: str, value) -> None:
+        if key not in HOLDING_KEYS:
+            raise KeyError(key)
+        qty = Decimal(value or 0)
+        row = self.holdings.get(key)
+        if row is None:
+            self.holdings[key] = Holding(asset_key=key, quantity=qty)
+        else:
+            row.quantity = qty
+        # Transition: keep the legacy column in sync so a rollback still shows current values.
+        setattr(self, f"_legacy_{key}", int(qty) if key in INT_HOLDING_KEYS else qty)
+
+
+HOLDING_KEYS: tuple[str, ...] = ('gold_grams', 'coin_emami', 'coin_bahar', 'coin_half', 'coin_quarter', 'coin_gram', 'silver_grams', 'btc', 'ada', 'eth', 'sol', 'doge', 'matic', 'usd', 'cash_toman', 'car_count')
+INT_HOLDING_KEYS = frozenset({"car_count"})
+
+
+def _holding_property(key: str) -> property:
+    return property(lambda self: self.get_holding(key), lambda self, v: self.set_holding(key, v))
+
+
+for _key in HOLDING_KEYS:
+    setattr(User, _key, _holding_property(_key))
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+    __table_args__ = (UniqueConstraint("user_id", "asset_key", name="uq_holdings_user_asset"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    asset_key: Mapped[str] = mapped_column(String(32))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(20, 8), default=Decimal("0"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="holdings")
 
 
 class PushDeviceToken(Base):

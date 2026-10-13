@@ -344,39 +344,18 @@ async def profile_save(
         user.car_fetched_at = None
     elif sanjeh_token.strip():
         user.sanjeh_token = sanjeh_token.strip()
+    sanjeh_warning = None
     if user.sanjeh_token:
         try:
             await refresh_user_sanjeh_car(user)
         except SanjehAuthError:
-            return render(
-                request,
-                "profile.html",
-                db,
-                error="توکن سنجه نامعتبر است. در sanjeh.app پروفایل را تکمیل کنید و توکن درست را وارد کنید.",
-                flash=None,
-                form=form,
-            account=_account_form(user),
-                has_sanjeh_token=bool(user.sanjeh_token),
-                car_fetched_label=format_when(user.car_fetched_at),
-                car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-            )
+            sanjeh_warning = "دارایی‌ها ذخیره شد، ولی توکن سنجه نامعتبر است و قیمت خودرو به‌روز نشد."
         except Exception:
             logger.exception("Sanjeh fetch failed on profile save")
-            return render(
-                request,
-                "profile.html",
-                db,
-                error="دریافت قیمت خودرو از سنجه ممکن نشد. بعداً دوباره تلاش کنید.",
-                flash=None,
-                form=form,
-            account=_account_form(user),
-                has_sanjeh_token=bool(user.sanjeh_token),
-                car_fetched_label=format_when(user.car_fetched_at),
-                car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-            )
+            sanjeh_warning = "دارایی‌ها ذخیره شد، ولی قیمت خودرو از سنجه گرفته نشد. بعداً دوباره تلاش کنید."
     db.commit()
     await refresh_prices_and_snapshot_user(user.id)
-    flash(request, "موجودی ذخیره شد")
+    flash(request, sanjeh_warning or "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
 
 

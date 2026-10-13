@@ -684,6 +684,10 @@ def delete_record(db: Session, slug: str, obj, actor_id: int) -> str | None:
     if slug == "users":
         if obj.id == actor_id:
             return "نمی‌توانید حساب خودتان را حذف کنید."
+        from app.user_guard import USER_HAS_DATA_ERROR, user_has_data
+
+        if user_has_data(db, obj):
+            return USER_HAS_DATA_ERROR
         db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == obj.id).delete(synchronize_session=False)
         db.query(DailySpend).filter(DailySpend.user_id == obj.id).delete(synchronize_session=False)
         db.query(SpendCategory).filter(

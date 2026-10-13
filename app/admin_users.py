@@ -1,5 +1,6 @@
 """Admin user list and account deletion."""
 
+from app.user_guard import USER_HAS_DATA_ERROR, user_has_data
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -120,6 +121,10 @@ async def admin_delete_user(
     target = db.get(User, user_id)
     if target is None:
         flash(request, "کاربر پیدا نشد.", error=True)
+        return RedirectResponse("/admin", status_code=303)
+
+    if user_has_data(db, target):
+        flash(request, USER_HAS_DATA_ERROR, error=True)
         return RedirectResponse("/admin", status_code=303)
 
     username = target.username

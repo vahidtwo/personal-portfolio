@@ -32,6 +32,10 @@
     <h2 id="users-heading">کاربران</h2>
     <p class="card-desc">توکن سنجه نمایش داده نمی‌شود · برای مرتب‌سازی روی عنوان ستون کلیک کنید</p>
   </div>
+  <form id="batch-delete-form" method="get" action="/admin/users/delete" class="inline-form">
+    <button type="submit" class="btn btn-danger btn-sm">حذف انتخاب‌شده‌ها…</button>
+    <span class="text-muted">پیش از حذف، فهرست داده‌ها نمایش داده می‌شود و از پایگاه داده پشتیبان گرفته می‌شود.</span>
+  </form>
   <div class="table-wrap table-wrap-wide">
     <table class="data-table" data-sortable data-sort-default="total" data-sort-desc="1">
       <thead>
@@ -72,14 +76,10 @@
           <td>{{ row.sanjeh_label }}</td>
           <td>
             {% if row.can_delete %}
-            <form
-              method="post"
-              action="/admin/users/{{ row.id }}/delete"
-              class="inline-form"
-              onsubmit="return confirm('کاربر «{{ row.username }}» و تمام اسنپ‌شات‌ها و داده‌هایش حذف شود؟ این عمل برگشت‌پذیر نیست.');"
-            >
+            <label class="inline-check"><input type="checkbox" name="ids" value="{{ row.id }}" form="batch-delete-form" aria-label="انتخاب {{ row.username }}"></label>
+            <form method="post" action="/admin/users/{{ row.id }}/delete" class="inline-form">
               <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+              <button type="submit" class="btn btn-danger btn-sm">حذف…</button>
             </form>
             {% else %}
             <span class="text-muted">—</span>

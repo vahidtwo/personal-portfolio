@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import User, utcnow
 from app import rate_limit
+from app import security
 from app.security import (
     attach_session_cookie_deletion,
     get_authenticated_user,
@@ -78,6 +79,9 @@ async def register(
             form={"username": username},
         )
     error = validate_username(username) or validate_password(password)
+    # Signing up with an admin name is only allowed to bootstrap an empty install.
+    if not error and username in security.ADMIN_USERNAMES and db.query(User.id).first() is not None:
+        error = security.ADMIN_NAME_ERROR
     if not error and password != password_confirm:
         error = "رمز عبور و تکرار آن یکسان نیستند"
     if error:

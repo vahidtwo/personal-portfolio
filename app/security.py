@@ -40,6 +40,20 @@ def validate_username(username: str) -> str | None:
     return None
 
 
+ADMIN_NAME_ERROR = "این نام کاربری رزرو شده است و قابل انتخاب یا تغییر نیست."
+
+
+def admin_name_change_error(old: str | None, new: str) -> str | None:
+    """Admin rights come from the username, so never rename into or out of an admin name."""
+    old_n = normalize_username(old or "")
+    new_n = normalize_username(new)
+    if old_n == new_n:
+        return None
+    if new_n in ADMIN_USERNAMES or (old_n and old_n in ADMIN_USERNAMES):
+        return ADMIN_NAME_ERROR
+    return None
+
+
 def validate_password(password: str) -> str | None:
     if len(password) < 8:
         return "رمز عبور باید حداقل ۸ کاراکتر باشد"

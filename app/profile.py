@@ -24,6 +24,7 @@ from app.security import (
     get_authenticated_user,
     redirect_to_login,
     hash_password,
+    admin_name_change_error,
     normalize_username,
     parse_decimal,
     require_csrf,
@@ -225,7 +226,7 @@ async def profile_account(
         "salary_toman": salary_toman,
     }
     name = normalize_username(username)
-    name_error = validate_username(name)
+    name_error = validate_username(name) or admin_name_change_error(user.username, name)
     if name_error:
         return _render_account_error(request, db, user, name_error, account)
     taken = db.query(User).filter(User.username == name, User.id != user.id).first()

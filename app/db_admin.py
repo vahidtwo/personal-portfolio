@@ -20,6 +20,7 @@ from app.security import (
     redirect_to_login,
     hash_password,
     is_admin,
+    admin_name_change_error,
     normalize_username,
     parse_decimal,
     require_csrf,
@@ -438,7 +439,7 @@ def fields_for(db: Session, slug: str, obj, form: FormData | None) -> list[dict]
 
 def _save_user(db: Session, user: User | None, form: FormData) -> str | None:
     username = normalize_username(_posted(form, "username"))
-    error = validate_username(username)
+    error = validate_username(username) or admin_name_change_error(user.username if user else None, username)
     if error:
         return error
     taken = db.query(User).filter(User.username == username).one_or_none()

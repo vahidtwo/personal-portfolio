@@ -42,11 +42,14 @@ def _exists(uid):
         db.close()
 
 
-def test_admin_cannot_delete_user_with_data(client, monkeypatch):
+def test_single_delete_only_opens_confirm_screen(client, monkeypatch):
+    # Oct 13 14:49: deleting users with data is allowed, but only via the confirm flow.
     victim, empty = _setup(client, monkeypatch)
     t = _csrf(client, "/admin")
-    client.post(f"/admin/users/{victim}/delete", data={"csrf": t})
+    r = client.post(f"/admin/users/{victim}/delete", data={"csrf": t}, follow_redirects=False)
+    assert r.headers["location"] == f"/admin/users/delete?ids={victim}"
     assert _exists(victim)
+    # DB editor still refuses deleting a user with data.
     client.post(f"/admin/db/users/{victim}/delete", data={"csrf": t})
     assert _exists(victim)
 
@@ -54,7 +57,12 @@ def test_admin_cannot_delete_user_with_data(client, monkeypatch):
 def test_admin_can_still_delete_empty_user(client, monkeypatch):
     victim, empty = _setup(client, monkeypatch)
     t = _csrf(client, "/admin")
-    client.post(f"/admin/users/{empty}/delete", data={"csrf": t})
+    page = client.get(f"/admin/users/delete?ids={empty}").text
+    import re as _re
+    form = dict(_re.findall(r'name="(expected_json|backup_name)" value="([^"]*)"', page))
+    import html
+    client.post("/admin/users/delete", data={"csrf": t, "ids": [str(empty)], "confirm_count": "1",
+                "expected_json": html.unescape(form["expected_json"]), "backup_name": form["backup_name"]})
     assert not _exists(empty)
 
 

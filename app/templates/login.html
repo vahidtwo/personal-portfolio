@@ -8,11 +8,11 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
       <span class="label-text">نام کاربری</span>
-      <input name="username" value="{{ form.username }}" autocomplete="username" required>
+      <input name="username" value="{{ form.username }}" autocomplete="username" required dir="ltr">
     </label>
     <label>
       <span class="label-text">رمز عبور</span>
-      <input type="password" name="password" autocomplete="current-password" required>
+      <input type="password" name="password" autocomplete="current-password" required dir="ltr">
     </label>
     <button type="submit" class="btn btn-primary btn-block">ورود</button>
   </form>

@@ -2,21 +2,23 @@
 {% block title %}ثبت‌نام · موجودی من{% endblock %}
 {% block auth_body %}
   <h1>ثبت‌نام</h1>
-  <p class="card-desc">یک حساب بسازید و موجودی خود را ثبت کنید.</p>
+  <p class="card-desc">یک حساب بسازید؛ بعد از ثبت‌نام مستقیم به صفحه ورود دارایی‌ها می‌روید.</p>
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
   <form method="post" action="/register" class="stack-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>
       <span class="label-text">نام کاربری</span>
-      <input name="username" value="{{ form.username }}" autocomplete="username" required>
+      <input name="username" value="{{ form.username }}" autocomplete="username" required dir="ltr" aria-describedby="username-hint" minlength="{{ auth_rules.username_min }}" maxlength="{{ auth_rules.username_max }}">
+      <span class="field-hint" id="username-hint">{{ auth_rules.username_min | string | fa }} تا {{ auth_rules.username_max | string | fa }} کاراکتر، با حرف انگلیسی شروع شود؛ فقط حروف انگلیسی، عدد و _</span>
     </label>
     <label>
       <span class="label-text">رمز عبور</span>
-      <input type="password" name="password" autocomplete="new-password" required minlength="8">
+      <input type="password" name="password" autocomplete="new-password" required minlength="{{ auth_rules.password_min }}" dir="ltr" aria-describedby="password-hint">
+      <span class="field-hint" id="password-hint">حداقل {{ auth_rules.password_min | string | fa }} کاراکتر</span>
     </label>
     <label>
       <span class="label-text">تکرار رمز عبور</span>
-      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="8">
+      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="{{ auth_rules.password_min }}" dir="ltr">
     </label>
     <button type="submit" class="btn btn-primary btn-block">ساخت حساب</button>
   </form>

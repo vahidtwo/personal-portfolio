@@ -21,6 +21,14 @@ templates.env.globals["static_v"] = STATIC_ASSET_VERSION
 templates.env.filters["toman"] = format_toman
 templates.env.filters["when"] = format_when
 templates.env.filters["fa"] = persian_digits
+# Signup rules shown as hints come from the real validator constants.
+from app.security import PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH  # noqa: E402
+
+templates.env.globals["auth_rules"] = {
+    "username_min": USERNAME_MIN_LENGTH,
+    "username_max": USERNAME_MAX_LENGTH,
+    "password_min": PASSWORD_MIN_LENGTH,
+}
 
 
 def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:

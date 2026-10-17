@@ -2,6 +2,7 @@ package app.myinventory
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -72,7 +73,7 @@ class MainActivity : AppCompatActivity() {
             // the setup button silently does nothing.
             AndroidBridge(
                 this,
-                onServerConfigured = { base -> runOnUiThread { loadRemote(base, "/dashboard") } },
+                onServerConfigured = { base -> runOnUiThread { onBridgeServerUrl(base) } },
                 onRetry = { runOnUiThread { retryLast() } },
             ),
             "AndroidBridge",
@@ -153,7 +154,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         askSmsPermission()
-        restoreOrSetup(savedInstanceState)
+        if (intent?.action == ACTION_OPEN_SETUP) {
+            openAdvancedSetup()
+        } else {
+            restoreOrSetup(savedInstanceState)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == ACTION_OPEN_SETUP) openAdvancedSetup()
+    }
+
+    /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */
+    private fun openAdvancedSetup() {
+        errorPending = false
+        showLoading(false)
+        web.stopLoading()
+        web.loadUrl(SETUP_ADVANCED_ASSET)
     }
 
     override fun onPause() {
@@ -166,6 +185,15 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
         outState.putString(STATE_FAILED_URL, lastFailedUrl)
+    }
+
+    /** Runs on the UI thread so web.url is the page that called setServerUrl. */
+    private fun onBridgeServerUrl(base: String) {
+        when (ServerAddress.bridgeAction(web.url, base)) {
+            ServerAddress.BridgeAction.NAVIGATE -> loadRemote(base, "/dashboard")
+            ServerAddress.BridgeAction.SAVE_ONLY -> saveBaseUrl(base)
+            ServerAddress.BridgeAction.IGNORE -> Unit
+        }
     }
 
     private fun showLoading(show: Boolean) {
@@ -261,6 +289,8 @@ class MainActivity : AppCompatActivity() {
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
         private const val SETUP_ERROR_ASSET = "$SETUP_ASSET?error=connect"
+        private const val SETUP_ADVANCED_ASSET = "$SETUP_ASSET?advanced=1"
         private const val STATE_FAILED_URL = "last_failed_url"
+        const val ACTION_OPEN_SETUP = "app.myinventory.OPEN_SETUP"
     }
 }

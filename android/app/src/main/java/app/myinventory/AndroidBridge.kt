@@ -10,15 +10,15 @@ class AndroidBridge(
     private val onRetry: () -> Unit,
 ) {
     /**
-     * Saves the server address and opens the dashboard. An empty address means the default
-     * server. Returns false when the address is rejected (unknown scheme or no host).
+     * Asks the app to use this server. An empty address means the default server.
+     * Returns false when the address is rejected (unknown scheme or no host).
+     * Saving and navigating happen in MainActivity on the UI thread, which checks
+     * the calling page first (see ServerAddress.bridgeAction): only the bundled
+     * setup page may navigate, remote pages may only re-save their own origin.
      */
     @JavascriptInterface
     fun setServerUrl(url: String): Boolean {
         val normalized = ServerAddress.normalizeOrDefault(url) ?: return false
-        context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit {
-            putString(MainActivity.KEY_URL, normalized)
-        }
         onServerConfigured(normalized)
         return true
     }

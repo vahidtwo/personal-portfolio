@@ -40,4 +40,26 @@ class ServerAddressTest {
     }
 
     @Test fun garbageIsRejected() = assertNull(ServerAddress.normalize("not a url"))
+
+    @Test fun setupPageMayNavigate() = assertEquals(
+        ServerAddress.BridgeAction.NAVIGATE,
+        ServerAddress.bridgeAction("file:///android_asset/www/setup.html?error=connect", "https://portfolio.vahidtwo.ir"),
+    )
+
+    @Test fun remotePageSameHostOnlySaves() {
+        for (page in listOf("https://portfolio.vahidtwo.ir/", "https://portfolio.vahidtwo.ir/dashboard", "https://portfolio.vahidtwo.ir/login?next=/")) {
+            assertEquals(page, ServerAddress.BridgeAction.SAVE_ONLY, ServerAddress.bridgeAction(page, "https://portfolio.vahidtwo.ir"))
+        }
+    }
+
+    @Test fun remotePageOtherHostIsIgnored() = assertEquals(
+        ServerAddress.BridgeAction.IGNORE,
+        ServerAddress.bridgeAction("https://evil.example/", "https://portfolio.vahidtwo.ir"),
+    )
+
+    @Test fun unknownPageIsIgnored() {
+        assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction(null, "https://portfolio.vahidtwo.ir"))
+        assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction("about:blank", "https://portfolio.vahidtwo.ir"))
+        assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction("http://portfolio.vahidtwo.ir/", "https://portfolio.vahidtwo.ir"))
+    }
 }

@@ -2135,8 +2135,10 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
     gap: 20px;
     align-items: start;
   }
-  .dash-hero, .dash-tiles { align-self: stretch; }
-  .dash .dash-tiles { grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 12px; }
+  .dash-hero { align-self: stretch; }
+  /* Tiles sit at the top and keep their own height (not stretched to the hero). */
+  .dash-tiles { align-self: start; }
+  .dash .dash-tiles { grid-template-columns: 1fr; grid-auto-rows: auto; align-content: start; gap: 12px; }
   .dash-pie { display: block; }
   .dash-assets {
     background: var(--surface);

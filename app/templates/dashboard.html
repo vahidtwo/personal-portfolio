@@ -149,7 +149,7 @@
     <div class="acard">
       <div class="r1">
         <span class="logo"><img src="/static/logos/{{ row.key }}.svg" alt="" width="24" height="24"></span>
-        <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span><bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}{% if row.usd_equiv_label %} · ≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار{% endif %}</span></div>
+        <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span>{% if row.key == "cash" %}وجه نقد{% else %}<bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}{% endif %}{% if row.usd_equiv_label %} · ≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار{% endif %}</span></div>
         <div class="vl"><div><b>{{ row.value_label }}</b> <small>تومان</small></div><div class="sub2"><span>{{ row.share_label }}٪ سهم</span><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></div></div>
       </div>
       <div class="line" aria-hidden="true"><i style="width:{{ row.share_width }}%;background:{{ row.color }}"></i></div>

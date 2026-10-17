@@ -230,6 +230,16 @@ def test_layout_css_contract():
     assert '"hero tiles"' in block  # desktop: tiles beside the hero
     assert "#chart-asset-select:focus-visible" in block and ".range button:focus-visible" in block
     assert "#chart-fullscreen { display: none; }" not in css  # full screen reachable on phones
+    assert ".dash-tiles { align-self: start; }" in block and "grid-auto-rows: 1fr" not in block  # tiles size to content
+
+
+def test_cash_card_subtitle_says_cash_not_the_amount_again(client, no_network):
+    _seed(client)
+    html = client.get("/dashboard").text
+    cards = html[html.index('id="asset-cards"'):html.index('id="portfolio-table"')]
+    cash = cards[cards.index("وجه نقد") - 400:cards.index("وجه نقد") + 200]
+    assert "<span>وجه نقد</span>" in cash
+    assert cash.count("۱٬۵۰۰٬۰۰۰") == 1  # the value once, not repeated as the subtitle
 
 
 # --- rendered dashboard -------------------------------------------------------------------

@@ -29,17 +29,14 @@ import jdatetime  # noqa: E402
 
 
 
-def apk_size_label() -> str | None:
-    """Size of the Android APK actually on the server («۴ مگابایت»), or None when the file is missing."""
-    try:
-        size = (BASE_DIR / "static" / "my-inventory.apk").stat().st_size
-    except OSError:
-        return None
-    mb = size / (1024 * 1024)
-    return f"{format_number(mb, 0 if mb >= 1 else 1)} مگابایت"
+def android_apk_info() -> dict | None:
+    """Version + size of the Android APK actually on the server, or None when the file is missing."""
+    from app.apk_info import apk_info
+
+    return apk_info(BASE_DIR / "static" / "my-inventory.apk")
 
 
-templates.env.globals["apk_size_label"] = apk_size_label
+templates.env.globals["android_apk_info"] = android_apk_info
 templates.env.globals["current_jalali_year"] = lambda: jdatetime.date.today().year
 templates.env.globals["auth_rules"] = {
     "username_min": USERNAME_MIN_LENGTH,

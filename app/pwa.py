@@ -36,25 +36,50 @@ def _apk_sha256_cached() -> str | None:
     return _sha_cache["sha256"]  # type: ignore[return-value]
 
 
-@router.get("/api/app-version")
-def android_app_version():
-    """Public: latest Android build, used by the app's «نسخهٔ تازه رسید» notice."""
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def to_fa_digits(value) -> str:
+    return str(value).translate(_FA_DIGITS)
+
+
+def load_android_release() -> dict | None:
+    """versionCode/versionName/notes/min_required/cert_sha256 from android_release.json,
+    plus sha256 and size_bytes measured from the served APK file."""
     try:
         release = json.loads(_RELEASE_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        raise HTTPException(status_code=404, detail="اطلاعات نسخه در دسترس نیست")
-    return JSONResponse(
-        {
+        info = {
             "versionCode": int(release["versionCode"]),
             "versionName": str(release["versionName"]),
             "url": _APK_DOWNLOAD_URL,
             "sha256": _apk_sha256_cached(),
+            "size_bytes": _APK_PATH.stat().st_size if _APK_PATH.is_file() else None,
+            "cert_sha256": release.get("cert_sha256") or None,
             "notes": [str(n) for n in release.get("notes", [])],
             # Parsed by the app but ignored for now: forced updates aren't approved.
             "min_required": int(release.get("min_required", 0) or 0),
-        },
-        headers={"Cache-Control": "no-cache"},
-    )
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return info
+
+
+def apk_size_label_fa(size_bytes: int | None) -> str | None:
+    """«حدود ۳ مگابایت» (rounded to whole megabytes, at least ۱)."""
+    if not size_bytes:
+        return None
+    mb = max(1, round(size_bytes / (1024 * 1024)))
+    return f"حدود {to_fa_digits(mb)} مگابایت"
+
+
+@router.get("/api/app-version")
+def android_app_version():
+    """Public: latest Android build, used by the app's update notice."""
+    info = load_android_release()
+    if info is None:
+        raise HTTPException(status_code=404, detail="اطلاعات نسخه در دسترس نیست")
+    return JSONResponse(info, headers={"Cache-Control": "no-cache"})
+
 
 @router.get("/manifest.webmanifest")
 def web_manifest():

@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity() {
                 if (url.startsWith("file:")) {
                     errorPending = false
                     showLoading(false)
+                    UpdateNotifier.hideQuietly()
                     return
                 }
                 if (errorPending) return // the error screen is on its way
@@ -141,6 +142,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     PushRegistrar.registerFcmToken(this@MainActivity)
                 }
+                UpdateNotifier.onPageLoaded(this@MainActivity, url, savedBaseUrl())
             }
         }
 
@@ -154,7 +156,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         askSmsPermission()
-        UpdateNotifier.checkOnce(this, savedBaseUrl())
         if (intent?.action == ACTION_OPEN_SETUP) {
             openAdvancedSetup()
         } else {
@@ -170,10 +171,35 @@ class MainActivity : AppCompatActivity() {
 
     /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */
     private fun openAdvancedSetup() {
+        UpdateNotifier.hideQuietly()
         errorPending = false
         showLoading(false)
         web.stopLoading()
         web.loadUrl(SETUP_ADVANCED_ASSET)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        UpdateNotifier.onResume(this)
+    }
+
+    override fun onDestroy() {
+        UpdateNotifier.hideQuietly()
+        super.onDestroy()
+    }
+
+    /** The update sheet may only cover a fully loaded, logged-in site page. */
+    fun canShowUpdateSheet(): Boolean =
+        !isFinishing && !isDestroyed && loading.visibility != View.VISIBLE && !errorPending &&
+            UpdateCheck.isEligiblePage(web.url, savedBaseUrl())
+
+    /** Keeps TalkBack inside the update sheet while it is open. */
+    fun setPageHiddenFromAccessibility(hidden: Boolean) {
+        web.importantForAccessibility = if (hidden) {
+            View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        } else {
+            View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        }
     }
 
     override fun onPause() {
@@ -203,6 +229,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Never leave Android's "Webpage not available" page up: show our Persian error screen. */
     private fun showConnectionError(failedUrl: String?) {
+        UpdateNotifier.hideQuietly()
         if (failedUrl != null && failedUrl.startsWith("https://")) lastFailedUrl = failedUrl
         errorPending = true
         showLoading(true)
@@ -252,7 +279,7 @@ class MainActivity : AppCompatActivity() {
         web.loadUrl("$normalized$suffix")
     }
 
-    private fun savedBaseUrl(): String? {
+    fun savedBaseUrl(): String? {
         val raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, "") ?: ""
         return AndroidBridge.normalizeBaseUrl(raw)
     }

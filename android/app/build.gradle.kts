@@ -22,8 +22,16 @@ android {
         applicationId = "app.myinventory"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "5.0"
+        // QA-only overrides (e.g. the throwaway v7 test APK): -PversionCodeOverride=7 -PversionNameOverride=7.0-test
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 6
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "6.0"
+        // Release: the update check uses the saved server address, https only.
+        buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
+        buildConfigField("String", "UPDATE_HTTP_HOST", "\"\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     signingConfigs {
@@ -48,6 +56,15 @@ android {
                 logger.warn("my-inventory: no release keystore.properties found; signing release with the debug key")
                 signingConfigs.getByName("debug")
             }
+        }
+        // QA variant: same applicationId and key as release, but the update check talks to
+        // a local test server (tools/qa_update_server.py). Never shipped in app/static.
+        create("qa") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            val qaBase = (project.findProperty("qaUpdateBaseUrl") as String?) ?: "http://10.0.2.2:8765"
+            buildConfigField("String", "UPDATE_BASE_URL", "\"$qaBase\"")
+            buildConfigField("String", "UPDATE_HTTP_HOST", "\"10.0.2.2\"")
         }
     }
 

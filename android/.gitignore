@@ -5,3 +5,9 @@ app/build/
 *.apk
 app/src/main/assets/www/static/
 app/google-services.json
+
+# Release signing material must never be committed
+*.jks
+*.keystore
+keystore.properties
+.my-inventory-release/

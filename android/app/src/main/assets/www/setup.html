@@ -30,17 +30,20 @@
           <li>کل صندوق پیامک خوانده نمی‌شود</li>
           <li>برای ذخیره خودکار پیامک باید در اپ وارد حساب شوید</li>
         </ul>
-        <form id="setup-form" class="grid-form">
+        <form id="setup-form" class="grid-form" novalidate>
           <label>
             <span class="label-text">آدرس سرور (https)</span>
-            <input type="url" id="site-url" dir="ltr" inputmode="url" autocomplete="url" value="https://portfolio.vahidtwo.ir" placeholder="https://portfolio.vahidtwo.ir" required>
+            <input type="url" id="site-url" dir="ltr" inputmode="url" autocomplete="url" value="https://portfolio.vahidtwo.ir" placeholder="https://portfolio.vahidtwo.ir">
           </label>
           <label>
             <span class="label-text">عبارت لازم در پیامک</span>
             <input type="text" id="sms-phrase" value="برداشت" autocomplete="off">
           </label>
-          <p id="setup-error" class="form-error" hidden role="alert"></p>
-          <button type="submit" class="btn btn-primary btn-block">ادامه به داشبورد</button>
+          <button type="submit" id="setup-submit" class="btn btn-primary btn-block">ادامه به داشبورد</button>
+          <div id="setup-error-box" hidden>
+            <p id="setup-error" class="toast toast-warn" role="alert"></p>
+            <button type="button" id="setup-retry" class="btn btn-block" hidden>تلاش دوباره</button>
+          </div>
         </form>
       </section>
     </div>
@@ -50,32 +53,111 @@
   </footer>
   <script>
     (function () {
+      var DEFAULT_URL = "https://portfolio.vahidtwo.ir";
+      var BUTTON_LABEL = "ادامه به داشبورد";
+      var CONNECT_ERROR = "اتصال به سرور برقرار نشد. نشانی را بررسی کنید.";
       var form = document.getElementById("setup-form");
       var urlInput = document.getElementById("site-url");
       var phraseInput = document.getElementById("sms-phrase");
+      var errorBox = document.getElementById("setup-error-box");
       var errorEl = document.getElementById("setup-error");
-      if (window.AndroidBridge) {
-        var saved = AndroidBridge.getServerUrl();
-        if (saved) urlInput.value = saved;
-        phraseInput.value = AndroidBridge.getSmsPhrase() || "برداشت";
+      var retryBtn = document.getElementById("setup-retry");
+      var button = document.getElementById("setup-submit");
+      var stuckTimer = null;
+
+      function setBusy(busy) {
+        button.disabled = busy;
+        retryBtn.disabled = busy;
+        button.textContent = busy ? "در حال اتصال…" : BUTTON_LABEL;
+        button.setAttribute("aria-busy", busy ? "true" : "false");
+        if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
       }
-      form.addEventListener("submit", function (event) {
-        event.preventDefault();
-        errorEl.hidden = true;
+
+      // withRetry: show the «تلاش دوباره» button (connection failures only).
+      function showError(message, withRetry) {
+        setBusy(false);
+        errorEl.textContent = message;
+        retryBtn.hidden = !withRetry;
+        errorBox.hidden = false;
+      }
+
+      function hideError() {
+        errorBox.hidden = true;
+        retryBtn.hidden = true;
+      }
+
+      function bridge(fn, fallback) {
+        if (!window.AndroidBridge) return fallback;
+        try { return fn(window.AndroidBridge); } catch (e) { return fallback; }
+      }
+
+      var saved = bridge(function (b) { return b.getServerUrl(); }, "");
+      urlInput.value = (saved || "").trim() || DEFAULT_URL;
+      phraseInput.value = bridge(function (b) { return b.getSmsPhrase(); }, "") || "برداشت";
+
+      // MainActivity sends us back here with ?error=connect when the page failed to load.
+      if (/[?&]error=connect\b/.test(location.search)) {
+        showError(CONNECT_ERROR, true);
+      }
+
+      function connect() {
+        hideError();
         var url = (urlInput.value || "").trim().replace(/\/+$/, "");
         var phrase = (phraseInput.value || "").trim() || "برداشت";
-        if (!url.startsWith("https://")) {
-          errorEl.textContent = "آدرس باید با https:// شروع شود.";
-          errorEl.hidden = false;
+        if (/^https?:\/*$/i.test(url)) url = ""; // only a protocol was typed
+
+        if (!url) {
+          urlInput.value = DEFAULT_URL;
+          urlInput.focus();
+          showError("نشانی سرور خالی است. نشانی اصلی را دوباره گذاشتیم؛ اگر درست است، دوباره «" + BUTTON_LABEL + "» را بزنید.", false);
           return;
         }
+        if (/^http:\/\//i.test(url)) {
+          urlInput.focus();
+          showError("فقط نشانی امن پذیرفته می‌شود. به‌جای http:// از https:// استفاده کنید.", false);
+          return;
+        }
+        if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+          // Typed without a protocol, e.g. portfolio.vahidtwo.ir
+          url = "https://" + url;
+        } else if (!/^https:\/\//i.test(url)) {
+          urlInput.focus();
+          showError("نشانی باید با https:// شروع شود؛ مثلاً " + DEFAULT_URL, false);
+          return;
+        }
+        urlInput.value = url;
+
         if (!window.AndroidBridge) {
-          errorEl.textContent = "پل اندروید در دسترس نیست.";
-          errorEl.hidden = false;
+          showError("این صفحه فقط داخل اپ اندروید کار می‌کند.", false);
           return;
         }
-        AndroidBridge.setSmsPhrase(phrase);
-        AndroidBridge.setServerUrl(url);
+
+        setBusy(true);
+        var accepted;
+        try {
+          window.AndroidBridge.setSmsPhrase(phrase);
+          accepted = window.AndroidBridge.setServerUrl(url);
+        } catch (e) {
+          showError(CONNECT_ERROR, true);
+          return;
+        }
+        // Older builds returned nothing; only an explicit false means rejected.
+        if (accepted === false) {
+          urlInput.focus();
+          showError("این نشانی پذیرفته نشد. یک نشانی کامل مثل " + DEFAULT_URL + " وارد کنید.", false);
+          return;
+        }
+        // The app is now opening the dashboard. If we are still here after a
+        // while, don't leave the button stuck.
+        stuckTimer = setTimeout(function () { showError(CONNECT_ERROR, true); }, 20000);
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!button.disabled) connect();
+      });
+      retryBtn.addEventListener("click", function () {
+        if (!button.disabled) connect();
       });
     })();
   </script>

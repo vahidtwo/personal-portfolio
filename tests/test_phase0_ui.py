@@ -113,3 +113,23 @@ def test_privacy_values_shown_by_default_with_labeled_toggle(client, no_network)
 def test_html_lang_and_dir(client):
     for path in ("/", "/login", "/register"):
         assert '<html lang="fa" dir="rtl"' in client.get(path).text
+
+
+def test_chart_picker_hides_zero_assets_like_the_table(client, no_network):
+    import re
+    _register(client)
+    _set_price("btc", "1000000")
+    _set_price("eth", "500000")
+    client.post("/profile", data={"btc": "2", "gold_grams": "1", "csrf": _csrf(client)})  # gold has no price
+
+    def picker():
+        html = client.get("/dashboard").text
+        sel = html[html.index('id="chart-asset-select"'):html.index("</select>", html.index('id="chart-asset-select"'))]
+        return re.findall(r'<option value="([^"]*)"', sel)
+
+    opts = picker()
+    assert opts[0] == "total"
+    assert "btc" in opts and "eth" not in opts
+    assert "gold" in opts  # quantity > 0 but no price (value 0): still shown, same as the table
+    client.post("/profile", data={"btc": "2", "gold_grams": "1", "eth": "1", "csrf": _csrf(client)})
+    assert "eth" in picker()

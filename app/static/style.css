@@ -2243,3 +2243,16 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
     box-shadow: var(--card-shadow);
   }
 }
+
+/* «نسخه جدید، تازه‌سازی»: shown when a new service worker takes over; the page is never reloaded by itself. */
+.pwa-update-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  min-height: 40px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--card-shadow);
+}

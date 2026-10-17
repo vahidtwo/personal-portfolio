@@ -1,16 +1,26 @@
 (function () {
   if ("serviceWorker" in navigator) {
+    // updateViaCache "none": the browser always asks the server for a new /sw.js (and its imports).
+    var hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("/sw.js", { updateViaCache: "none" })
       .then(function (registration) {
         registration.update();
+        window.addEventListener("load", function () { registration.update(); });
       })
       .catch(function () {});
-    var refreshing = false;
+    // A new version took over. Never reload an open page on its own (it could drop what the user is
+    // typing): offer a small refresh button; the next navigation picks the new version up anyway.
     navigator.serviceWorker.addEventListener("controllerchange", function () {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
+      if (!hadController) return; // first install, nothing changed on screen
+      if (document.getElementById("pwa-update")) return;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.id = "pwa-update";
+      btn.className = "btn btn-ghost btn-sm pwa-update-btn";
+      btn.textContent = "نسخه جدید، تازه‌سازی";
+      btn.addEventListener("click", function () { window.location.reload(); });
+      document.body.appendChild(btn);
     });
   }
 

@@ -203,4 +203,4 @@ def test_save_bar_and_leave_warning_contract(client, no_network):
 
 def test_static_asset_version_bumped():
     from app.config import STATIC_ASSET_VERSION
-    assert STATIC_ASSET_VERSION != "20261017g"
+    assert STATIC_ASSET_VERSION not in ("20261017g",)

@@ -72,6 +72,17 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
+@app.middleware("http")
+async def no_store_html(request, call_next):
+    """Never let a browser, proxy or WebView HTTP cache keep an HTML page: after a deploy the next load
+    must come from the server. Versioned /static assets keep their normal caching. The service worker's
+    own offline copy of the dashboard (Cache API) is not affected by this header."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/static/") and response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/health")
 async def health():
     return JSONResponse({"ok": True})

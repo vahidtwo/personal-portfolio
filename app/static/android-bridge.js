@@ -4,8 +4,10 @@
   document.querySelectorAll("#pwa-install, #pwa-install-landing").forEach(function (el) {
     el.hidden = true;
   });
-  // Do NOT call the setServerUrl bridge method from web pages. In the app,
-  // setServerUrl navigates to /dashboard, so calling it on every page load
-  // causes a reload loop (landing -> /dashboard -> landing ...). The app
-  // already saves the server address itself in onPageFinished.
+  try {
+    var origin = window.location.origin;
+    if (origin && origin.startsWith("https://") && typeof AndroidBridge.setServerUrl === "function") {
+      AndroidBridge.setServerUrl(origin);
+    }
+  } catch (e) {}
 })();

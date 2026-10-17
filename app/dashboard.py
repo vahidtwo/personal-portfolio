@@ -44,7 +44,13 @@ def _format_usd(value: Decimal) -> str:
     return format_usd(value, fixed=True)
 
 
-CHART_FULL_DETAIL = timedelta(days=7)
+# Chart history tiers (age -> bucket). Each bucket keeps its last snapshot, values untouched.
+CHART_FULL_DETAIL = timedelta(hours=48)          # every (hourly) snapshot
+CHART_TIERS = (
+    (timedelta(days=7), "6h"),                    # 48h-7d: one per 6 hours (Tehran)
+    (timedelta(days=366), "day"),                 # 7d-1y: one per Tehran day
+    (None, "week"),                               # older: one per Tehran week
+)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -54,57 +60,87 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def chart_snapshots(snaps: list[PortfolioSnapshot], now: datetime) -> list[PortfolioSnapshot]:
-    """Every snapshot of the last 7 days; older history keeps the last snapshot of each Tehran day.
+def _chart_bucket(at_tehran: datetime, age: timedelta):
+    for limit, tier in CHART_TIERS:
+        if limit is None or age < limit:
+            break
+    if tier == "6h":
+        return (tier, at_tehran.date(), at_tehran.hour // 6)
+    if tier == "day":
+        return (tier, at_tehran.date())
+    year, week, _ = at_tehran.date().isocalendar()
+    return (tier, year, week)
 
-    Hourly snapshots for a year would be ~9k points per series; one point per day is plenty
-    for the 3M / 1Y / all ranges and keeps the page light. Values are untouched.
+
+def chart_snapshots(snaps: list, now: datetime) -> list:
+    """Snapshots for the chart, oldest first: every one of the last 48 hours, then the last one
+    per 6 hours (to 7 days), per Tehran day (to 1 year) and per week (older).
+
+    Three years of hourly snapshots would be ~26k points per series; this keeps ~570 and every
+    kept point is a real snapshot with its stored values. Works on anything with ``taken_at``.
     """
     cutoff = now - CHART_FULL_DETAIL
-    daily: dict = {}
-    recent: list[PortfolioSnapshot] = []
+    buckets: dict = {}
+    recent: list = []
     for snap in snaps:
         at = _as_utc(snap.taken_at)
         if at >= cutoff:
             recent.append(snap)
         else:
-            daily[at.astimezone(TEHRAN).date()] = snap  # ascending order: last one of the day wins
-    return [daily[d] for d in sorted(daily)] + recent
+            buckets[_chart_bucket(at.astimezone(TEHRAN), now - at)] = snap  # ascending: last one wins
+    older = sorted(buckets.values(), key=lambda s: _as_utc(s.taken_at))
+    return older + recent
+
+
+def _chart_number(value) -> int | float:
+    """Stored toman value as JSON number; integers without a trailing «.0» (same value)."""
+    d = Decimal(str(value))
+    return int(d) if d == d.to_integral_value() else float(d)
 
 
 def build_chart_data(db: Session, user_id: int, view, now: datetime | None = None) -> dict:
     """Labels + per-asset series; chronological left→right, last point is live portfolio."""
     now = _as_utc(now or utcnow())
-    all_snaps = (
-        db.query(PortfolioSnapshot)
+    # Pick the points from (id, taken_at) only, then load the breakdowns of the kept ones.
+    index = (
+        db.query(PortfolioSnapshot.id, PortfolioSnapshot.taken_at)
         .filter(PortfolioSnapshot.user_id == user_id)
         .order_by(PortfolioSnapshot.taken_at.asc(), PortfolioSnapshot.id.asc())
         .all()
     )
-    snaps = chart_snapshots(all_snaps, now)
+    picked = chart_snapshots(index, now)
+    ids = [row.id for row in picked]
+    loaded: dict[int, PortfolioSnapshot] = {}
+    for i in range(0, len(ids), 500):
+        for snap in db.query(PortfolioSnapshot).filter(PortfolioSnapshot.id.in_(ids[i:i + 500])):
+            loaded[snap.id] = snap
+    snaps = [loaded[i] for i in ids if i in loaded]
     stamps = [_as_utc(s.taken_at) for s in snaps] + [now]
     labels = [format_chart_jalali(at) for at in stamps]
     times = [int(at.timestamp() * 1000) for at in stamps]
     breakdowns = [json.loads(s.breakdown_json) for s in snaps]
 
-    current: dict[str, float] = {row.key: float(row.value_toman) for row in view.rows}
-    current["total"] = float(view.total_toman)
+    current: dict[str, Decimal] = {row.key: row.value_toman for row in view.rows}
+    current["total"] = view.total_toman
 
     series: list[dict] = [
         {
             "key": "total",
             "label": "جمع کل",
-            "data": [float(bd.get("total", s.total_toman)) for s, bd in zip(snaps, breakdowns)]
-            + [current["total"]],
+            "data": [_chart_number(bd.get("total", s.total_toman)) for s, bd in zip(snaps, breakdowns)]
+            + [_chart_number(current["total"])],
         }
     ]
+    # Only assets the picker can show (the current rows); others were never sent to the UI.
+    shown = {row.key for row in view.rows}
     for key in ASSET_ORDER:
-        history_vals = [float(bd.get(key, 0)) for bd in breakdowns]
+        if key not in shown:
+            continue
         series.append(
             {
                 "key": key,
                 "label": ASSET_LABEL_FA.get(key, key),
-                "data": history_vals + [current.get(key, 0.0)],
+                "data": [_chart_number(bd.get(key, 0)) for bd in breakdowns] + [_chart_number(current.get(key, 0))],
             }
         )
     asset_options = [{"key": "total", "label": "جمع کل"}] + [

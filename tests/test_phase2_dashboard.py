@@ -118,15 +118,54 @@ def test_asset_week_chip(client):
     assert asset_week_change(rows["cash"], None)[0]["label"] == "بدون تغییر"
 
 
-def test_chart_history_keeps_week_and_one_point_per_tehran_day(client):
+def test_chart_history_tiers_keep_real_snapshots(client):
     from app.dashboard import chart_snapshots
 
-    snaps = [_Snap(NOW - timedelta(hours=h)) for h in range(24 * 10, -1, -1)]  # hourly, 10 days
+    snaps = [_Snap(NOW - timedelta(hours=h)) for h in range(24 * 365 * 3, -1, -1)]  # hourly, 3 years
     kept = chart_snapshots(snaps, NOW)
-    recent = [s for s in snaps if s.taken_at >= NOW - timedelta(days=7)]
-    assert kept[-len(recent):] == recent
-    older_days = {s.taken_at.astimezone(TEHRAN).date() for s in kept[: -len(recent)]}
-    assert len(kept) - len(recent) == len(older_days)  # one per Tehran day
+    assert all(k in snaps for k in kept)  # real snapshots, stored values untouched
+    assert [k.taken_at for k in kept] == sorted(k.taken_at for k in kept)
+    age = lambda s: NOW - s.taken_at  # noqa: E731
+    last48 = [s for s in snaps if age(s) <= timedelta(hours=48)]
+    assert [k for k in kept if age(k) <= timedelta(hours=48)] == last48  # every hourly point
+    six = [k for k in kept if timedelta(hours=48) < age(k) < timedelta(days=7)]
+    buckets = {(k.taken_at.astimezone(TEHRAN).date(), k.taken_at.astimezone(TEHRAN).hour // 6) for k in six}
+    assert len(six) == len(buckets) and 18 <= len(six) <= 21  # one per 6 hours
+    days = [k for k in kept if timedelta(days=7) <= age(k) < timedelta(days=366)]
+    assert len(days) == len({k.taken_at.astimezone(TEHRAN).date() for k in days})  # one per Tehran day
+    weeks = [k for k in kept if age(k) >= timedelta(days=366)]
+    assert len(weeks) == len({k.taken_at.astimezone(TEHRAN).date().isocalendar()[:2] for k in weeks})
+    assert len(kept) < 600
+
+
+def test_chart_payload_small_for_three_years_hourly(client):
+    """~3 years of hourly snapshots, every asset held: the embedded chart JSON stays < 200 KB."""
+    from app.dashboard import build_chart_data
+    from app.db import SessionLocal
+    from app.models import PortfolioSnapshot, User
+    from app.portfolio import ASSET_ORDER
+
+    _register(client)
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == "alice").one()
+    now = datetime.now(timezone.utc)
+    keys = list(ASSET_ORDER) + [f"extra_{i}" for i in range(40 - len(ASSET_ORDER))]  # 40 keys per breakdown
+    rows = []
+    for h in range(24 * 365 * 3, 0, -1):
+        bd = {k: str(123_456_789 + h * (i + 1)) for i, k in enumerate(keys)}
+        bd["total"] = str(9_876_543_210 + h)
+        rows.append({"user_id": user.id, "taken_at": (now - timedelta(hours=h)).replace(tzinfo=None),
+                     "total_toman": Decimal(bd["total"]), "breakdown_json": json.dumps(bd)})
+    db.execute(PortfolioSnapshot.__table__.insert(), rows)
+    db.commit()
+    view = _view(**{k: (1, 1000) if k not in ("cash", "car") else (1000, None) for k in ASSET_ORDER if k != "car"})
+    data = build_chart_data(db, user.id, view, now)
+    db.close()
+    size = len(json.dumps(data, ensure_ascii=False).encode())
+    assert size < 200 * 1024, size
+    assert len(data["series"]) == len(view.rows) + 1
+    # Values are the stored ones: the newest snapshot's total is passed through as is.
+    assert data["series"][0]["data"][-2] == 9_876_543_211
 
 
 def test_next_instalment_due_chip(client):

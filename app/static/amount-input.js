@@ -10,21 +10,22 @@
     });
   }
 
+  // Same rules as the server parser (NumberFa.normalize / app.number_input); amounts are never signed.
   function plainNumber(text) {
-    var latin = toLatin(text).replace(/[,٬\s]/g, "");
-    if (!/^\d*\.?\d*$/.test(latin) || latin === "" || latin === ".") return "";
-    return latin;
+    var t = NF.normalize(text);
+    if (!t || /^[+-]/.test(t)) return "";
+    return t;
   }
 
   function groupInteger(digits) {
     return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
-  // Display form inside inputs: Persian digits and ٬ (submit strips back to Latin).
+  // Display form inside inputs: Persian digits, ٬ grouping, ٫ decimal (submit strips back to Latin).
   function displayAmount(text) {
     var plain = formatAmount(text);
     if (!plain) return "";
-    return plain.replace(/,/g, "٬").replace(/\d/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[Number(d)]; });
+    return plain.replace(/,/g, "٬").replace(".", "٫").replace(/\d/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[Number(d)]; });
   }
 
   function formatAmount(text) {
@@ -54,6 +55,7 @@
       var digitsBefore = toLatin(input.value.slice(0, start)).replace(/\D/g, "").length;
       var next = displayAmount(input.value);
       if (input.value === next) return;
+      if (!next && input.value.trim()) return; // leave invalid text for the user (and server) to see
       input.value = next;
       var seen = 0;
       var pos = next.length;
@@ -74,7 +76,9 @@
       form.dataset.amountStrip = "1";
       form.addEventListener("submit", function () {
         form.querySelectorAll("[data-thousands]").forEach(function (field) {
-          field.value = plainNumber(field.value);
+          var plain = plainNumber(field.value);
+          // Invalid text is sent as typed so the server rejects it instead of silently saving 0.
+          if (plain || !field.value.trim()) field.value = plain;
         });
       });
     }
@@ -111,6 +115,12 @@
     return (info.exact ? "= " : "≈ ") + info.text;
   }
 
+  // Chip label: «≈» in front whenever the words are rounded.
+  function chipLabel(amount) {
+    var info = amountWordsInfo(amount);
+    return info.exact ? info.text : "≈ " + info.text;
+  }
+
   // QA (Oct 17): a chip may never be more than 100x what was typed, so one tap
   // can't silently log 1000x. Exception (team decision): below 1,000 toman, offer
   // exactly one chip = typed x 1000 (people type "150" meaning 150 thousand).
@@ -123,14 +133,14 @@
     if (!plain || !isFinite(amount) || amount <= 0) return [];
     if (amount < SMALL_AMOUNT) {
       var thousandPlain = scaleByZeros(plain, 3);
-      return [{ plain: thousandPlain, label: amountInWords(Number(thousandPlain)) }];
+      return [{ plain: thousandPlain, label: chipLabel(Number(thousandPlain)) }];
     }
     var out = [];
     CHIP_ZEROS.forEach(function (zeros) {
       var scaledPlain = scaleByZeros(plain, zeros);
       var scaled = Number(scaledPlain);
       if (!isFinite(scaled) || scaled > amount * MAX_CHIP_FACTOR) return;
-      out.push({ plain: scaledPlain, label: amountInWords(scaled) });
+      out.push({ plain: scaledPlain, label: chipLabel(scaled) });
     });
     return out;
   }
@@ -174,7 +184,7 @@
   }
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { amountInWords: amountInWords, amountWordsLine: amountWordsLine, SMALL_AMOUNT: SMALL_AMOUNT, chipOptions: chipOptions, plainNumber: plainNumber,
+    module.exports = { amountInWords: amountInWords, amountWordsLine: amountWordsLine, SMALL_AMOUNT: SMALL_AMOUNT, chipOptions: chipOptions, chipLabel: chipLabel, plainNumber: plainNumber,
                        formatAmount: formatAmount, displayAmount: displayAmount, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
   }
   if (typeof document === "undefined") return;

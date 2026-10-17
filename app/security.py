@@ -64,16 +64,17 @@ def validate_password(password: str) -> str | None:
 
 
 def parse_decimal(raw: str | None, *, field: str) -> Decimal:
-    text = (raw or "0").strip().translate(PERSIAN_DIGITS).replace(",", "").replace("٬", "").replace(" ", "")
-    if text == "":
-        return Decimal("0")
+    from app.number_input import parse_decimal_text
+
     try:
-        value = Decimal(text)
-    except InvalidOperation as exc:
+        value = parse_decimal_text(raw)
+    except (ValueError, InvalidOperation) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"عدد نامعتبر: {field}",
         ) from exc
+    if value is None:
+        return Decimal("0")
     if value < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

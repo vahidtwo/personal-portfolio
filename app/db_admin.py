@@ -15,6 +15,7 @@ from starlette.datastructures import FormData
 from app.db import get_db
 from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER
+from app.number_input import parse_int_text
 from app.security import (
     get_authenticated_user,
     redirect_to_login,
@@ -101,12 +102,10 @@ def _parse_datetime(raw: str, *, field: str, required: bool) -> tuple[datetime |
 
 
 def _parse_int(raw: str, *, field: str) -> tuple[int | None, str | None]:
-    text = (raw or "0").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
-    text = text.replace(",", "").replace("٬", "")
-    if text == "":
-        return 0, None
     try:
-        value = int(text)
+        value = parse_int_text(raw)
+        if value is None:
+            return 0, None
     except ValueError:
         return None, f"عدد نامعتبر: {field}"
     if value < 0:

@@ -15,12 +15,13 @@ from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows
 from app.expenses import expense_form_for_request
-from app.formatting import format_qty_input, format_toman, format_when
+from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
 from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
 from app.models import Debt, User, utcnow
 from app.sanjeh import SanjehAuthError
+from app.number_input import to_latin_digits
 from app.security import (
     get_authenticated_user,
     redirect_to_login,
@@ -168,7 +169,7 @@ async def revoke_mcp_token(
     return RedirectResponse("/profile", status_code=303)
 def _account_form(user: User, **overrides: str) -> dict[str, str]:
     salary = Decimal(getattr(user, "salary_toman", 0) or 0)
-    text = "" if salary == 0 else format(salary, "f").rstrip("0").rstrip(".")
+    text = format_amount_input(salary)
     data = {
         "full_name": user.full_name or "",
         "username": user.username,
@@ -180,7 +181,7 @@ def _account_form(user: User, **overrides: str) -> dict[str, str]:
 
 
 def _parse_mobile(raw: str) -> tuple[str | None, str | None]:
-    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+    text = to_latin_digits(raw).strip()
     digits = "".join(ch for ch in text if ch.isdigit())
     if digits == "":
         return "", None
@@ -379,5 +380,5 @@ def holdings_form(user: User) -> dict[str, str]:
         "doge": format_qty_input(Decimal(user.doge or 0), 4),
         "matic": format_qty_input(Decimal(user.matic or 0), 4),
         "usd": format_qty_input(Decimal(user.usd or 0), 2),
-        "cash_toman": format_qty_input(Decimal(user.cash_toman or 0), 0),
+        "cash_toman": format_amount_input(Decimal(user.cash_toman or 0)),
     }

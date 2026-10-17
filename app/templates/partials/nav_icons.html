@@ -1,23 +1,24 @@
-{#- Main navigation icon set. One macro so the whole set can be swapped in one place.
-    Each icon has an outline variant (default) and a filled variant (active tab).
-    Shapes inside a filled icon that must stay visible use class "ico-cut" (drawn in the bar color). -#}
-{% macro nav_icon(name, filled=false) -%}
-<svg class="main-nav-icon{% if filled %} is-filled{% endif %}" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="{% if filled %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+{#- Main navigation icon set, lifted from the Phase 1 mockups (/mockups/phase1/build.py).
+    One macro so the whole set can be swapped in one place. Stroke icons; the active tab passes
+    filled=true, which only fills when --main-nav-active-icon-fill is set (default: none, per mockup). -#}
+{% macro nav_icon(name, filled=false, size='') -%}
+<svg class="main-nav-icon{% if size %} main-nav-icon-{{ size }}{% endif %}{% if filled %} is-filled{% endif %}" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
 {%- if name == 'home' %}
-  <path d="M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19z"/>
+  <path d="M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.8H9.2v5.8H5A1.5 1.5 0 0 1 3.5 19z"/>
 {%- elif name == 'assets' %}
-  <path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h11.5a1 1 0 0 1 1 1v2h1.5a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>
-  <circle class="{% if filled %}ico-cut{% endif %}" cx="16" cy="14" r="1.4"/>
+  <rect x="3" y="6.5" width="18" height="13.5" rx="2.5"/><path class="ico-line" d="M16.5 6.5V5a1.5 1.5 0 0 0-1.9-1.45L5 6.5"/><path class="ico-line" d="M21 11h-4a2.25 2.25 0 0 0 0 4.5h4"/><circle class="ico-dot" cx="16.9" cy="13.25" r=".6"/>
 {%- elif name == 'spending' %}
-  <path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2z"/>
-  <path class="{% if filled %}ico-cut{% endif %}" d="M9 8.5h6M9 12.5h6" fill="none"/>
+  <path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"/><path class="ico-line" d="M9 8.5h6M9 12h6M9 15.5h3.5"/>
 {%- elif name == 'debts' %}
-  <rect x="3" y="5.5" width="18" height="13" rx="2"/>
-  <path class="{% if filled %}ico-cut{% endif %}" d="M3 10h18M7 15h4" fill="none"/>
+  <rect x="3" y="5" width="18" height="14" rx="2.5"/><path class="ico-line" d="M3 9.5h18M7 14.5h4"/>
 {%- elif name == 'settings' %}
-  <path d="M4 7h9M19 7h1M4 17h3M13 17h7" fill="none"/>
-  <circle cx="16" cy="7" r="2.5"/>
-  <circle cx="10" cy="17" r="2.5"/>
+  <path class="ico-line" d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>
+{%- elif name == 'shield' %}
+  <path d="M12 3.5 19 6v5.5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/>
+{%- elif name == 'logout' %}
+  <path class="ico-line" d="M14 4.5h4.5A1.5 1.5 0 0 1 20 6v12a1.5 1.5 0 0 1-1.5 1.5H14"/><path class="ico-line" d="M10 8l-4 4 4 4M6 12h9"/>
+{%- elif name == 'chev' %}
+  <path class="ico-line" d="M14.5 6 8.5 12l6 6"/>
 {%- endif %}
 </svg>
 {%- endmacro %}

@@ -86,13 +86,56 @@ def test_admin_link_and_logout_still_in_side_menu(client, no_network):
     assert 'href="/profile">پروفایل</a>' in html
 
 
+def _make_admin(monkeypatch, name="boss"):
+    import app.security as sec
+    monkeypatch.setattr(sec, "ADMIN_USERNAMES", frozenset({name}))
+
+
+def test_settings_has_logout_row_and_no_admin_link_for_regular_user(client, no_network):
+    _register(client, "regular")
+    html = client.get("/profile?section=settings").text
+    rows = html[html.index('id="settings-account-actions"'):]
+    rows = rows[:rows.index("</section>")]
+    assert "خروج از حساب" in rows and 'action="/logout"' in rows and 'name="csrf"' in rows
+    # admin entry is decided on the server: not in the HTML at all for non-admins
+    assert 'href="/admin"' not in html
+    assert "مدیریت" not in html
+    # desktop avatar menu (side panel) also offers logout
+    assert html.count("خروج از حساب") == 2
+    assert 'class="avatar"' in html
+
+
+def test_admin_sees_admin_row_in_settings_and_menu(client, no_network, monkeypatch):
+    _make_admin(monkeypatch)
+    _register(client, "boss")
+    html = client.get("/profile?section=settings").text
+    rows = html[html.index('id="settings-account-actions"'):]
+    rows = rows[:rows.index("</section>")]
+    assert 'href="/admin"' in rows and "مدیریت" in rows
+    assert rows.index("مدیریت") < rows.index("خروج از حساب")  # logout is the last row
+    assert html.count('href="/admin"') == 2  # settings row + avatar/side menu
+    assert client.get("/admin").status_code == 200
+
+
+def test_logout_row_logs_out(client, no_network):
+    _register(client, "leaver")
+    t = _csrf(client, "/profile?section=settings")
+    r = client.post("/logout", data={"csrf": t}, follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert 'class="main-nav"' not in client.get("/").text
+
+
 def test_bottom_bar_css_contract():
     css = CSS.read_text(encoding="utf-8")
-    mobile = css[css.index("@media (max-width: 767px) {", css.index("Main navigation (Phase 1)")):]
-    assert "--main-nav-h: 56px" in css
+    block = css[css.index("Main navigation (Phase 1"):]
+    mobile = block[block.index("@media (max-width: 899px) {"):]
+    desktop = block[block.index("@media (min-width: 900px) {"):]
+    assert "--main-nav-h: 56px" in block
     assert "position: fixed" in mobile and "bottom: 0" in mobile
-    assert "calc(var(--main-nav-h) + env(safe-area-inset-bottom))" in mobile  # bar height + home indicator
-    assert "body.has-main-nav { padding-bottom: calc(var(--main-nav-h) + env(safe-area-inset-bottom)); }" in mobile
-    assert "min-width: var(--main-nav-item-min)" in mobile and "--main-nav-item-min: 44px" in css
+    assert "height: calc(var(--main-nav-h) + env(safe-area-inset-bottom));" in mobile  # bar + home indicator
+    assert "body.has-main-nav { padding-bottom: calc(var(--main-nav-h) + env(safe-area-inset-bottom) + var(--page-extra-bottom)); }" in mobile
+    assert "minmax(var(--main-nav-item-min), 1fr)" in mobile and "--main-nav-item-min: 44px" in block
     assert "html.is-typing .main-nav" in mobile  # keyboard open -> bar hidden
-    assert ".top-tabs" not in css
+    assert "position: fixed" not in desktop[:desktop.index("@media (max-width: 899px)")]
+    assert ".top-tabs" not in css and "#6b7287" not in css.lower()
+    assert "::placeholder { color: var(--text-muted)" in css

@@ -345,6 +345,16 @@
     {% endif %}
   </section>
 </details>
+{% from "partials/nav_icons.html" import nav_icon %}
+<section class="card auth-card wide settings-rows" id="settings-account-actions" aria-label="حساب">
+  {% if is_admin %}
+  <a class="settings-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
+  {% endif %}
+  <form method="post" action="/logout" class="settings-row-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="settings-row settings-row-danger">{{ nav_icon('logout') }}<span class="settings-row-label">خروج از حساب</span></button>
+  </form>
+</section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>

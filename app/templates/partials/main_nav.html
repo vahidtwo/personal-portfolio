@@ -1,5 +1,6 @@
-{#- Five-section main navigation (logged-in users only). Desktop: inside the top bar.
-    Mobile (<768px): fixed bottom bar. Order in the DOM = right-to-left order in RTL.
+{#- Five-section main navigation (logged-in users only), from the Phase 1 mockups.
+    >=900px: rounded pill container in the top bar. <900px: fixed bottom bar (icon over label,
+    active tab = filled pill + bold label). DOM order = right-to-left order in RTL.
     Each item points at where that content lives today; the profile split comes later. -#}
 {% from "partials/nav_icons.html" import nav_icon %}
 {%- set _path = request.url.path -%}
@@ -21,8 +22,8 @@
 <nav class="main-nav" id="main-nav" aria-label="بخش‌های اصلی" data-main-nav>
   {%- for item in nav_items %}
   <a class="main-nav-item{% if item.active %} is-active{% endif %}" href="{{ item.href }}" data-nav="{{ item.key }}"{% if item.full != item.label %} aria-label="{{ item.full }}" title="{{ item.full }}"{% endif %}{% if item.active %} aria-current="page"{% endif %}>
-    {{ nav_icon(item.key, filled=item.active) }}
-    <span class="main-nav-label">{{ item.label }}</span>
+    <span class="main-nav-pill">{{ nav_icon(item.key, filled=item.active) }}</span>
+    <span class="main-nav-label">{{ item.label }}</span>{% if item.full != item.label %}<span class="main-nav-label-rest" aria-hidden="true">{{ item.full[item.label|length:] }}</span>{% endif %}
   </a>
   {%- endfor %}
 </nav>

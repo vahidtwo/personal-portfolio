@@ -3,7 +3,6 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 // Release signing key lives OUTSIDE the repo. Point MY_INVENTORY_KEYSTORE_PROPERTIES at a
@@ -100,3 +99,5 @@ tasks.register("syncWebAssets") {
 tasks.named("preBuild").configure {
     dependsOn("syncWebAssets")
 }
+
+apply(plugin = "com.google.gms.google-services")

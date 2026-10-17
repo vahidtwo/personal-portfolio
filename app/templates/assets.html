@@ -34,7 +34,7 @@
         <span class="arow-worth" id="worth-{{ r.field }}">{% if r.manual %}بدون تبدیل{% elif r.value_label is none %}قیمت در دسترس نیست{% else %}<bdi class="num" data-row-value>{{ r.value_label }}</bdi> تومان{% endif %}</span>
       </div>
       <div class="arow-input">
-        <input name="{{ r.field }}" value="{{ r.value }}" placeholder="۰" inputmode="decimal" dir="ltr" id="asset-{{ r.field }}" autocomplete="off" aria-describedby="worth-{{ r.field }}" data-asset-input{% if r.thousands %} data-thousands{% endif %}>
+        <input name="{{ r.field }}" value="{{ r.value }}" placeholder="۰" inputmode="decimal" dir="ltr" id="asset-{{ r.field }}" aria-describedby="worth-{{ r.field }}" data-asset-input{% if r.thousands %} data-thousands{% endif %}>
         <span class="arow-unit"{% if r.unit_latin %} dir="ltr"{% endif %}>{{ r.unit }}</span>
       </div>
     </div>

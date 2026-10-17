@@ -134,5 +134,24 @@
   });
   if (mobile.addEventListener) mobile.addEventListener("change", setExtraBottom);
   window.addEventListener("resize", setExtraBottom);
+
+  // Back/forward: the browser may put typed-but-unsaved values back into the fields after this script
+  // ran. Show the rows those values belong to (a new asset's row starts hidden) and the save bar again.
+  function restoreTyped() {
+    inputs.forEach(function (input) {
+      var row = rowOf(input);
+      if (!row || !row.hidden || !isChanged(input)) return;
+      var chip = form.querySelector('[data-add-asset="' + row.dataset.assetRow + '"]');
+      row.hidden = false;
+      if (chip) {
+        chip.hidden = true;
+        revealed.push({ row: row, chip: chip });
+        updateMore(chip.closest("[data-asset-group]"));
+      }
+    });
+    refresh();
+  }
+  window.addEventListener("pageshow", restoreTyped);
+  window.addEventListener("load", restoreTyped);
   refresh();
 })();

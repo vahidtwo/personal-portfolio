@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 from app.config import ADMIN_USERNAMES, HTTPS_ONLY, SESSION_COOKIE_NAME
 from app.models import User
 
-USERNAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$")
+USERNAME_MIN_LENGTH = 3
+USERNAME_MAX_LENGTH = 32
+PASSWORD_MIN_LENGTH = 8
+USERNAME_RE = re.compile(rf"^[a-zA-Z][a-zA-Z0-9_]{{{USERNAME_MIN_LENGTH - 1},{USERNAME_MAX_LENGTH - 1}}}$")
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 SESSION_COOKIE_PATH = "/"
@@ -55,7 +58,7 @@ def admin_name_change_error(old: str | None, new: str) -> str | None:
 
 
 def validate_password(password: str) -> str | None:
-    if len(password) < 8:
+    if len(password) < PASSWORD_MIN_LENGTH:
         return "رمز عبور باید حداقل ۸ کاراکتر باشد"
     return None
 

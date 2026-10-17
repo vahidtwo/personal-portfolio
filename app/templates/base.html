@@ -16,8 +16,9 @@
   <link rel="stylesheet" href="/static/style.css?v={{ static_v }}">
   <script>
     try {
-      if (localStorage.getItem("privacy-portfolio") === "0") document.documentElement.dataset.showPortfolio = "1";
-      if (localStorage.getItem("privacy-salary") === "0") document.documentElement.dataset.showSalary = "1";
+      // Values are shown by default; only an explicit "hide" choice ("1") masks them.
+      if (localStorage.getItem("privacy-portfolio") !== "1") document.documentElement.dataset.showPortfolio = "1";
+      if (localStorage.getItem("privacy-salary") !== "1") document.documentElement.dataset.showSalary = "1";
     } catch (e) {}
   </script>
   <script src="/static/theme.js?v={{ static_v }}" defer></script>

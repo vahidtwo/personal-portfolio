@@ -18,6 +18,13 @@
     return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
+  // Display form inside inputs: Persian digits and ٬ (submit strips back to Latin).
+  function displayAmount(text) {
+    var plain = formatAmount(text);
+    if (!plain) return "";
+    return plain.replace(/,/g, "٬").replace(/\d/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[Number(d)]; });
+  }
+
   function formatAmount(text) {
     var plain = plainNumber(text);
     if (!plain) return "";
@@ -43,13 +50,13 @@
     function paint() {
       var start = input.selectionStart || 0;
       var digitsBefore = toLatin(input.value.slice(0, start)).replace(/\D/g, "").length;
-      var next = formatAmount(input.value);
+      var next = displayAmount(input.value);
       if (input.value === next) return;
       input.value = next;
       var seen = 0;
       var pos = next.length;
       for (var i = 0; i < next.length; i++) {
-        if (/\d/.test(next[i])) seen += 1;
+        if (/\d/.test(toLatin(next[i]))) seen += 1;
         if (seen >= digitsBefore) {
           pos = i + 1;
           break;
@@ -135,7 +142,7 @@
         button.textContent = option.label;
         button.setAttribute("aria-label", "تغییر مبلغ به " + option.label);
         button.addEventListener("click", function () {
-          input.value = formatAmount(option.plain);
+          input.value = displayAmount(option.plain);
           input.dispatchEvent(new Event("input", { bubbles: true }));
           input.focus();
         });
@@ -149,7 +156,7 @@
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { amountInWords: amountInWords, chipOptions: chipOptions, plainNumber: plainNumber,
-                       formatAmount: formatAmount, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
+                       formatAmount: formatAmount, displayAmount: displayAmount, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
   }
   if (typeof document === "undefined") return;
 

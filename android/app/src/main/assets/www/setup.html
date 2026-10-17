@@ -8,6 +8,17 @@
   <title>موجودی من — اتصال به سرور</title>
   <link rel="stylesheet" href="static/style.css">
   <script src="static/theme.js" defer></script>
+  <style>
+    .setup-error-screen { display: grid; gap: 12px; margin-bottom: 16px; }
+    .setup-error-screen .toast { margin: 0; }
+    .setup-link { background: none; border: 0; padding: 4px 0; color: inherit; opacity: .75;
+                  text-decoration: underline; font: inherit; font-size: 14px; cursor: pointer; justify-self: center; }
+    .setup-advanced { border: 1px solid var(--border, rgba(127,127,127,.3)); border-radius: 10px; padding: 8px 12px; }
+    .setup-advanced > summary { cursor: pointer; padding: 6px 0; font-size: 14px; opacity: .85; }
+    .setup-advanced[open] > summary { margin-bottom: 8px; }
+    .setup-advanced .grid-form-inner { display: grid; gap: 12px; }
+    .setup-address-row { display: grid; gap: 8px; }
+  </style>
 </head>
 <body class="app-body">
   <header class="top">
@@ -24,26 +35,36 @@
         <div class="card-head">
           <h1 id="android-heading" class="card-title">اتصال اپ به سرور شما</h1>
         </div>
-        <p class="card-desc">بعد از این مرحله همان وب‌اپ (داشبورد، پروفایل، خرج روزانه) داخل اپ باز می‌شود. آدرس سرور اصلی از قبل پر شده است؛ اگر سرور دیگری دارید آن را عوض کنید.</p>
+        <p class="card-desc">بعد از این مرحله همان وب‌اپ (داشبورد، پروفایل، خرج روزانه) داخل اپ باز می‌شود. سرور اصلی از قبل تنظیم شده است؛ فقط «ادامه به داشبورد» را بزنید. اگر سرور دیگری دارید، از «تنظیمات پیشرفته» آن را عوض کنید.</p>
         <ul class="landing-steps landing-steps-compact">
           <li>پیامک‌های دارای عبارت «برداشت» به‌صورت خرج روزانه ذخیره می‌شوند</li>
           <li>کل صندوق پیامک خوانده نمی‌شود</li>
           <li>برای ذخیره خودکار پیامک باید در اپ وارد حساب شوید</li>
         </ul>
+        <div id="error-screen" class="setup-error-screen" hidden>
+          <p id="error-screen-text" class="toast toast-warn" role="alert">اتصال به سرور برقرار نشد. نشانی را بررسی کنید.</p>
+          <button type="button" id="error-retry" class="btn btn-primary btn-block">تلاش دوباره</button>
+          <button type="button" id="error-advanced" class="setup-link">تنظیمات پیشرفته</button>
+        </div>
         <form id="setup-form" class="grid-form" novalidate>
-          <label>
-            <span class="label-text">آدرس سرور (https)</span>
-            <input type="url" id="site-url" dir="ltr" inputmode="url" autocomplete="url" value="https://portfolio.vahidtwo.ir" placeholder="https://portfolio.vahidtwo.ir">
-          </label>
-          <label>
-            <span class="label-text">عبارت لازم در پیامک</span>
-            <input type="text" id="sms-phrase" value="برداشت" autocomplete="off">
-          </label>
           <button type="submit" id="setup-submit" class="btn btn-primary btn-block">ادامه به داشبورد</button>
-          <div id="setup-error-box" hidden>
-            <p id="setup-error" class="toast toast-warn" role="alert"></p>
-            <button type="button" id="setup-retry" class="btn btn-block" hidden>تلاش دوباره</button>
-          </div>
+          <p id="setup-error" class="toast toast-warn" role="alert" hidden></p>
+          <details id="advanced" class="setup-advanced">
+            <summary>تنظیمات پیشرفته</summary>
+            <div class="grid-form-inner">
+              <div class="setup-address-row">
+                <label>
+                  <span class="label-text">آدرس سرور</span>
+                  <input type="url" id="site-url" dir="ltr" inputmode="url" autocomplete="url" value="https://portfolio.vahidtwo.ir" placeholder="https://portfolio.vahidtwo.ir">
+                </label>
+                <button type="button" id="reset-default" class="btn btn-block">بازگشت به آدرس پیش‌فرض</button>
+              </div>
+              <label>
+                <span class="label-text">عبارت لازم در پیامک</span>
+                <input type="text" id="sms-phrase" value="برداشت" autocomplete="off">
+              </label>
+            </div>
+          </details>
         </form>
       </section>
     </div>
@@ -55,35 +76,45 @@
     (function () {
       var DEFAULT_URL = "https://portfolio.vahidtwo.ir";
       var BUTTON_LABEL = "ادامه به داشبورد";
+      var BUSY_LABEL = "در حال اتصال…";
       var CONNECT_ERROR = "اتصال به سرور برقرار نشد. نشانی را بررسی کنید.";
       var form = document.getElementById("setup-form");
       var urlInput = document.getElementById("site-url");
       var phraseInput = document.getElementById("sms-phrase");
-      var errorBox = document.getElementById("setup-error-box");
       var errorEl = document.getElementById("setup-error");
-      var retryBtn = document.getElementById("setup-retry");
       var button = document.getElementById("setup-submit");
+      var advanced = document.getElementById("advanced");
+      var resetBtn = document.getElementById("reset-default");
+      var errorScreen = document.getElementById("error-screen");
+      var retryBtn = document.getElementById("error-retry");
+      var errorAdvanced = document.getElementById("error-advanced");
       var stuckTimer = null;
 
-      function setBusy(busy) {
+      function setBusy(busy, which) {
         button.disabled = busy;
         retryBtn.disabled = busy;
-        button.textContent = busy ? "در حال اتصال…" : BUTTON_LABEL;
-        button.setAttribute("aria-busy", busy ? "true" : "false");
+        button.textContent = busy && which !== retryBtn ? BUSY_LABEL : BUTTON_LABEL;
+        retryBtn.textContent = busy && which === retryBtn ? BUSY_LABEL : "تلاش دوباره";
         if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
+        if (busy) {
+          // The app normally leaves this page. If not, don't leave the button stuck.
+          stuckTimer = setTimeout(function () { setBusy(false); showErrorScreen(); }, 20000);
+        }
       }
 
-      // withRetry: show the «تلاش دوباره» button (connection failures only).
-      function showError(message, withRetry) {
+      function showError(message) {
         setBusy(false);
         errorEl.textContent = message;
-        retryBtn.hidden = !withRetry;
-        errorBox.hidden = false;
+        errorEl.hidden = false;
       }
 
-      function hideError() {
-        errorBox.hidden = true;
-        retryBtn.hidden = true;
+      function showErrorScreen() {
+        errorScreen.hidden = false;
+      }
+
+      function openAdvanced() {
+        advanced.open = true;
+        try { urlInput.focus(); } catch (e) {}
       }
 
       function bridge(fn, fallback) {
@@ -91,65 +122,53 @@
         try { return fn(window.AndroidBridge); } catch (e) { return fallback; }
       }
 
+      // Same rules as ServerAddress.kt: empty -> default, no scheme -> https://,
+      // http:// -> https://, anything else that isn't https is rejected.
+      function normalize(raw) {
+        var url = (raw || "").trim().replace(/\/+$/, "");
+        if (!url || /^https?:\/*$/i.test(url)) return DEFAULT_URL;
+        if (/^http:\/\//i.test(url)) return "https://" + url.slice(7);
+        if (/^https:\/\//i.test(url)) return url;
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return null;
+        if (/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(url)) return null;
+        return "https://" + url;
+      }
+
       var saved = bridge(function (b) { return b.getServerUrl(); }, "");
       urlInput.value = (saved || "").trim() || DEFAULT_URL;
       phraseInput.value = bridge(function (b) { return b.getSmsPhrase(); }, "") || "برداشت";
 
-      // MainActivity sends us back here with ?error=connect when the page failed to load.
-      if (/[?&]error=connect\b/.test(location.search)) {
-        showError(CONNECT_ERROR, true);
-      }
+      var query = location.search || "";
+      if (/[?&]error=connect\b/.test(query)) showErrorScreen();
+      if (/[?&]advanced=1\b/.test(query)) openAdvanced();
 
       function connect() {
-        hideError();
-        var url = (urlInput.value || "").trim().replace(/\/+$/, "");
-        var phrase = (phraseInput.value || "").trim() || "برداشت";
-        if (/^https?:\/*$/i.test(url)) url = ""; // only a protocol was typed
-
+        errorEl.hidden = true;
+        var url = normalize(urlInput.value);
         if (!url) {
-          urlInput.value = DEFAULT_URL;
-          urlInput.focus();
-          showError("نشانی سرور خالی است. نشانی اصلی را دوباره گذاشتیم؛ اگر درست است، دوباره «" + BUTTON_LABEL + "» را بزنید.", false);
-          return;
-        }
-        if (/^http:\/\//i.test(url)) {
-          urlInput.focus();
-          showError("فقط نشانی امن پذیرفته می‌شود. به‌جای http:// از https:// استفاده کنید.", false);
-          return;
-        }
-        if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
-          // Typed without a protocol, e.g. portfolio.vahidtwo.ir
-          url = "https://" + url;
-        } else if (!/^https:\/\//i.test(url)) {
-          urlInput.focus();
-          showError("نشانی باید با https:// شروع شود؛ مثلاً " + DEFAULT_URL, false);
+          openAdvanced();
+          showError("نشانی باید با https:// شروع شود؛ مثلاً " + DEFAULT_URL);
           return;
         }
         urlInput.value = url;
-
+        var phrase = (phraseInput.value || "").trim() || "برداشت";
         if (!window.AndroidBridge) {
-          showError("این صفحه فقط داخل اپ اندروید کار می‌کند.", false);
+          showError("این صفحه فقط داخل اپ اندروید کار می‌کند.");
           return;
         }
-
-        setBusy(true);
+        setBusy(true, button);
         var accepted;
         try {
           window.AndroidBridge.setSmsPhrase(phrase);
           accepted = window.AndroidBridge.setServerUrl(url);
         } catch (e) {
-          showError(CONNECT_ERROR, true);
+          showError(CONNECT_ERROR);
           return;
         }
-        // Older builds returned nothing; only an explicit false means rejected.
         if (accepted === false) {
-          urlInput.focus();
-          showError("این نشانی پذیرفته نشد. یک نشانی کامل مثل " + DEFAULT_URL + " وارد کنید.", false);
-          return;
+          openAdvanced();
+          showError("این نشانی پذیرفته نشد. یک نشانی کامل مثل " + DEFAULT_URL + " وارد کنید.");
         }
-        // The app is now opening the dashboard. If we are still here after a
-        // while, don't leave the button stuck.
-        stuckTimer = setTimeout(function () { showError(CONNECT_ERROR, true); }, 20000);
       }
 
       form.addEventListener("submit", function (event) {
@@ -157,7 +176,21 @@
         if (!button.disabled) connect();
       });
       retryBtn.addEventListener("click", function () {
-        if (!button.disabled) connect();
+        if (retryBtn.disabled) return;
+        errorEl.hidden = true;
+        setBusy(true, retryBtn);
+        try {
+          window.AndroidBridge.retry();
+        } catch (e) {
+          // Older app without retry(): reconnect with the address in the box.
+          setBusy(false);
+          connect();
+        }
+      });
+      errorAdvanced.addEventListener("click", openAdvanced);
+      resetBtn.addEventListener("click", function () {
+        urlInput.value = DEFAULT_URL;
+        errorEl.hidden = true;
       });
     })();
   </script>

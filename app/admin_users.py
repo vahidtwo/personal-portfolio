@@ -14,7 +14,7 @@ from app.models import PortfolioSnapshot, User
 from app.portfolio import ASSET_LABEL_FA, ASSET_ORDER, build_portfolio, latest_market_prices_fetched_at, load_prices
 from app.security import PERSIAN_DIGITS, get_authenticated_user, is_admin, redirect_to_login, require_csrf
 from app.user_delete import (
-    BACKUP_NAME_RE, COUNT_TABLES, DeleteRefused, count_user_rows, delete_users, new_backup_name, protected_reason,
+    BACKUP_NAME_RE, DeleteRefused, count_labels, count_user_rows, delete_users, new_backup_name, protected_reason,
 )
 from app.web import flash, pop_flash, render
 
@@ -162,11 +162,15 @@ async def admin_delete_confirm(request: Request, db: Session = Depends(get_db)):
             flash(request, reason, error=True)
             return RedirectResponse("/admin", status_code=303)
     counts = {u.id: count_user_rows(db, u.id) for u in users}
+    keys: list[str] = []
+    for c in counts.values():
+        keys += [k for k in c if k not in keys]
+    labels = count_labels(keys)
     rows = [
         {
             "id": u.id,
             "username": u.username,
-            "counts": [(label, persian_digits(str(counts[u.id][key]))) for key, label in COUNT_TABLES],
+            "counts": [(label, persian_digits(str(counts[u.id].get(key, 0)))) for key, label in labels],
             "total": persian_digits(str(sum(counts[u.id].values()))),
         }
         for u in users
@@ -176,7 +180,7 @@ async def admin_delete_confirm(request: Request, db: Session = Depends(get_db)):
         "admin_delete_confirm.html",
         db,
         rows=rows,
-        count_labels=[label for _, label in COUNT_TABLES],
+        count_labels=[label for _, label in labels],
         user_count=persian_digits(str(len(users))),
         ids=[u.id for u in users],
         expected_json=json.dumps({str(k): v for k, v in counts.items()}),
@@ -211,6 +215,7 @@ async def admin_delete_users(
     if not BACKUP_NAME_RE.match(backup_name):
         flash(request, "نام فایل پشتیبان نامعتبر است.", error=True)
         return RedirectResponse(back, status_code=303)
+    db.rollback()
     try:
         delete_users(db, admin, id_list, expected, backup_name)
     except DeleteRefused as exc:

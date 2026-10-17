@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DATA_DIR, DATABASE_URL
@@ -12,8 +12,17 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 10},
 )
+
+SQLITE_BUSY_TIMEOUT_MS = 10_000
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_busy_timeout(dbapi_conn, _record):
+    # Wait up to 10s for another writer (e.g. an admin batch delete holding BEGIN IMMEDIATE)
+    # instead of failing immediately with "database is locked".
+    dbapi_conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

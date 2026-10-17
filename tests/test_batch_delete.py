@@ -112,7 +112,7 @@ def test_backup_failure_aborts_delete(client, monkeypatch):
 
     def boom(*a, **k):
         raise OSError("disk full")
-    monkeypatch.setattr(ud, "make_backup", boom)
+    monkeypatch.setattr(ud, "_backup_from", boom)
     before = _rows(_db_path())
     _submit(client, sel, expected, backup)
     assert _exists(ids["alice"]) and _rows(_db_path()) == before
@@ -124,9 +124,9 @@ def test_failure_mid_batch_rolls_back_everything(client, monkeypatch):
     _, expected, backup = _confirm(client, sel)
     import app.user_delete as ud
 
-    def failing_ctor(**kw):
+    def fail_at_end(conn):  # after all deletes + audit insert, before COMMIT
         raise RuntimeError("fail at end")
-    monkeypatch.setattr(ud, "AdminAuditLog", failing_ctor)
+    monkeypatch.setattr(ud, "_before_commit_hook", fail_at_end)
     before = _rows(_db_path())
     with pytest.raises(RuntimeError):
         _submit(client, sel, expected, backup)

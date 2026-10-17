@@ -15,7 +15,10 @@ from app.config import PRICE_MANUAL_REFRESH_MINUTES
 from app.db import get_db
 from app.debts import debt_rows
 from app.expenses import monthly_view
-from app.formatting import format_chart_jalali, format_qty, format_share_label, format_toman, format_when, persian_digits
+from app.formatting import (
+    MONEY_DECIMALS, format_chart_jalali, format_number, format_qty, format_share_label, format_toman, format_usd,
+    format_when, persian_digits,
+)
 from app.jobs import refresh_market_prices_for_user, refresh_user_sanjeh_car
 from app.models import Debt, PortfolioSnapshot, User, utcnow
 from app.portfolio import (
@@ -36,10 +39,7 @@ router = APIRouter()
 
 
 def _format_usd(value: Decimal) -> str:
-    quantized = Decimal(value).quantize(Decimal("0.01"))
-    sign = "−" if quantized < 0 else ""
-    whole, _, frac = f"{abs(quantized):,.2f}".partition(".")
-    return sign + persian_digits(whole.replace(",", "٬") + "." + frac)
+    return format_usd(value)
 
 
 def build_chart_data(db: Session, user_id: int, view) -> dict:
@@ -227,11 +227,8 @@ def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
 
 
 def format_percent_label(pct: float) -> str:
-    body = abs(pct)
-    text = body if body >= 100 else round(body, 1)
-    s = format(text, "f").rstrip("0").rstrip(".")
     sign = "+" if pct > 0 else "−" if pct < 0 else ""
-    return sign + persian_digits(s) + "٪"
+    return sign + format_number(abs(pct), MONEY_DECIMALS) + "٪"
 
 
 def week_trend_change_label(values: list[float]) -> str | None:

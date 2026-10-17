@@ -1442,23 +1442,27 @@ input[readonly] { opacity: 0.75; }
   box-sizing: border-box;
 }
 .privacy-btn {
-  width: 44px;
-  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 36px;
   margin-inline-start: 8px;
-  padding: 0;
-  border-radius: 50%;
+  padding: 4px 12px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
   vertical-align: middle;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
+  white-space: nowrap;
 }
 .privacy-btn:hover { color: var(--text); }
 .privacy-btn[aria-pressed="false"] .privacy-icon-hide { display: none; }
 .privacy-btn[aria-pressed="true"] .privacy-icon-show { display: none; }
-.privacy-icon { width: 18px; height: 18px; display: block; margin: auto; }
+.privacy-icon { width: 18px; height: 18px; display: block; flex: none; }
 [data-mask] {
   font-size: 0 !important;
   user-select: none;
@@ -1853,6 +1857,8 @@ input:focus {
   .daily-section select { min-height: 48px; font-size: 16px; }
   .daily-section .form-actions .btn { min-height: 48px; }
   .month-nav .btn { min-width: 88px; }
+  .amount-suggest-btn { min-height: 44px; padding: 8px 14px; }
+  .privacy-btn { min-height: 44px; }
   .pager .btn { min-width: 88px; }
 }
 
@@ -1868,11 +1874,12 @@ input:focus {
   font-size: 13px;
 }
 
-.landing-steps li.has-url { flex-wrap: wrap; }
+.landing-steps li.has-url { flex-wrap: wrap; row-gap: 4px; }
+.landing-steps li.has-url > .url-block { margin-top: 0; }
+.landing-steps li.has-url > .li-text { flex: 1 1 0; min-width: 0; }
 .landing-steps li.has-url .url-block { flex: 1 0 100%; word-break: normal; overflow-wrap: anywhere; }
 
 /* labeled privacy toggle (values shown by default) */
-.privacy-btn { display: inline-flex; align-items: center; gap: 4px; }
 .privacy-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .privacy-btn[aria-pressed="false"] .privacy-label-show { display: none; }
 .privacy-btn[aria-pressed="true"] .privacy-label-hide { display: none; }

@@ -1,4 +1,6 @@
 (function () {
+  var NF = (typeof window !== "undefined" && window.NumberFa) ||
+    (typeof require === "function" ? require("./number-format.js") : null);
   var PERSIAN = "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩";
 
   function toLatin(text) {
@@ -91,7 +93,7 @@
       if (amount >= units[i][0] || units[i][0] === 1) {
         var n = Math.round((amount / units[i][0]) * 100) / 100;
         var exact = Math.abs(n * units[i][0] - amount) <= 1e-9 * Math.max(1, amount);
-        var text = toPersianDigits(String(n).replace(".", "٫")) + (units[i][1] ? " " + units[i][1] : "") + " تومان";
+        var text = NF.format(n, 2) + (units[i][1] ? " " + units[i][1] : "") + " تومان";
         return { text: text, exact: exact };
       }
     }

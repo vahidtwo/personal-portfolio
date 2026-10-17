@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 import jdatetime
@@ -17,26 +17,68 @@ def persian_digits(text: str) -> str:
     return str(text).translate(_PERSIAN_DIGITS)
 
 
+MONEY_DECIMALS = 2
+QTY_DECIMALS = 8
+
+
+def format_number(value, max_decimals: int = MONEY_DECIMALS) -> str:
+    """THE display formatter (mirrored by app/static/number-format.js).
+
+    Persian digits, ٬ thousands, ٫ decimals, round half-up to max_decimals, no trailing
+    zeros, "−" for negatives. Display only: never use for <input> values, JSON or APIs.
+    """
+    if value is None or value == "":
+        return ""
+    if isinstance(value, float):
+        d = Decimal(repr(value))
+    else:
+        text = str(value).strip().translate(_TO_ASCII).replace(",", "").replace("٬", "")
+        d = Decimal(text.replace("٫", ".").replace("−", "-"))
+    q = d.quantize(Decimal(1).scaleb(-max_decimals), rounding=ROUND_HALF_UP)
+    negative = q < 0
+    q = abs(q)
+    whole, _, frac = format(q, "f").partition(".")
+    frac = frac.rstrip("0")
+    out = f"{int(whole):,}".replace(",", "٬") + (f"٫{frac}" if frac else "")
+    if negative and q != 0:
+        out = "−" + out
+    return persian_digits(out)
+
+
 def format_toman(value: Decimal | None) -> str:
+    """Toman amount for display (whole toman; «تومان» is written after it in templates)."""
     if value is None:
         return "—"
-    quantized = Decimal(value).quantize(Decimal("1"))
-    sign = "−" if quantized < 0 else ""
-    formatted = f"{abs(int(quantized)):,}".replace(",", "٬")
-    return sign + persian_digits(formatted)
+    return format_number(value, 0)
+
+
+def format_usd(value: Decimal | None) -> str:
+    if value is None:
+        return "—"
+    return format_number(value, MONEY_DECIMALS)
 
 
 def format_qty(value: Decimal, places: int) -> str:
-    quantized = Decimal(value).quantize(Decimal("1") if places == 0 else Decimal("0." + "0" * (places - 1) + "1"))
-    text = format(quantized, "f")
+    """Asset quantity for display (max 8 decimals)."""
+    return format_number(Decimal(value or 0), min(places, QTY_DECIMALS)) or "۰"
+
+
+def format_qty_input(value: Decimal, places: int) -> str:
+    """Value for an <input>: Persian digits, '.' decimal, no grouping; empty when zero.
+
+    The server parser (security.parse_decimal) maps '' to 0 and accepts Persian/Latin digits.
+    """
+    d = Decimal(value or 0).quantize(Decimal(1).scaleb(-min(places, QTY_DECIMALS)), rounding=ROUND_HALF_UP)
+    if d == 0:
+        return ""
+    text = format(d, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return persian_digits(text or "0")
+    return persian_digits(text)
 
 
 def format_share_label(share: Decimal) -> str:
-    text = format(share, "f").rstrip("0").rstrip(".")
-    return persian_digits(text)
+    return format_number(share, MONEY_DECIMALS)
 
 
 def _to_tehran(value: datetime) -> datetime:

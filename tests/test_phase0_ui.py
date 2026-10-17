@@ -68,7 +68,7 @@ def test_debts_expenses_spends_empty_states(client, no_network):
     _register(client)
     html = client.get("/profile?tab=debts").text
     assert "هنوز بدهی یا قسطی ثبت نکرده‌اید" in html and 'href="#debt-form"' in html
-    assert "هنوز خرج ماهانه‌ای ثبت نکرده‌اید" in html and 'href="#expense-form"' in html
+    assert "هنوز هزینهٔ ماهانه‌ای ثبت نکرده‌اید" in html and 'href="#expense-form"' in html
     daily = client.get("/dashboard?tab=daily").text
     assert "در این ماه خرجی ثبت نشده است" in daily
 
@@ -174,3 +174,75 @@ def test_profile_mcp_url_uses_request_or_public_base_url(client, no_network, mon
     monkeypatch.setattr(profile, "PUBLIC_BASE_URL", "https://portfolio.vahidtwo.ir")
     html = client.get("/profile").text
     assert "POST https://portfolio.vahidtwo.ir/mcp" in html and "127.0.0.1" not in html
+
+
+def test_android_setup_prefills_public_server_url():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "android/app/src/main/assets/www/setup.html").read_text(encoding="utf-8")
+    assert 'id="site-url"' in html and 'value="https://portfolio.vahidtwo.ir"' in html
+    assert "if (saved) urlInput.value = saved;" in html  # a saved address still wins
+
+
+def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):
+    import re
+    _register(client)
+    for path in ("/dashboard", "/profile?tab=debts"):
+        html = client.get(path).text
+        assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html), path
+        assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr">[^<]+</bdi> تومان</dd>', html), path
+
+
+def test_glossary_terms(client, no_network):
+    _register(client)
+    dash = client.get("/dashboard").text
+    debts = client.get("/profile?tab=debts").text
+    assets = client.get("/profile").text
+    for html in (dash, debts):
+        assert "هزینهٔ ماهانه" in html and "خرج ماهانه" not in html
+    assert "دلار آمریکا" in assets and "دلار نقد" not in assets
+
+
+def test_privacy_btn_is_pill_not_fixed_circle():
+    import re
+    from pathlib import Path
+    css = (Path(__file__).resolve().parent.parent / "app/static/style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.privacy-btn \{([^}]*)\}", css).group(1)
+    assert "border-radius: 999px" in rule and "50%" not in rule
+    assert not re.search(r"(^|\s)width:\s*44px", rule) and not re.search(r"(^|\s)height:\s*44px", rule)
+
+
+def test_privacy_note_mentions_backups_and_hashed_passwords(client):
+    from app.security import hash_password
+    assert hash_password("x" * 8).startswith("$2")  # bcrypt, as the note says
+    html = client.get("/").text
+    assert "نسخه‌های پشتیبان" in html and "هش‌شده" in html
+
+
+def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_network):
+    import re
+    _register(client)
+    html = client.get("/profile").text
+    for k in ("gold_grams", "btc", "usd", "cash_toman"):
+        assert re.search(rf'<input name="{k}" value="" placeholder="۰"', html), k
+    assert re.search(r'<input name="salary_toman" value="" placeholder="۰"', html)
+    data = {k: "" for k in ("gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram",
+                            "silver_grams", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman")}
+    data["csrf"] = _csrf(client)
+    r = client.post("/profile", data=data, follow_redirects=False)
+    assert r.status_code == 303
+    client.post("/profile", data={**data, "btc": "۰.۵", "cash_toman": "۱۸٬۵۰۰٬۰۰۰", "csrf": _csrf(client)})
+    from app.db import SessionLocal
+    from app.models import User
+    db = SessionLocal(); u = db.query(User).filter_by(username="alice").one()
+    assert u.btc == Decimal("0.5") and u.cash_toman == Decimal("18500000") and u.gold_grams == 0
+    db.close()
+    html = client.get("/profile").text
+    assert 'name="btc" value="۰.۵"' in html
+
+
+def test_debt_year_placeholder_is_current_jalali_year(client, no_network):
+    import jdatetime
+    from app.formatting import persian_digits
+    _register(client)
+    html = client.get("/profile?tab=debts").text
+    assert f'name="due_year" value="" inputmode="numeric" placeholder="{persian_digits(str(jdatetime.date.today().year))}"' in html

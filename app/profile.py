@@ -15,7 +15,7 @@ from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows
 from app.expenses import expense_form_for_request
-from app.formatting import format_qty, format_toman, format_when
+from app.formatting import format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
 from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
@@ -168,7 +168,7 @@ async def revoke_mcp_token(
     return RedirectResponse("/profile", status_code=303)
 def _account_form(user: User, **overrides: str) -> dict[str, str]:
     salary = Decimal(getattr(user, "salary_toman", 0) or 0)
-    text = format(salary, "f").rstrip("0").rstrip(".")
+    text = "" if salary == 0 else format(salary, "f").rstrip("0").rstrip(".")
     data = {
         "full_name": user.full_name or "",
         "username": user.username,
@@ -365,19 +365,19 @@ async def profile_save(
 
 def holdings_form(user: User) -> dict[str, str]:
     return {
-        "gold_grams": format_qty(Decimal(user.gold_grams or 0), 4),
-        "coin_emami": format_qty(Decimal(user.coin_emami or 0), 2),
-        "coin_bahar": format_qty(Decimal(user.coin_bahar or 0), 2),
-        "coin_half": format_qty(Decimal(user.coin_half or 0), 2),
-        "coin_quarter": format_qty(Decimal(user.coin_quarter or 0), 2),
-        "coin_gram": format_qty(Decimal(user.coin_gram or 0), 2),
-        "silver_grams": format_qty(Decimal(user.silver_grams or 0), 4),
-        "btc": format_qty(Decimal(user.btc or 0), 8),
-        "ada": format_qty(Decimal(user.ada or 0), 4),
-        "eth": format_qty(Decimal(user.eth or 0), 8),
-        "sol": format_qty(Decimal(user.sol or 0), 4),
-        "doge": format_qty(Decimal(user.doge or 0), 4),
-        "matic": format_qty(Decimal(user.matic or 0), 4),
-        "usd": format_qty(Decimal(user.usd or 0), 2),
-        "cash_toman": format_qty(Decimal(user.cash_toman or 0), 0),
+        "gold_grams": format_qty_input(Decimal(user.gold_grams or 0), 4),
+        "coin_emami": format_qty_input(Decimal(user.coin_emami or 0), 2),
+        "coin_bahar": format_qty_input(Decimal(user.coin_bahar or 0), 2),
+        "coin_half": format_qty_input(Decimal(user.coin_half or 0), 2),
+        "coin_quarter": format_qty_input(Decimal(user.coin_quarter or 0), 2),
+        "coin_gram": format_qty_input(Decimal(user.coin_gram or 0), 2),
+        "silver_grams": format_qty_input(Decimal(user.silver_grams or 0), 4),
+        "btc": format_qty_input(Decimal(user.btc or 0), 8),
+        "ada": format_qty_input(Decimal(user.ada or 0), 4),
+        "eth": format_qty_input(Decimal(user.eth or 0), 8),
+        "sol": format_qty_input(Decimal(user.sol or 0), 4),
+        "doge": format_qty_input(Decimal(user.doge or 0), 4),
+        "matic": format_qty_input(Decimal(user.matic or 0), 4),
+        "usd": format_qty_input(Decimal(user.usd or 0), 2),
+        "cash_toman": format_qty_input(Decimal(user.cash_toman or 0), 0),
     }

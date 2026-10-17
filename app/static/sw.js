@@ -7,6 +7,7 @@ const PRECACHE = [
   "/static/style.css",
   "/static/theme.js",
   "/static/privacy.js",
+  "/static/number-format.js",
   "/static/dashboard.js",
   "/static/amount-input.js",
   "/static/table-sort.js",

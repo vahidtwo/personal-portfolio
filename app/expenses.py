@@ -145,7 +145,7 @@ async def profile_add_expense(
         return _render_expense_error(request, db, user, error or "مقادیر نامعتبر است", form, None)
     db.add(MonthlyExpense(user_id=user.id, title=form["title"], amount_toman=amount, due_day=day))
     db.commit()
-    flash(request, "خرج ماهانه ذخیره شد")
+    flash(request, "هزینهٔ ماهانه ذخیره شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
@@ -165,7 +165,7 @@ async def profile_update_expense(
         return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
-        flash(request, "خرج ماهانه پیدا نشد.", error=True)
+        flash(request, "هزینهٔ ماهانه پیدا نشد.", error=True)
         return RedirectResponse("/profile?tab=debts", status_code=303)
     form, amount, day, error = _read_expense_fields(title, amount_toman, due_day)
     if error or amount is None or day is None:
@@ -174,7 +174,7 @@ async def profile_update_expense(
     item.amount_toman = amount
     item.due_day = day
     db.commit()
-    flash(request, "خرج ماهانه به‌روز شد")
+    flash(request, "هزینهٔ ماهانه به‌روز شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
@@ -191,9 +191,9 @@ async def profile_delete_expense(
         return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
-        flash(request, "خرج ماهانه پیدا نشد.", error=True)
+        flash(request, "هزینهٔ ماهانه پیدا نشد.", error=True)
         return RedirectResponse("/profile?tab=debts", status_code=303)
     db.delete(item)
     db.commit()
-    flash(request, "خرج ماهانه حذف شد")
+    flash(request, "هزینهٔ ماهانه حذف شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)

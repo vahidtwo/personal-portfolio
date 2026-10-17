@@ -136,6 +136,7 @@ def test_bottom_bar_css_contract():
     assert "body.has-main-nav { padding-bottom: calc(var(--main-nav-h) + env(safe-area-inset-bottom) + var(--page-extra-bottom)); }" in mobile
     assert "minmax(var(--main-nav-item-min), 1fr)" in mobile and "--main-nav-item-min: 44px" in block
     assert "html.is-typing .main-nav" in mobile  # keyboard open -> bar hidden
-    assert "position: fixed" not in desktop[:desktop.index("@media (max-width: 899px)")]
+    # desktop: the nav (after <main> in the HTML) is placed in the top bar with fixed positioning
+    assert "position: fixed" in desktop[:desktop.index("@media (max-width: 899px)")]
     assert ".top-tabs" not in css and "#6b7287" not in css.lower()
     assert "::placeholder { color: var(--text-muted)" in css

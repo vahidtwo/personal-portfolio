@@ -1909,6 +1909,7 @@ input:focus {
   --avatar-size: 36px;
   --avatar-fg: #04120e;
   --avatar-bg: linear-gradient(135deg, var(--accent), #5ad4f0 55%, var(--accent-violet));
+  --main-nav-desk-shift: -49px;
   --page-extra-bottom: 0px; /* a future sticky bar (e.g. unsaved changes on assets) adds its height here */
 }
 [data-theme="light"] {
@@ -1916,7 +1917,7 @@ input:focus {
   --main-nav-fg: var(--text-muted);
   --main-nav-active-ring: rgba(13, 159, 122, 0.25);
   --main-nav-desk-bg: rgba(255, 255, 255, 0.7);
-  --avatar-fg: #ffffff;
+  --avatar-fg: #04120e; /* dark text on the teal in both themes (>=4.5:1); white was ~2.6:1 */
 }
 
 /* Secondary text / placeholders use the muted token (#8b93a8 in dark). */
@@ -1956,6 +1957,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 #account-settings { scroll-margin-top: calc(env(safe-area-inset-top) + 84px); }
 
 .menu-toggle .avatar { display: none; }
+.avatar-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .avatar {
   width: var(--avatar-size);
   height: var(--avatar-size);
@@ -2001,10 +2003,18 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 [data-theme="light"] .settings-row-danger .main-nav-icon { color: #c2410c; }
 
 @media (min-width: 900px) {
+  /* The nav comes after <main> in the HTML (keyboard order); it is placed in the top bar here, centered
+     between the logo and the avatar like before: (avatar 36 + gap 12 − logo 134 − gap 12) / 2 = −49px. */
+  .has-main-nav .top-inner { min-height: 74px; } /* same height as when the nav sat inside it */
   .main-nav {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 10px);
+    left: calc(50% + var(--main-nav-desk-shift));
+    transform: translateX(-50%);
+    z-index: 51;
+    max-width: calc(100vw - 2 * 200px);
     gap: 4px;
     padding: 5px;
-    margin-inline: auto;
     border-radius: 999px;
     border: 1px solid var(--main-nav-desk-border);
     background: var(--main-nav-desk-bg);
@@ -2023,7 +2033,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
   }
   .main-nav-icon { width: var(--main-nav-icon-desk); height: var(--main-nav-icon-desk); }
   .main-nav-label-rest { display: inline; }
-  .has-main-nav .menu-toggle { margin-inline-start: 0; padding: 0; border: 0; background: transparent; min-height: 0; border-radius: 50%; }
+  .has-main-nav .menu-toggle { padding: 0; border: 0; background: transparent; min-height: 0; border-radius: 50%; }
   .has-main-nav .menu-toggle .menu-toggle-text { display: none; }
   .has-main-nav .menu-toggle .avatar { display: grid; }
 }

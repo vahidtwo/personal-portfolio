@@ -32,8 +32,7 @@
         <img class="brand-logo" src="/static/logo.svg" width="36" height="36" alt="">
         <span class="brand-name">موجودی من</span>
       </a>
-      {% if user %}{% include "partials/main_nav.html" %}{% endif %}
-      <button type="button" class="btn btn-ghost btn-sm menu-toggle{% if user %} has-avatar{% endif %}" id="menu-toggle" aria-expanded="false" aria-controls="side-panel"{% if user %} aria-label="منو و حساب"{% endif %}><span class="menu-toggle-text">منو</span>{% if user %}<span class="avatar" aria-hidden="true">{{ (user.full_name or user.username or "?")[:1] | upper }}</span>{% endif %}</button>
+      <button type="button" class="btn btn-ghost btn-sm menu-toggle{% if user %} has-avatar{% endif %}" id="menu-toggle" aria-expanded="false" aria-controls="side-panel"{% if user %} aria-label="منو و حساب"{% endif %}><span class="menu-toggle-text">منو</span>{% if user %}<span class="avatar" aria-hidden="true">{% if user.full_name and user.full_name.strip() %}{{ user.full_name.strip()[:1] | upper }}{% else %}<svg class="avatar-icon" viewBox="0 0 24 24" width="20" height="20" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 19.5c1.2-3.4 4-5.2 7.2-5.2s6 1.8 7.2 5.2"/></svg>{% endif %}</span>{% endif %}</button>
     </div>
   </header>
   <div class="side-backdrop" id="side-backdrop" aria-hidden="true"></div>
@@ -75,6 +74,9 @@
   <main id="main" class="shell">
     {% block content %}{% endblock %}
   </main>
+  {#- After <main> so keyboard/screen-reader users reach the page before the section bar; CSS puts it in the
+      top bar (>=900px) or at the bottom (<900px), so the visual order is unchanged. -#}
+  {% if user %}{% include "partials/main_nav.html" %}{% endif %}
   <footer class="foot">
     <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> · به‌روزرسانی ساعتی</p>
   </footer>
@@ -102,7 +104,7 @@
         panel.inert = !open;
         openBtn.setAttribute("aria-expanded", open ? "true" : "false");
         document.body.classList.toggle("menu-open", open);
-        ["main", "top", "foot"].forEach(function (id) {
+        ["main", "top", "foot", "main-nav"].forEach(function (id) {
           const el = document.getElementById(id) || document.querySelector("." + id);
           if (el) el.inert = open;
         });

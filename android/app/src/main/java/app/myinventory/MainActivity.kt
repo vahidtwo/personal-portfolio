@@ -154,7 +154,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         askSmsPermission()
-        UpdateNotifier.checkOnce(this, savedBaseUrl())
         if (intent?.action == ACTION_OPEN_SETUP) {
             openAdvancedSetup()
         } else {

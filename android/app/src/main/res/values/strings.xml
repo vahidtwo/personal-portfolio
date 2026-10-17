@@ -3,12 +3,4 @@
     <string name="connecting">در حال اتصال…</string>
     <string name="shortcut_settings_short">تنظیمات اتصال</string>
     <string name="shortcut_settings_long">تنظیمات اتصال به سرور</string>
-    <!-- PLACEHOLDER update-notice strings (all user-facing update text lives here).
-         Final copy and bottom-sheet design (what's new, downloading / ready / failed
-         states) will come from Arabi; UpdateNotifier.show() is the only UI code to swap. -->
-    <string name="update_title">نسخهٔ تازه رسید</string>
-    <string name="update_version_line">نسخهٔ %1$s آمادهٔ نصب است.</string>
-    <string name="update_note_bullet">• %1$s</string>
-    <string name="update_now">به‌روزرسانی</string>
-    <string name="update_later">بعداً</string>
 </resources>

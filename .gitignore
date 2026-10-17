@@ -14,3 +14,9 @@ data/
 
 # Android SDK archives (downloaded by android/Dockerfile)
 /*.zip
+
+# Android release signing (kept outside the repo)
+*.jks
+*.keystore
+keystore.properties
+.my-inventory-release/

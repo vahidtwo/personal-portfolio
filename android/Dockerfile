@@ -1,5 +1,11 @@
-# Build debug APK for sideload (my-inventory.apk).
+# Build the release APK for sideload (my-inventory.apk).
 # Override when Docker Hub is blocked: --build-arg BASE_IMAGE=hub.hamdocker.ir/eclipse-temurin:17-jdk-jammy
+#
+# The release signing key is passed as BuildKit secrets, never copied into the image:
+#   docker build -f android/Dockerfile --target builder \
+#     --secret id=keystore_properties,src=$HOME/.my-inventory-release/keystore.properties \
+#     --secret id=release_jks,src=$HOME/.my-inventory-release/release.jks .
+# Without the secrets the release APK is signed with a throwaway debug key.
 ARG BASE_IMAGE=eclipse-temurin:17-jdk-jammy
 FROM ${BASE_IMAGE} AS builder
 
@@ -37,7 +43,12 @@ WORKDIR /src
 COPY android ./android
 COPY app/static ./app/static
 
-RUN if [ ! -f android/app/google-services.json ]; then cp android/app/google-services.json.example android/app/google-services.json; fi \
+RUN --mount=type=secret,id=keystore_properties,target=/run/secrets/signing/keystore.properties \
+    --mount=type=secret,id=release_jks,target=/run/secrets/signing/release.jks \
+    if [ ! -f android/app/google-services.json ]; then cp android/app/google-services.json.example android/app/google-services.json; fi \
     && printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
     && chmod +x android/gradlew \
-    && cd android && ./gradlew assembleDebug --no-daemon
+    && if [ -s /run/secrets/signing/keystore.properties ]; then export MY_INVENTORY_KEYSTORE_PROPERTIES=/run/secrets/signing/keystore.properties; fi \
+    && cd android && ./gradlew assembleRelease --no-daemon \
+    && mkdir -p /src/out \
+    && cp app/build/outputs/apk/release/app-release.apk /src/out/my-inventory.apk

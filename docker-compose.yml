@@ -35,6 +35,7 @@ services:
   #   restart: unless-stopped
 
   # One-off: docker compose --profile build-android run --rm android-build
+  # Prefer scripts/build-android-apk-docker.sh: it passes the release key as build secrets.
   android-build:
     profiles: ["build-android"]
     build:
@@ -50,7 +51,7 @@ services:
       [
         "sh",
         "-c",
-        "cp /src/android/app/build/outputs/apk/debug/app-debug.apk /out/my-inventory.apk && sha256sum /out/my-inventory.apk",
+        "cp /src/out/my-inventory.apk /out/my-inventory.apk && sha256sum /out/my-inventory.apk",
       ]
 
 volumes:

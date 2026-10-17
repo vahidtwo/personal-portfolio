@@ -291,6 +291,7 @@ async def profile_save(
     cash_toman: str = Form("0"),
     sanjeh_token: str = Form(""),
     clear_sanjeh: str = Form(""),
+    next_url: str = Form("", alias="next"),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -355,6 +356,10 @@ async def profile_save(
             sanjeh_warning = "دارایی‌ها ذخیره شد، ولی قیمت خودرو از سنجه گرفته نشد. بعداً دوباره تلاش کنید."
     db.commit()
     await refresh_prices_and_snapshot_user(user.id)
+    # Only where we go next differs: the Assets page asks to come back to itself (exact internal path only).
+    if next_url == "/assets":
+        flash(request, sanjeh_warning or "ذخیره شد")
+        return RedirectResponse("/assets", status_code=303)
     flash(request, sanjeh_warning or "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
 

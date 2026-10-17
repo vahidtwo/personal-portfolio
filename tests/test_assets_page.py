@@ -49,11 +49,12 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
     from app.profile import profile_save
     _register(client)
     form = _assets_form(client.get("/assets").text)
-    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "db", "csrf", "clear_sanjeh"}
+    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "db", "csrf", "clear_sanjeh", "next_url"}
     assert handler_fields == set(QTY_FIELDS) | {"sanjeh_token"}
     for name in handler_fields:
         assert form.count(f'name="{name}"') == 1, name
     assert 'name="csrf"' in form
+    assert '<input type="hidden" name="next" value="/assets">' in form
     # groups as cards, in mockup order
     heads = re.findall(r'<h2 id="group-\w+">([^<]+)</h2>', form)
     assert heads == ["طلا و سکه", "ارز و نقد", "رمزارز", "خودرو"]
@@ -204,3 +205,25 @@ def test_save_bar_and_leave_warning_contract(client, no_network):
 def test_static_asset_version_bumped():
     from app.config import STATIC_ASSET_VERSION
     assert STATIC_ASSET_VERSION not in ("20261017g",)
+
+
+def test_save_from_assets_page_stays_on_assets_with_flash(client, no_network):
+    _register(client)
+    fields = _fields(_assets_form(client.get("/assets").text))
+    assert fields["next"] == "/assets"
+    r = client.post("/profile", data={**fields, "btc": "۱٫۵"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/assets"
+    html = client.get("/assets").text
+    assert '<p class="toast toast-ok" role="status">ذخیره شد</p>' in html
+    assert 'name="btc" value="۱٫۵"' in html
+    assert "ذخیره شد" not in client.get("/assets").text  # flash shown once
+
+
+def test_other_next_values_keep_the_old_destination(client, no_network):
+    _register(client)
+    for nxt in ("", "/dashboard", "https://evil.example/", "//evil.example", "/assets/../admin", "/assets?x=1"):
+        r = client.post("/profile", data={"btc": "1", "next": nxt, "csrf": _csrf(client, "/assets")}, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/dashboard", nxt
+    db, u = _user()
+    assert u.btc == Decimal("1")
+    db.close()

@@ -64,3 +64,12 @@ def test_avatar_text_is_dark_on_teal_in_both_themes():
     # the letter sits on the teal part of the gradient: >= 4.5:1 against both themes' teal and the middle stop
     for teal in ("#3ee0b8", "#0d9f7a", "#5ad4f0"):
         assert _ratio("#04120e", teal) >= 4.5, teal
+
+
+def test_skip_link_dark_text_on_teal():
+    css = CSS.read_text(encoding="utf-8")
+    rule = css[css.index(".skip-link {"):]
+    rule = rule[:rule.index("}")]
+    assert "background: var(--accent);" in rule and "color: #04120e;" in rule
+    for teal in ("#3ee0b8", "#0d9f7a"):  # dark and light theme accent
+        assert _ratio("#04120e", teal) >= 4.5

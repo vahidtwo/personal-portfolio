@@ -5,6 +5,7 @@
     Posts to the unchanged POST /profile handler; every quantity field of the old profile assets tab is here. -#}
 <form method="post" action="/profile" class="assets-page" id="assets-form" data-assets-form>
   <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next" value="/assets">
   <div class="assets-head">
     <div class="assets-head-text">
       <h1>دارایی‌ها</h1>

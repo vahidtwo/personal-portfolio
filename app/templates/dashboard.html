@@ -10,6 +10,11 @@
 {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
 
 {% if tab != 'daily' %}
+{# Zero rule shared by the table and the chart picker: hide only when quantity AND value are 0. #}
+{% set visible_rows = [] %}
+{% for row in rows %}{% if (row.sort_qty | float) != 0 or (row.sort_value | float) != 0 %}{% set _ = visible_rows.append(row) %}{% endif %}{% endfor %}
+{% set hidden_zero_count = rows | length - visible_rows | length %}
+{% set visible_keys = visible_rows | map(attribute='key') | list %}
 <section class="summary summary-grid" dir="rtl" aria-labelledby="total-heading">
   <div class="summary-main">
     <div class="summary-text">
@@ -106,7 +111,7 @@
           <span class="chart-asset-picker-title">به تفکیک دارایی</span>
           <select id="chart-asset-select" class="chart-asset-select" {% if not chart_asset_options %}disabled{% endif %} aria-label="انتخاب نمای نمودار">
             {% if chart_asset_options %}
-            {% for opt in chart_asset_options %}
+            {% for opt in chart_asset_options if opt.key == 'total' or opt.key in visible_keys %}
             <option value="{{ opt.key }}" {% if opt.key == default_chart_asset_key %}selected{% endif %}>{{ opt.name_fa }}</option>
             {% endfor %}
             {% else %}
@@ -137,9 +142,6 @@
     <h2 id="table-heading">پرتفوی فعلی</h2>
     <p class="card-desc">برای مرتب‌سازی روی «سهم» یا «بیشترین رشد» بزنید · بیشترین رشد: درصد تغییر قیمت واحد از ۷ روز پیش تا الان · دارایی‌های با مقدار صفر نمایش داده نمی‌شوند</p>
   </div>
-  {% set visible_rows = [] %}
-  {% for row in rows %}{% if (row.sort_qty | float) != 0 or (row.sort_value | float) != 0 %}{% set _ = visible_rows.append(row) %}{% endif %}{% endfor %}
-  {% set hidden_zero_count = rows | length - visible_rows | length %}
   {% if not visible_rows %}
   <div class="empty-state">
     <p class="empty-state-title">هنوز دارایی‌ای ثبت نکرده‌اید</p>

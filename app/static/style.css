@@ -1770,7 +1770,14 @@ input:focus {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  direction: ltr;
+  direction: rtl;
+  min-height: 40px;
+}
+.amount-words {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
 }
 .amount-suggest-btn:hover {
   background: var(--accent-muted);

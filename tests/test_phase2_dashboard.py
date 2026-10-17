@@ -170,6 +170,19 @@ def test_chart_axis_uses_milyoun_not_m_and_spaced_labels():
     assert "wheel: { enabled: false }" in js
 
 
+def test_chart_axis_and_tooltips_use_shared_formatter_and_page_font(client):
+    from app.formatting import format_number
+
+    js = (ROOT / "app/static/dashboard.js").read_text(encoding="utf-8")
+    nf = (ROOT / "app/static/number-format.js").read_text(encoding="utf-8")
+    assert format_number(1120, 0) == "۱٬۱۲۰"  # «٬» (U+066C), never an apostrophe
+    assert "\\u066C" in nf or "٬" in nf
+    assert "toLocaleString" not in js and "NumberFormat(" not in js  # ticks/tooltips only via NumberFa
+    # Canvas text drawn in Vazirmatn (the default canvas font shows «٬» like «'»), re-drawn once it loads.
+    assert "Chart.defaults.font.family = APP_FONT" in js and "Vazirmatn" in js
+    assert "document.fonts.load" in js
+
+
 def test_layout_css_contract():
     css = (ROOT / "app/static/style.css").read_text(encoding="utf-8")
     block = css[css.index("Dashboard (Phase 2"):]

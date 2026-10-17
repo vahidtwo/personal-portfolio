@@ -29,6 +29,13 @@
     return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
   }
 
+  // Canvas text must use the page font: the browser's default canvas font draws the
+  // Persian thousands separator «٬» like an apostrophe («۱'۱۲۰»).
+  const APP_FONT = 'Vazirmatn, Tahoma, "Segoe UI", sans-serif';
+  function useAppFont() {
+    if (window.Chart && Chart.defaults && Chart.defaults.font) Chart.defaults.font.family = APP_FONT;
+  }
+
   // Shared display formatter (number-format.js, mirrors Python format_number).
   const fmtNum = (v, d) => window.NumberFa.format(v, d);
 
@@ -662,10 +669,17 @@
     assetSelect?.addEventListener("input", onSeriesChange);
 
     renderChart();
+    // Re-draw once Vazirmatn has loaded (font-display: swap), so axis/tooltip digits match.
+    if (document.fonts && document.fonts.load) {
+      Promise.all([document.fonts.load('12px Vazirmatn', "۱٬۲۳۴٫۵"), document.fonts.ready])
+        .then(() => renderChart())
+        .catch(() => {});
+    }
     return true;
   }
 
   function boot(retries) {
+    useAppFont();
     const timelineOk = init();
     initPieChart();
     if (timelineOk) return;

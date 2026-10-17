@@ -113,6 +113,33 @@ Tokens are stored **per user in your database**. Treat them like passwords; rota
 
 ---
 
+## Deleting users & restoring one from backup
+
+Admins delete users from **/admin** (tick users → «حذف انتخاب‌شده‌ها…», or «حذف…» on one row).
+The confirm screen lists every selected user with row counts per table and the backup file
+name; you must type the number of users. On submit the app, under one SQLite write lock
+(`BEGIN IMMEDIATE`): recounts (aborts if anything changed), checks free disk (≥ 2× DB size),
+takes an online backup to `$DATA_DIR/backups/predelete-<UTC>-<rand>.db` (dir 0700, file 0600,
+integrity-checked), deletes the users and all their rows, writes `admin_audit_log`, commits.
+Any failure rolls back everything. Self and `ADMIN_USERNAMES` can never be deleted.
+Backups older than 30 days are pruned, but the newest 10 are always kept.
+
+Restore ONE user (all rows, original ids) from such a backup:
+
+```bash
+# take a fresh backup of the live DB first, then:
+docker exec -it <container> python scripts/restore_user.py \
+    /app/data/backups/predelete-20261013-111500-1a2b3c4d.db <user_id> --dry-run
+docker exec -it <container> python scripts/restore_user.py \
+    /app/data/backups/predelete-20261013-111500-1a2b3c4d.db <user_id>
+```
+
+It refuses if the user id or username already exists, copies categories parents-first and
+then every table with a `user_id` column (holdings, snapshots, debts, expenses, spends,
+push tokens, monthly_incomes, …) in one transaction, and checks foreign keys/integrity
+before committing. The audit log (`admin_audit_log`) records who deleted whom, the row
+counts and the backup filename.
+
 ## Production notes
 
 - Run **one** uvicorn worker (`--workers 1` in the Dockerfile) so the hourly job does not run twice.

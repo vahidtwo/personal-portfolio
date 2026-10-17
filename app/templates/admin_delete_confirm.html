@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}تأیید حذف کاربران · موجودی من{% endblock %}
+{% block content %}
+<section class="card" aria-labelledby="del-heading">
+  <div class="card-head">
+    <h1 id="del-heading">حذف {{ user_count }} کاربر</h1>
+    <p class="card-desc">این کاربران و تمام داده‌هایشان حذف می‌شوند. پیش از حذف، خودکار از کل پایگاه داده پشتیبان گرفته می‌شود و اگر پشتیبان‌گیری ناموفق باشد هیچ چیزی حذف نمی‌شود.</p>
+  </div>
+  <div class="table-wrap table-wrap-wide">
+    <table class="data-table">
+      <thead><tr>
+        <th scope="col">کاربر</th>
+        {% for label in count_labels %}<th scope="col">{{ label }}</th>{% endfor %}
+        <th scope="col">جمع ردیف‌ها</th>
+      </tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td dir="ltr">{{ row.username }}</td>
+          {% for label, n in row.counts %}<td class="num">{{ n }}</td>{% endfor %}
+          <td class="num"><strong>{{ row.total }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p>فایل پشتیبان: <code dir="ltr">backups/{{ backup_name }}</code></p>
+  <form method="post" action="/admin/users/delete">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for id in ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+    <input type="hidden" name="expected_json" value="{{ expected_json }}">
+    <input type="hidden" name="backup_name" value="{{ backup_name }}">
+    <label for="confirm_count">برای تأیید، تعداد کاربرانی که حذف می‌شوند ({{ user_count }}) را بنویسید:</label>
+    <input id="confirm_count" name="confirm_count" inputmode="numeric" autocomplete="off" required dir="ltr">
+    <button type="submit" class="btn btn-danger">حذف قطعی</button>
+    <a class="btn" href="/admin">انصراف</a>
+  </form>
+</section>
+{% endblock %}

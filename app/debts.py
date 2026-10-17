@@ -8,8 +8,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.formatting import format_jalali_date, format_toman, format_when, next_jalali_due, parse_jalali_parts, persian_digits
+from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, next_jalali_due, parse_jalali_parts, persian_digits
 from app.models import Debt, User
+from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -42,7 +43,7 @@ def debt_rows(debts: list[Debt]) -> tuple[list[dict], Decimal, str]:
             {
                 "id": debt.id,
                 "title": (debt.title or "").strip(),
-                "monthly_raw": format(Decimal(debt.monthly_toman), "f").rstrip("0").rstrip("."),
+                "monthly_raw": format_amount_input(Decimal(debt.monthly_toman)),
                 "months_raw": str(debt.months_left),
                 "due_year": str(debt.due_year),
                 "due_month": str(debt.due_month),
@@ -58,9 +59,8 @@ def debt_rows(debts: list[Debt]) -> tuple[list[dict], Decimal, str]:
         )
     return rows, total, format_jalali_date(soonest) if soonest else "—"
 def _parse_months_left(raw: str) -> tuple[int | None, str | None]:
-    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
     try:
-        value = int(text)
+        value = parse_int_required(raw)
     except ValueError:
         return None, "تعداد ماه مانده باید عدد باشد"
     if value < 1:
@@ -69,9 +69,8 @@ def _parse_months_left(raw: str) -> tuple[int | None, str | None]:
 
 
 def parse_jalali_parts(year: str, month: str, day: str) -> tuple[jdatetime.date | None, str | None]:
-    trans = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
     try:
-        parsed = jdatetime.date(int(year.strip().translate(trans)), int(month.strip().translate(trans)), int(day.strip().translate(trans)))
+        parsed = jdatetime.date(parse_int_required(year), parse_int_required(month), parse_int_required(day))
     except (TypeError, ValueError):
         return None, "تاریخ جلالی نامعتبر است"
     return parsed, None

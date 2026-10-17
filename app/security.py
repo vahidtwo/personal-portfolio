@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 from app.config import ADMIN_USERNAMES, HTTPS_ONLY, SESSION_COOKIE_NAME
 from app.models import User
 
-USERNAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$")
+USERNAME_MIN_LENGTH = 3
+USERNAME_MAX_LENGTH = 32
+PASSWORD_MIN_LENGTH = 8
+USERNAME_RE = re.compile(rf"^[a-zA-Z][a-zA-Z0-9_]{{{USERNAME_MIN_LENGTH - 1},{USERNAME_MAX_LENGTH - 1}}}$")
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 SESSION_COOKIE_PATH = "/"
@@ -55,22 +58,23 @@ def admin_name_change_error(old: str | None, new: str) -> str | None:
 
 
 def validate_password(password: str) -> str | None:
-    if len(password) < 8:
+    if len(password) < PASSWORD_MIN_LENGTH:
         return "رمز عبور باید حداقل ۸ کاراکتر باشد"
     return None
 
 
 def parse_decimal(raw: str | None, *, field: str) -> Decimal:
-    text = (raw or "0").strip().translate(PERSIAN_DIGITS).replace(",", "").replace("٬", "").replace(" ", "")
-    if text == "":
-        return Decimal("0")
+    from app.number_input import parse_decimal_text
+
     try:
-        value = Decimal(text)
-    except InvalidOperation as exc:
+        value = parse_decimal_text(raw)
+    except (ValueError, InvalidOperation) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"عدد نامعتبر: {field}",
         ) from exc
+    if value is None:
+        return Decimal("0")
     if value < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

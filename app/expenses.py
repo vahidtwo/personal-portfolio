@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.debts import debt_rows
-from app.formatting import format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
+from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
 from app.models import Debt, MonthlyExpense, User
+from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -48,7 +49,7 @@ def monthly_view(
             {
                 "id": item.id,
                 "title": (item.title or "").strip(),
-                "amount_raw": format(amount, "f").rstrip("0").rstrip("."),
+                "amount_raw": format_amount_input(amount),
                 "due_day": str(item.due_day),
                 "amount_label": format_toman(amount),
                 "day_label": persian_digits(str(item.due_day)),
@@ -81,9 +82,8 @@ def expense_form_for_request(db: Session, user: User, request: Request) -> dict:
         }
     return view
 def _parse_due_day(raw: str) -> tuple[int | None, str | None]:
-    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
     try:
-        day = int(text)
+        day = parse_int_required(raw)
     except ValueError:
         return None, "روز ماه باید عدد باشد"
     if day < 1 or day > 31:
@@ -145,7 +145,7 @@ async def profile_add_expense(
         return _render_expense_error(request, db, user, error or "مقادیر نامعتبر است", form, None)
     db.add(MonthlyExpense(user_id=user.id, title=form["title"], amount_toman=amount, due_day=day))
     db.commit()
-    flash(request, "خرج ماهانه ذخیره شد")
+    flash(request, "هزینهٔ ماهانه ذخیره شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
@@ -165,7 +165,7 @@ async def profile_update_expense(
         return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
-        flash(request, "خرج ماهانه پیدا نشد.", error=True)
+        flash(request, "هزینهٔ ماهانه پیدا نشد.", error=True)
         return RedirectResponse("/profile?tab=debts", status_code=303)
     form, amount, day, error = _read_expense_fields(title, amount_toman, due_day)
     if error or amount is None or day is None:
@@ -174,7 +174,7 @@ async def profile_update_expense(
     item.amount_toman = amount
     item.due_day = day
     db.commit()
-    flash(request, "خرج ماهانه به‌روز شد")
+    flash(request, "هزینهٔ ماهانه به‌روز شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)
 
 
@@ -191,9 +191,9 @@ async def profile_delete_expense(
         return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
-        flash(request, "خرج ماهانه پیدا نشد.", error=True)
+        flash(request, "هزینهٔ ماهانه پیدا نشد.", error=True)
         return RedirectResponse("/profile?tab=debts", status_code=303)
     db.delete(item)
     db.commit()
-    flash(request, "خرج ماهانه حذف شد")
+    flash(request, "هزینهٔ ماهانه حذف شد")
     return RedirectResponse("/profile?tab=debts", status_code=303)

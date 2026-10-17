@@ -1442,23 +1442,27 @@ input[readonly] { opacity: 0.75; }
   box-sizing: border-box;
 }
 .privacy-btn {
-  width: 44px;
-  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 36px;
   margin-inline-start: 8px;
-  padding: 0;
-  border-radius: 50%;
+  padding: 4px 12px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
   vertical-align: middle;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
+  white-space: nowrap;
 }
 .privacy-btn:hover { color: var(--text); }
 .privacy-btn[aria-pressed="false"] .privacy-icon-hide { display: none; }
 .privacy-btn[aria-pressed="true"] .privacy-icon-show { display: none; }
-.privacy-icon { width: 18px; height: 18px; display: block; margin: auto; }
+.privacy-icon { width: 18px; height: 18px; display: block; flex: none; }
 [data-mask] {
   font-size: 0 !important;
   user-select: none;
@@ -1770,7 +1774,14 @@ input:focus {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  direction: ltr;
+  direction: rtl;
+  min-height: 40px;
+}
+.amount-words {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
 }
 .amount-suggest-btn:hover {
   background: var(--accent-muted);
@@ -1816,3 +1827,76 @@ input:focus {
   .form-actions { flex-direction: column-reverse; }
   .form-actions .btn { width: 100%; }
 }
+
+/* ---- Phase 0: empty states, notes, tap targets ---- */
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px 18px;
+  margin: 12px 0;
+  text-align: center;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+.empty-state-title { margin: 0; font-weight: 700; font-size: 16px; }
+.empty-state-hint { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.8; max-width: 52ch; }
+.table-note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; }
+.privacy-note {
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 10px;
+  font-size: 13px;
+}
+.h-sub { font-size: 0.6em; font-weight: 500; color: var(--text-muted); }
+.field-hint-inline { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.daily-add { border-color: var(--accent-muted); }
+
+@media (max-width: 720px) {
+  .btn, .btn-sm { min-height: 44px; }
+  .daily-section input,
+  .daily-section select { min-height: 48px; font-size: 16px; }
+  .daily-section .form-actions .btn { min-height: 48px; }
+  .month-nav .btn { min-width: 88px; }
+  .amount-suggest-btn { min-height: 44px; padding: 8px 14px; }
+  .privacy-btn { min-height: 44px; }
+  .pager .btn { min-width: 88px; }
+}
+
+.url-block {
+  display: block;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  margin-top: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.landing-steps li.has-url { flex-wrap: wrap; row-gap: 4px; }
+.landing-steps li.has-url > .url-block { margin-top: 0; }
+.landing-steps li.has-url > .li-text { flex: 1 1 0; min-width: 0; }
+.landing-steps li.has-url .url-block { flex: 1 0 100%; word-break: normal; overflow-wrap: anywhere; }
+
+/* labeled privacy toggle (values shown by default) */
+.privacy-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.privacy-btn[aria-pressed="false"] .privacy-label-show { display: none; }
+.privacy-btn[aria-pressed="true"] .privacy-label-hide { display: none; }
+/* auth pages: space between title, subtitle and first label */
+.auth-card h1 { margin-bottom: 6px; }
+.auth-card h1 + .card-desc { margin-bottom: 20px; line-height: 1.8; }
+.stack-form .field-hint { display: block; margin-top: 6px; }
+.section-gap { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+/* Profile: collapsed advanced section (MCP token) */
+.advanced-card { padding-top: 0; padding-bottom: 0; }
+.advanced-summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+  min-height: 48px; font-weight: 700; color: var(--muted, #64748b);
+}
+.advanced-summary::-webkit-details-marker { display: none; }
+.advanced-summary::before { content: "‹"; display: inline-block; transition: transform .15s; }
+.advanced-card[open] > .advanced-summary::before { transform: rotate(-90deg); }
+.advanced-card[open] { padding-bottom: 16px; }
+.advanced-body > h2 { margin-top: 4px; }

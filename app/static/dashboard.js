@@ -32,18 +32,20 @@
   // Shared display formatter (number-format.js, mirrors Python format_number).
   const fmtNum = (v, d) => window.NumberFa.format(v, d);
 
-  function formatAxisCompact(v, divisor, suffix, decimals) {
-    return fmtNum(v / divisor, decimals) + suffix;
-  }
-
   function axisLabelDecimals(step, divisor) {
     const unit = step / divisor;
-    if (unit >= 100) return 0;
-    if (unit >= 10) return 1;
-    if (unit >= 1) return 2;
-    if (unit >= 0.1) return 3;
-    if (unit >= 0.01) return 4;
-    return 5;
+    if (unit >= 1) return 0;
+    if (unit >= 0.1) return 1;
+    if (unit >= 0.01) return 2;
+    if (unit >= 0.001) return 3;
+    return 4;
+  }
+
+  /** Display unit for a toman series: «میلیون تومان» for big numbers (no Latin M/K/B suffix). */
+  function axisUnit(maxAbs) {
+    if (maxAbs >= 1e6) return { divisor: 1e6, label: "میلیون تومان" };
+    if (maxAbs >= 1e3) return { divisor: 1e3, label: "هزار تومان" };
+    return { divisor: 1, label: "تومان" };
   }
 
   function dataMinMaxFromDatasets(datasets) {
@@ -51,7 +53,7 @@
     let max = -Infinity;
     for (const ds of datasets) {
       for (const v of ds.data || []) {
-        const n = Number(v);
+        const n = Number(v && typeof v === "object" ? v.y : v);
         if (Number.isFinite(n)) {
           if (n < min) min = n;
           if (n > max) max = n;
@@ -65,8 +67,8 @@
   }
 
   /** Nice-number axis bounds so Y zooms to the data (not 0..max). */
-  function buildYAxisScale(dataMin, dataMax, targetTicks) {
-    const ticks = targetTicks || 10;
+  function buildYAxisScale(dataMin, dataMax, targetTicks, unit) {
+    const ticks = targetTicks || 5;
     const dataSpan = Math.max(dataMax - dataMin, 0);
     let lo = dataMin;
     let hi = dataMax;
@@ -75,21 +77,15 @@
       lo -= margin;
       hi += margin;
     } else {
-      const pad = dataSpan * 0.03;
+      const pad = dataSpan * 0.06;
       lo -= pad;
       hi += pad;
     }
-
-    const roughRange = hi - lo;
-    const range = niceAxisStep(roughRange, false);
-    let step = niceAxisStep(range / Math.max(ticks - 1, 1), true);
-    if (dataSpan > 0 && step > dataSpan / 3) {
-      const finer = niceAxisStep(step / 2, true);
-      if (finer > 0 && finer < step) step = finer;
-    }
+    const step = niceAxisStep((hi - lo) / Math.max(ticks - 1, 1), true);
     const axisMin = Math.floor(lo / step) * step;
     const axisMax = Math.ceil(hi / step) * step;
-    const formatTick = makeAxisTickFormatter(step, axisMax);
+    const decimals = axisLabelDecimals(step, unit.divisor);
+    const formatTick = (v) => fmtNum(v / unit.divisor, decimals);
     return { min: axisMin, max: axisMax, stepSize: step, formatTick };
   }
 
@@ -108,24 +104,6 @@
     else if (f <= 5) nf = 5;
     else nf = 10;
     return nf * Math.pow(10, exp);
-  }
-
-  function makeAxisTickFormatter(step, axisMax) {
-    const ref = Math.max(Math.abs(axisMax), Math.abs(step));
-    if (ref >= 1e9) {
-      const decimals = axisLabelDecimals(step, 1e9);
-      return (v) => formatAxisCompact(v, 1e9, "B", decimals, true);
-    }
-    if (ref >= 1e6) {
-      const decimals = axisLabelDecimals(step, 1e6);
-      return (v) => formatAxisCompact(v, 1e6, "M", decimals, true);
-    }
-    if (ref >= 1e3) {
-      const decimals = axisLabelDecimals(step, 1e3);
-      return (v) => formatAxisCompact(v, 1e3, "K", decimals, true);
-    }
-    const decimals = axisLabelDecimals(step, 1);
-    return (v) => formatAxisCompact(v, 1, "", decimals, true);
   }
 
   function formatToman(v) {
@@ -163,7 +141,8 @@
     }
     const series = ctx.dataset.data;
     const current = ctx.parsed.y;
-    const previous = Number(series[idx - 1]);
+    const prevPoint = series[idx - 1];
+    const previous = Number(prevPoint && typeof prevPoint === "object" ? prevPoint.y : prevPoint);
     const change = formatChangeFromPrevious(current, previous);
     if (change == null) {
       return "تغییر نسبت به قبل: —";
@@ -189,14 +168,13 @@
     const slices = payload.slices || [];
     if (!slices.length) return;
 
-    const muted = cssVar("--text-muted") || "#9aa3b2";
     const surface = cssVar("--surface") || "#181d27";
     const text = cssVar("--text") || "#eef1f6";
     const border = cssVar("--border") || "#2a3140";
 
     const labels = slices.map((s) => s.label);
     const data = slices.map((s) => Number(s.value));
-    const colors = slices.map((s) => ASSET_COLORS[s.key] || "#9aa3b2");
+    const colors = slices.map((s) => s.color || ASSET_COLORS[s.key] || "#9aa3b2");
 
     pieChartInited = true;
     new Chart(canvas, {
@@ -216,20 +194,9 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "58%",
+        cutout: "72%",
         plugins: {
-          legend: {
-            position: "bottom",
-            rtl: true,
-            labels: {
-              boxWidth: 12,
-              boxHeight: 12,
-              padding: 14,
-              usePointStyle: true,
-              color: muted,
-              font: { size: 12, weight: "500" },
-            },
-          },
+          legend: { display: false },
           tooltip: {
             backgroundColor: surface,
             titleColor: text,
@@ -303,32 +270,47 @@
     return [singleSeriesDataset(row, color, assetFill)];
   }
 
-  function chartOptions(labels, rangeSelect, zoomEnabled, datasets) {
+  // Jalali day / time labels in Tehran time for the time axis (Persian digits).
+  const DAY_FMT = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { timeZone: "Asia/Tehran", day: "numeric", month: "long" });
+  const TIME_FMT = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit", hour12: false });
+  const DAY_MS = 86400000;
+
+  /** A few evenly spaced time ticks (width-based) with de-duplicated labels, so they never overlap. */
+  function timeTicks(first, last, width, nowMs) {
+    const slots = Math.max(2, Math.floor((width || 320) / 96));
+    const short = last - first <= 2 * DAY_MS;
+    const today = DAY_FMT.format(nowMs);
+    const out = [];
+    let prev = null;
+    for (let i = 0; i < slots; i++) {
+      const v = first + ((last - first) * i) / Math.max(slots - 1, 1);
+      let label = short ? TIME_FMT.format(v) : DAY_FMT.format(v);
+      if (!short && label === today) label = "امروز";
+      if (label === prev) continue;
+      prev = label;
+      out.push({ value: v, label });
+    }
+    return out;
+  }
+
+  function chartOptions(view, opts) {
+    const { labels, datasets, unit, first, last, nowMs } = view;
+    const { rangeSelect, zoomOn, height } = opts;
     const muted = cssVar("--text-muted") || "#9aa3b2";
     const grid = cssVar("--chart-grid") || "rgba(255,255,255,0.06)";
     const extent = dataMinMaxFromDatasets(datasets || []);
-    const yScale = buildYAxisScale(extent.min, extent.max, 10);
+    const targetTicks = Math.max(3, Math.min(6, Math.floor((height || 220) / 55)));
+    const yScale = buildYAxisScale(extent.min, extent.max, targetTicks, unit);
     const surface = cssVar("--surface") || "#181d27";
     const text = cssVar("--text") || "#eef1f6";
     const border = cssVar("--border") || "#2a3140";
 
     const plugins = {
-      legend: {
-        display: false,
-        position: "bottom",
-        rtl: true,
-        labels: {
-          boxWidth: 12,
-          boxHeight: 12,
-          padding: 16,
-          usePointStyle: true,
-          color: muted,
-          font: { size: 12, weight: "500" },
-        },
-      },
+      legend: { display: false },
       tooltip: {
         enabled: !rangeSelect,
         position: "nearest",
+        rtl: true,
         backgroundColor: surface,
         titleColor: text,
         bodyColor: text,
@@ -343,14 +325,12 @@
         callbacks: {
           title: function (items) {
             if (!items.length) return "";
-            const idx = items[0].dataIndex;
-            return labels[idx] ?? "";
+            return labels[items[0].dataIndex] ?? "";
           },
           label: function (ctx) {
-            const name = ctx.dataset.label || "";
             const v = ctx.parsed.y;
             if (v == null || Number.isNaN(v)) return null;
-            return name + ": " + formatToman(v);
+            return (ctx.dataset.label || "") + ": " + formatToman(v);
           },
           afterLabel: function (ctx) {
             const v = ctx.parsed.y;
@@ -359,97 +339,78 @@
           },
         },
       },
+      // Zoom/pan only in full screen; on the page the wheel and touch scroll the page.
+      zoom: zoomOn
+        ? {
+            limits: { x: { min: "original", max: "original", minRange: 3600000 } },
+            pan: { enabled: !rangeSelect, mode: "x" },
+            zoom: {
+              wheel: { enabled: !rangeSelect, speed: 0.1 },
+              pinch: { enabled: !rangeSelect },
+              drag: {
+                enabled: rangeSelect,
+                backgroundColor: "rgba(62, 224, 184, 0.15)",
+                borderColor: "rgba(62, 224, 184, 0.6)",
+                borderWidth: 1,
+                threshold: 4,
+              },
+              mode: "x",
+            },
+          }
+        : {
+            pan: { enabled: false },
+            zoom: { wheel: { enabled: false }, pinch: { enabled: false }, drag: { enabled: false } },
+          },
     };
-
-    if (zoomEnabled) {
-      plugins.zoom = {
-        limits: {
-          x: { minRange: 1 },
-        },
-        pan: {
-          enabled: true,
-          mode: "x",
-          modifierKey: "shift",
-        },
-        zoom: {
-          wheel: {
-            enabled: !rangeSelect,
-            speed: 0.1,
-          },
-          pinch: {
-            enabled: !rangeSelect,
-          },
-          drag: {
-            enabled: rangeSelect,
-            backgroundColor: "rgba(62, 224, 184, 0.15)",
-            borderColor: "rgba(62, 224, 184, 0.6)",
-            borderWidth: 1,
-            threshold: 4,
-          },
-          mode: "x",
-        },
-      };
-    }
 
     return {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
       events: ["mousemove", "mouseout", "click", "touchstart", "touchmove", "touchend"],
-      layout: { padding: { top: 8, right: 12, bottom: 4, left: 10 } },
-      interaction: {
-        mode: "index",
-        intersect: false,
-        axis: "x",
-        includeInvisible: true,
-      },
-      elements: {
-        point: {
-          hitRadius: 28,
-          hoverRadius: 7,
-        },
-        line: {
-          borderWidth: 2,
-        },
-      },
+      layout: { padding: { top: 8, right: 14, bottom: 0, left: 4 } },
+      interaction: { mode: "index", intersect: false, axis: "x", includeInvisible: true },
+      elements: { point: { hitRadius: 28, hoverRadius: 7 }, line: { borderWidth: 2 } },
       plugins,
       scales: {
         x: {
+          type: "linear",
           reverse: false,
-          title: {
-            display: true,
-            text: "تاریخ و زمان (شمسی)",
-            color: muted,
-            font: { size: 12, weight: "500" },
-            padding: { top: 8 },
+          min: first,
+          max: last,
+          // Real time axis: older history is one point a day, the last week is hourly.
+          afterBuildTicks: function (scale) {
+            const lo = Number.isFinite(scale.min) ? scale.min : first;
+            const hi = Number.isFinite(scale.max) ? scale.max : last;
+            const ticks = timeTicks(lo, hi, scale.width || scale.chart.width, nowMs);
+            scale._phase2Labels = new Map(ticks.map((t) => [t.value, t.label]));
+            scale.ticks = ticks.map((t) => ({ value: t.value }));
           },
           ticks: {
-            maxRotation: 40,
+            autoSkip: false,
+            align: "inner", // first/last labels stay inside the plot instead of clipping
+            maxRotation: 0,
             minRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 8,
             color: muted,
-            font: { size: 11 },
+            font: { size: 11.5 },
+            padding: 6,
+            callback: function (value) {
+              return (this._phase2Labels && this._phase2Labels.get(value)) || "";
+            },
           },
-          grid: { color: grid, drawBorder: false },
+          grid: { display: false },
           border: { display: false },
         },
         y: {
           min: yScale.min,
           max: yScale.max,
           beginAtZero: false,
-          title: {
-            display: true,
-            text: "ارزش (تومان)",
-            color: muted,
-            font: { size: 12, weight: "500" },
-          },
           ticks: {
             color: muted,
-            font: { size: 12, weight: "500" },
+            font: { size: 11.5, weight: "500" },
             stepSize: yScale.stepSize,
-            maxTicksLimit: 12,
-            autoSkip: false,
+            autoSkip: true,
+            autoSkipPadding: 12,
             callback: yScale.formatTick,
             padding: 8,
           },
@@ -460,6 +421,8 @@
     };
   }
 
+  const RANGE_CHANGE_LABEL = { "7": "این هفته", "30": "این ماه", "90": "۳ ماه", "365": "این سال", all: "کل دوره" };
+
   function init() {
     const el = document.getElementById("chart-data");
     const canvas = document.getElementById("timeline-chart");
@@ -469,13 +432,16 @@
     const zoomBtns = document.querySelectorAll("[data-zoom]");
     const rangeBtn = document.getElementById("chart-range-btn");
     const fullscreenBtn = document.getElementById("chart-fullscreen");
+    const rangeBtns = document.querySelectorAll("#chart-range [data-range]");
+    const unitEl = document.getElementById("chart-unit");
+    const foot = document.getElementById("chart-foot");
 
     if (!el || !canvas || typeof Chart === "undefined") {
       return false;
     }
 
-    const zoomEnabled = registerZoomPlugin();
-    if (!zoomEnabled) {
+    const zoomAvailable = registerZoomPlugin();
+    if (!zoomAvailable) {
       console.warn("chartjs-plugin-zoom not loaded; zoom/range disabled");
     }
 
@@ -487,6 +453,8 @@
     }
 
     const labels = payload.labels || [];
+    const times = payload.times || [];
+    const nowMs = payload.now || (times.length ? times[times.length - 1] : Date.now());
     const series = payload.series || [];
     const assetOptions = payload.assetOptions || [];
     // A single point is not a trend: show the empty state until there are 2+ points.
@@ -511,6 +479,90 @@
     let chart = null;
     let seriesKey = assetSelect?.value || "total";
     let rangeSelect = false;
+    let fullscreen = false;
+    let range = (document.querySelector('#chart-range [aria-pressed="true"]') || {}).dataset?.range || "30";
+    const fsIconOpen = fullscreenBtn ? fullscreenBtn.innerHTML : "";
+    const fsIconClose =
+      '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+    /** First index inside the selected range (Tehran "now" comes from the server). */
+    function rangeStart() {
+      if (range === "all" || !times.length) return 0;
+      const cutoff = nowMs - Number(range) * 86400000;
+      let start = times.findIndex((t) => t >= cutoff);
+      if (start < 0) start = times.length - 1;
+      return Math.max(0, Math.min(start, times.length - 2)); // keep at least two points
+    }
+
+    function currentView() {
+      const start = rangeStart();
+      const full = buildDatasets(series, seriesKey);
+      const xs = times.slice(start);
+      const datasets = full.map((ds) => {
+        const data = ds.data.slice(start).map((y, i) => ({ x: xs[i], y }));
+        const many = data.length > 49;
+        return Object.assign({}, ds, {
+          data,
+          pointRadius: data.map((_, i) => (i === data.length - 1 ? 5 : many ? 0 : 3)),
+        });
+      });
+      const extent = dataMinMaxFromDatasets(datasets);
+      const unit = axisUnit(Math.max(Math.abs(extent.min), Math.abs(extent.max)));
+      return { labels: labels.slice(start), datasets, unit, first: xs[0], last: xs[xs.length - 1], nowMs };
+    }
+
+    function updateFoot(view) {
+      if (!foot) return;
+      const data = ((view.datasets[0] && view.datasets[0].data) || []).map((p) => p.y);
+      if (data.length < 2) {
+        foot.hidden = true;
+        return;
+      }
+      const max = Math.max(...data);
+      const min = Math.min(...data);
+      const first = data[0];
+      const last = data[data.length - 1];
+      const d = view.unit.divisor;
+      document.getElementById("chart-max").textContent = fmtNum(max / d, d === 1 ? 0 : 1);
+      document.getElementById("chart-min").textContent = fmtNum(min / d, d === 1 ? 0 : 1);
+      const changeEl = document.getElementById("chart-change");
+      const label = document.getElementById("chart-change-label");
+      if (label) label.textContent = RANGE_CHANGE_LABEL[range] || "";
+      changeEl.classList.remove("is-up", "is-down");
+      if (first === 0) {
+        changeEl.textContent = "—";
+      } else {
+        const pct = ((last - first) / Math.abs(first)) * 100;
+        const rounded = Math.round(pct * 10) / 10;
+        if (rounded > 0) {
+          changeEl.textContent = "▲ " + fmtNum(rounded, 1) + "٪";
+          changeEl.classList.add("is-up");
+        } else if (rounded < 0) {
+          changeEl.textContent = "▼ " + fmtNum(-rounded, 1) + "٪";
+          changeEl.classList.add("is-down");
+        } else {
+          changeEl.textContent = "۰٪";
+        }
+      }
+      foot.hidden = false;
+    }
+
+    function renderChart() {
+      const view = currentView();
+      if (!view.datasets.length) return;
+      if (unitEl) unitEl.textContent = view.unit.label;
+      updateFoot(view);
+      if (chart) chart.destroy();
+      chart = new Chart(canvas, {
+        type: "line",
+        data: { datasets: view.datasets },
+        options: chartOptions(view, {
+          rangeSelect,
+          zoomOn: zoomAvailable && fullscreen,
+          height: chartWrap ? chartWrap.clientHeight : 220,
+        }),
+      });
+    }
 
     function onSeriesChange() {
       if (!assetSelect || assetSelect.disabled) return;
@@ -518,16 +570,14 @@
       renderChart();
     }
 
-    function renderChart() {
-      const datasets = buildDatasets(series, seriesKey);
-      if (!datasets.length) return;
-
-      if (chart) chart.destroy();
-      chart = new Chart(canvas, {
-        type: "line",
-        data: { labels, datasets },
-        options: chartOptions(labels, rangeSelect, zoomEnabled, datasets),
+    function setRange(next) {
+      range = next;
+      rangeBtns.forEach((btn) => {
+        const on = btn.dataset.range === next;
+        btn.classList.toggle("on", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
+      renderChart();
     }
 
     function setRangeMode(on) {
@@ -539,7 +589,7 @@
     }
 
     function zoomChart(action) {
-      if (!chart || typeof chart.resetZoom !== "function") return;
+      if (!fullscreen || !chart || typeof chart.resetZoom !== "function") return;
       if (action === "reset") {
         chart.resetZoom();
         return;
@@ -549,8 +599,33 @@
       chart.zoomScale("x", { factor, center: "center" });
     }
 
+    function setFullscreen(on) {
+      if (fullscreen === on) return;
+      fullscreen = on;
+      if (!on) {
+        rangeSelect = false;
+        rangeBtn?.classList.remove("is-active");
+        rangeBtn?.setAttribute("aria-pressed", "false");
+        chartWrap?.classList.remove("is-range-mode");
+      }
+      panel.classList.toggle("is-fullscreen", on);
+      document.documentElement.classList.toggle("chart-fs-open", on);
+      if (fullscreenBtn) {
+        fullscreenBtn.innerHTML = on ? fsIconClose : fsIconOpen;
+        fullscreenBtn.setAttribute("aria-label", on ? "خروج از تمام‌صفحه" : "تمام‌صفحه");
+        fullscreenBtn.title = on ? "خروج از تمام‌صفحه" : "تمام‌صفحه";
+      }
+      window.requestAnimationFrame(renderChart);
+    }
+
+    rangeBtns.forEach((btn) => {
+      btn.addEventListener("click", function () {
+        setRange(btn.dataset.range);
+      });
+    });
+
     rangeBtn?.addEventListener("click", function () {
-      setRangeMode(!rangeSelect);
+      if (fullscreen) setRangeMode(!rangeSelect);
     });
 
     zoomBtns.forEach((btn) => {
@@ -562,18 +637,24 @@
 
     if (fullscreenBtn && panel) {
       fullscreenBtn.addEventListener("click", function () {
-        if (!document.fullscreenElement) {
-          panel.requestFullscreen?.().catch(() => {});
-        } else {
+        if (!fullscreen) {
+          // Real full screen where the browser allows it; a fixed overlay otherwise (iPhone).
+          if (panel.requestFullscreen && document.fullscreenEnabled) {
+            panel.requestFullscreen().catch(() => setFullscreen(true));
+          } else {
+            setFullscreen(true);
+          }
+        } else if (document.fullscreenElement) {
           document.exitFullscreen?.();
+        } else {
+          setFullscreen(false);
         }
       });
       document.addEventListener("fullscreenchange", function () {
-        const on = document.fullscreenElement === panel;
-        panel.classList.toggle("is-fullscreen", on);
-        fullscreenBtn.textContent = on ? "✕" : "⛶";
-        fullscreenBtn.setAttribute("aria-label", on ? "خروج از تمام‌صفحه" : "تمام‌صفحه");
-        chart?.resize();
+        setFullscreen(document.fullscreenElement === panel);
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && fullscreen && !document.fullscreenElement) setFullscreen(false);
       });
     }
 

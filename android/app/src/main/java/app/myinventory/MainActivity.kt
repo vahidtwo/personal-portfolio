@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -51,7 +52,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         web.addJavascriptInterface(
-            AndroidBridge(this) { base -> loadRemote(base, "/dashboard") },
+            // @JavascriptInterface methods run on the "JavaBridge" thread, but
+            // WebView.loadUrl must be called on the UI thread, or it throws and
+            // the setup button silently does nothing.
+            AndroidBridge(this) { base -> runOnUiThread { loadRemote(base, "/dashboard") } },
             "AndroidBridge",
         )
 
@@ -63,6 +67,19 @@ class MainActivity : AppCompatActivity() {
                 if (target.scheme == "file") return false
                 if (isAllowedRemoteUrl(target)) return false
                 return true
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError,
+            ) {
+                super.onReceivedError(view, request, error)
+                if (!request.isForMainFrame) return
+                if (request.url?.scheme == "file") return
+                // Back to setup with a retry button. The saved address is kept on
+                // purpose, so being offline never wipes it.
+                view.loadUrl(SETUP_ERROR_ASSET)
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
@@ -96,11 +113,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restoreOrSetup(savedInstanceState: Bundle?) {
+        val saved = savedBaseUrl()
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState)
+            // If the activity was recreated on the setup page after an address was
+            // already saved, go to the dashboard instead of showing setup again.
+            val restoredUrl = web.url
+            if (saved != null && (restoredUrl == null || restoredUrl.startsWith(SETUP_ASSET))) {
+                loadRemote(saved, "/dashboard")
+            } else if (restoredUrl == null) {
+                web.loadUrl(SETUP_ASSET)
+            }
             return
         }
-        val saved = savedBaseUrl()
         if (saved != null) {
             loadRemote(saved, "/dashboard")
         } else {
@@ -152,5 +177,6 @@ class MainActivity : AppCompatActivity() {
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
+        private const val SETUP_ERROR_ASSET = "$SETUP_ASSET?error=connect"
     }
 }

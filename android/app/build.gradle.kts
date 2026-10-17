@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Release signing key lives OUTSIDE the repo. Point MY_INVENTORY_KEYSTORE_PROPERTIES at a
+// keystore.properties file (storeFile, storePassword, keyAlias, keyPassword), or keep it at
+// ~/.my-inventory-release/keystore.properties. storeFile is resolved relative to that file.
+// When neither exists, release builds fall back to the debug key.
+val releaseKeystoreProps: File? = (
+    System.getenv("MY_INVENTORY_KEYSTORE_PROPERTIES")?.takeIf { it.isNotBlank() }?.let(::File)
+        ?: File(System.getProperty("user.home"), ".my-inventory-release/keystore.properties")
+    ).takeIf { it.isFile }
 
 android {
     namespace = "app.myinventory"
@@ -11,14 +22,32 @@ android {
         applicationId = "app.myinventory"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 4
+        versionName = "4.0"
+    }
+
+    signingConfigs {
+        if (releaseKeystoreProps != null) {
+            create("release") {
+                val props = Properties().apply { releaseKeystoreProps.inputStream().use(::load) }
+                storeFile = releaseKeystoreProps.parentFile.resolve(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            signingConfig = if (releaseKeystoreProps != null) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("my-inventory: no release keystore.properties found; signing release with the debug key")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

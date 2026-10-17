@@ -8,13 +8,15 @@ class AndroidBridge(
     private val context: Context,
     private val onServerConfigured: (String) -> Unit,
 ) {
+    /** Returns false when the address is rejected (empty, not https, or no host). */
     @JavascriptInterface
-    fun setServerUrl(url: String) {
-        val normalized = normalizeBaseUrl(url) ?: return
+    fun setServerUrl(url: String): Boolean {
+        val normalized = normalizeBaseUrl(url) ?: return false
         context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit {
             putString(MainActivity.KEY_URL, normalized)
         }
         onServerConfigured(normalized)
+        return true
     }
 
     @JavascriptInterface

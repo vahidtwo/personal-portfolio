@@ -180,7 +180,9 @@ def test_android_setup_prefills_public_server_url():
     from pathlib import Path
     html = (Path(__file__).resolve().parent.parent / "android/app/src/main/assets/www/setup.html").read_text(encoding="utf-8")
     assert 'id="site-url"' in html and 'value="https://portfolio.vahidtwo.ir"' in html
-    assert "if (saved) urlInput.value = saved;" in html  # a saved address still wins
+    # a saved address still wins over the default
+    assert ('urlInput.value = (saved || "").trim() || DEFAULT_URL;' in html
+            or "if (saved) urlInput.value = saved;" in html)
 
 
 def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):

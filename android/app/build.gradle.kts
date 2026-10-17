@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
 }
 
 // Release signing key lives OUTSIDE the repo. Point MY_INVENTORY_KEYSTORE_PROPERTIES at a
@@ -63,7 +64,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
     implementation("com.google.firebase:firebase-messaging")
 }
 
@@ -99,5 +100,3 @@ tasks.register("syncWebAssets") {
 tasks.named("preBuild").configure {
     dependsOn("syncWebAssets")
 }
-
-apply(plugin = "com.google.gms.google-services")

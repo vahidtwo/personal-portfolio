@@ -7,11 +7,15 @@ import androidx.core.content.edit
 class AndroidBridge(
     private val context: Context,
     private val onServerConfigured: (String) -> Unit,
+    private val onRetry: () -> Unit,
 ) {
-    /** Returns false when the address is rejected (empty, not https, or no host). */
+    /**
+     * Saves the server address and opens the dashboard. An empty address means the default
+     * server. Returns false when the address is rejected (unknown scheme or no host).
+     */
     @JavascriptInterface
     fun setServerUrl(url: String): Boolean {
-        val normalized = normalizeBaseUrl(url) ?: return false
+        val normalized = ServerAddress.normalizeOrDefault(url) ?: return false
         context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit {
             putString(MainActivity.KEY_URL, normalized)
         }
@@ -43,13 +47,16 @@ class AndroidBridge(
     @JavascriptInterface
     fun isAndroidApp(): Boolean = true
 
+    /** Retry the page that last failed to load (used by the error screen). */
+    @JavascriptInterface
+    fun retry() {
+        onRetry()
+    }
+
+    @JavascriptInterface
+    fun getDefaultServerUrl(): String = ServerAddress.DEFAULT
+
     companion object {
-        fun normalizeBaseUrl(raw: String): String? {
-            val trimmed = raw.trim()
-            if (trimmed.isEmpty()) return null
-            val uri = android.net.Uri.parse(trimmed)
-            if (uri.scheme != "https" || uri.host.isNullOrBlank()) return null
-            return "https://${uri.host}"
-        }
+        fun normalizeBaseUrl(raw: String): String? = ServerAddress.normalize(raw)
     }
 }

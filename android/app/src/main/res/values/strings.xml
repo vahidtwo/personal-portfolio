@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">موجودی من</string>
+    <string name="connecting">در حال اتصال…</string>
 </resources>

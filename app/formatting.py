@@ -31,9 +31,15 @@ def format_number(value, max_decimals: int = MONEY_DECIMALS) -> str:
         return ""
     if isinstance(value, float):
         d = Decimal(repr(value))
+    elif isinstance(value, str):
+        from app.number_input import normalize_number_text
+
+        text = normalize_number_text(value)
+        if text == "":
+            return ""
+        d = Decimal(text)
     else:
-        text = str(value).strip().translate(_TO_ASCII).replace(",", "").replace("٬", "")
-        d = Decimal(text.replace("٫", ".").replace("−", "-"))
+        d = Decimal(value)
     q = d.quantize(Decimal(1).scaleb(-max_decimals), rounding=ROUND_HALF_UP)
     negative = q < 0
     q = abs(q)
@@ -63,18 +69,32 @@ def format_qty(value: Decimal, places: int) -> str:
     return format_number(Decimal(value or 0), min(places, QTY_DECIMALS)) or "۰"
 
 
-def format_qty_input(value: Decimal, places: int) -> str:
-    """Value for an <input>: Persian digits, '.' decimal, no grouping; empty when zero.
-
-    The server parser (security.parse_decimal) maps '' to 0 and accepts Persian/Latin digits.
-    """
-    d = Decimal(value or 0).quantize(Decimal(1).scaleb(-min(places, QTY_DECIMALS)), rounding=ROUND_HALF_UP)
+def _input_text(value) -> str:
+    """Exact stored value as plain Latin text ('' for zero): never rounded, no trailing zeros."""
+    d = Decimal(value or 0)
     if d == 0:
         return ""
     text = format(d, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return persian_digits(text)
+    return text
+
+
+def format_qty_input(value: Decimal, places: int | None = None) -> str:
+    """Quantity <input> value: full stored precision (no rounding), Persian digits, ٫ decimal,
+    no grouping; '' when zero. app.number_input parses it back exactly. `places` is ignored."""
+    return persian_digits(_input_text(value).replace(".", "٫"))
+
+
+def format_amount_input(value: Decimal) -> str:
+    """Toman <input> value: like format_qty_input but with ٬ thousands grouping."""
+    text = _input_text(value)
+    if text == "":
+        return ""
+    negative = text.startswith("-")
+    whole, _, frac = text.lstrip("-").partition(".")
+    out = f"{int(whole):,}".replace(",", "٬") + (f"٫{frac}" if frac else "")
+    return persian_digits(("-" if negative else "") + out)
 
 
 def format_share_label(share: Decimal) -> str:
@@ -130,11 +150,9 @@ def format_jalali_date(value: jdatetime.date) -> str:
 
 def parse_jalali_parts(year: str, month: str, day: str) -> tuple[jdatetime.date | None, str | None]:
     try:
-        parsed = jdatetime.date(
-            int(year.strip().translate(_TO_ASCII)),
-            int(month.strip().translate(_TO_ASCII)),
-            int(day.strip().translate(_TO_ASCII)),
-        )
+        from app.number_input import parse_int_required
+
+        parsed = jdatetime.date(parse_int_required(year), parse_int_required(month), parse_int_required(day))
     except (TypeError, ValueError):
         return None, "تاریخ جلالی نامعتبر است"
     return parsed, None

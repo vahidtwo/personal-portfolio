@@ -99,7 +99,7 @@ def build_pie_data(view) -> dict:
                 "label": row.name_fa,
                 "value": float(val),
                 "value_label": format_toman(val),
-                "share_label": persian_digits(format(share_q, "f").rstrip("0").rstrip(".")),
+                "share_label": format_number(share_q, 1),
             }
         )
     slices.sort(key=lambda s: s["value"], reverse=True)

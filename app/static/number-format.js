@@ -16,10 +16,26 @@
       }
       return s;
     }
-    var t = String(value).trim().replace(/[۰-۹٠-٩]/g, function (ch) {
+    var t = normalizeNumberText(value);
+    return t ? t : null;
+  }
+
+  /* THE input parser (mirrors app/number_input.normalize_number_text):
+     Persian/Arabic digits -> Latin; whitespace and direction marks removed; "−" is minus;
+     "." or "٫" is the decimal point (only one); ",", "٬", "،" are thousands separators
+     (rejected after the decimal point). Returns canonical Latin text, "" when empty,
+     or null when invalid/ambiguous. "۱٫۵" -> "1.5", never 15. */
+  function normalizeNumberText(raw) {
+    if (raw === null || raw === undefined) return "";
+    var t = String(raw).replace(/[۰-۹٠-٩]/g, function (ch) {
       return String(IN_DIGITS.indexOf(ch) % 10);
-    }).replace(/[,٬\s]/g, "").replace("٫", ".").replace("−", "-");
-    if (!/^-?\d*\.?\d*$/.test(t) || t === "" || t === "-" || t === "." || t === "-.") return null;
+    }).replace(/[\s\u200c\u200d\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+      .replace(/\u2212/g, "-").replace(/\u066B/g, ".");
+    if (t === "") return "";
+    if (t.split(".").length > 2) return null;
+    if (t.indexOf(".") !== -1 && /[,\u066C\u060C]/.test(t.slice(t.indexOf(".") + 1))) return null;
+    t = t.replace(/[,\u066C\u060C]/g, "");
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(t)) return null;
     return t;
   }
 
@@ -53,7 +69,7 @@
     return out.replace(/\d/g, function (d) { return FA[Number(d)]; });
   }
 
-  var api = { format: formatNumberFa, MONEY_DECIMALS: 2, QTY_DECIMALS: 8 };
+  var api = { format: formatNumberFa, normalize: normalizeNumberText, MONEY_DECIMALS: 2, QTY_DECIMALS: 8 };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.NumberFa = api;
 })(typeof window !== "undefined" ? window : null);

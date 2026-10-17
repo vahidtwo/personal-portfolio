@@ -60,3 +60,10 @@ def test_words_line_uses_approx_sign_only_when_rounded():
     assert _run("m.amountWordsLine(1230000)") == "= ۱٫۲۳ میلیون تومان"
     assert _run("m.amountWordsLine(950)") == "= ۹۵۰ تومان"
     assert _run("m.amountWordsLine(0)") == ""
+
+
+def test_rounded_chip_labels_carry_approx_sign():
+    labels = [o["label"] for o in _run('m.chipOptions("1234567")')]
+    assert labels == ["≈ ۱۲٫۳۵ میلیون تومان", "≈ ۱۲۳٫۴۶ میلیون تومان"]
+    assert [o["label"] for o in _run('m.chipOptions("150000")')] == ["۱٫۵ میلیون تومان", "۱۵ میلیون تومان"]
+    assert _run('m.chipOptions(m.plainNumber("۱٫۵"))') == [{"plain": "1500", "label": "۱٫۵ هزار تومان"}]  # ٫ is a decimal point

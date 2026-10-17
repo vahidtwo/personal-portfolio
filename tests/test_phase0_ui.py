@@ -237,7 +237,7 @@ def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_ne
     assert u.btc == Decimal("0.5") and u.cash_toman == Decimal("18500000") and u.gold_grams == 0
     db.close()
     html = client.get("/profile").text
-    assert 'name="btc" value="۰.۵"' in html
+    assert 'name="btc" value="۰٫۵"' in html
 
 
 def test_debt_year_placeholder_is_current_jalali_year(client, no_network):

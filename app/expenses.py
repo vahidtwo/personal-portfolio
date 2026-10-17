@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.debts import debt_rows
-from app.formatting import format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
+from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
 from app.models import Debt, MonthlyExpense, User
+from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -48,7 +49,7 @@ def monthly_view(
             {
                 "id": item.id,
                 "title": (item.title or "").strip(),
-                "amount_raw": format(amount, "f").rstrip("0").rstrip("."),
+                "amount_raw": format_amount_input(amount),
                 "due_day": str(item.due_day),
                 "amount_label": format_toman(amount),
                 "day_label": persian_digits(str(item.due_day)),
@@ -81,9 +82,8 @@ def expense_form_for_request(db: Session, user: User, request: Request) -> dict:
         }
     return view
 def _parse_due_day(raw: str) -> tuple[int | None, str | None]:
-    text = (raw or "").strip().translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
     try:
-        day = int(text)
+        day = parse_int_required(raw)
     except ValueError:
         return None, "روز ماه باید عدد باشد"
     if day < 1 or day > 31:

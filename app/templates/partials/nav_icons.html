@@ -22,3 +22,23 @@
 {%- endif %}
 </svg>
 {%- endmacro %}
+
+{#- Dashboard UI icons (Phase 2 mockups, /mockups/phase2/build.py). Stroke icons, currentColor. -#}
+{% macro ui_icon(name, size=18) -%}
+<svg class="ui-icon" viewBox="0 0 24 24" width="{{ size }}" height="{{ size }}" aria-hidden="true" focusable="false">
+{%- if name == 'cal' %}<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
+{%- elif name == 'spend' %}<path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>
+{%- elif name == 'refresh' %}<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v6h-6"/>
+{%- elif name == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/>
+{%- elif name == 'edit' %}<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>
+{%- elif name == 'chev' %}<path d="M14.5 6 8.5 12l6 6"/>
+{%- elif name == 'plus' %}<path d="M12 5v14M5 12h14"/>
+{%- elif name == 'full' %}<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+{%- elif name == 'x' %}<path d="M6 6l12 12M18 6 6 18"/>
+{%- elif name == 'zin' %}<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3M8.5 11h5M11 8.5v5"/>
+{%- elif name == 'zout' %}<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3M8.5 11h5"/>
+{%- elif name == 'reset' %}<path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/>
+{%- elif name == 'select' %}<rect x="4" y="6" width="16" height="12" rx="1.5" stroke-dasharray="3 2.5"/>
+{%- endif %}
+</svg>
+{%- endmacro %}

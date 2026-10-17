@@ -261,6 +261,7 @@
 </details>
 {% from "partials/nav_icons.html" import nav_icon %}
 <section class="card auth-card wide settings-rows" id="settings-account-actions" aria-label="حساب">
+  {% with cls="settings-row" %}{% include "partials/apk_download.html" %}{% endwith %}
   {% if is_admin %}
   <a class="settings-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
   {% endif %}

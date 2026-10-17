@@ -44,6 +44,7 @@
     <nav class="side-nav" aria-label="ناوبری">
       {% if user %}
       <a class="nav-link {% if request.url.path.startswith('/profile') %}is-active{% endif %}" href="/profile">پروفایل</a>
+      {% with cls="nav-link" %}{% include "partials/apk_download.html" %}{% endwith %}
       {% if is_admin %}<a class="nav-link {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">مدیریت</a>{% endif %}
       <form method="post" action="/logout" class="side-logout">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -123,6 +124,10 @@
     })();
   </script>
   {% if user %}
+  <script>
+    // App download rows: on a non-Android browser, say where to open the link.
+    if (!/Android/i.test(navigator.userAgent)) document.querySelectorAll("[data-apk-hint]").forEach(function (el) { el.hidden = false; });
+  </script>
   <script>
     (function () {
       // While a text field is focused on a phone the keyboard is open: hide the bottom bar so it never covers the form.

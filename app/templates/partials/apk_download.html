@@ -1,0 +1,14 @@
+{#- «دانلود اپلیکیشن اندروید»: logged-in users only; hidden inside the Android app (html.in-android-app,
+    set by android-bridge.js). Links to the unchanged /download/my-inventory.apk route. -#}
+{% from "partials/nav_icons.html" import nav_icon %}
+{%- set _apk_size = apk_size_label() -%}
+{%- if _apk_size %}
+<a class="{{ cls }} apk-download" href="/download/my-inventory.apk" data-apk-download>
+  {{ nav_icon('download') }}
+  <span class="apk-download-text">
+    <span class="settings-row-label">دانلود اپلیکیشن اندروید <span class="apk-size">({{ _apk_size }})</span></span>
+    <span class="apk-note">اگر کروم پرسید، نصب از این منبع را برای کروم مجاز کنید.</span>
+    <span class="apk-hint" data-apk-hint hidden>روی گوشی اندروید باز کنید</span>
+  </span>
+</a>
+{%- endif %}

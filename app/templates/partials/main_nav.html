@@ -1,0 +1,29 @@
+{#- Five-section main navigation (logged-in users only), from the Phase 1 mockups.
+    >=900px: rounded pill container in the top bar. <900px: fixed bottom bar (icon over label,
+    active tab = filled pill + bold label). DOM order = right-to-left order in RTL.
+    Each item points at where that content lives today; the profile split comes later. -#}
+{% from "partials/nav_icons.html" import nav_icon %}
+{%- set _path = request.url.path -%}
+{%- set _tab = request.query_params.get('tab') -%}
+{%- set _section = request.query_params.get('section') -%}
+{%- set _on_profile = _path == '/profile' -%}
+{%- set nav_items = [
+  {'key': 'home', 'label': 'خانه', 'full': 'خانه', 'href': '/dashboard',
+   'active': _path == '/dashboard' and _tab != 'daily'},
+  {'key': 'assets', 'label': 'دارایی‌ها', 'full': 'دارایی‌ها', 'href': '/profile?tab=assets',
+   'active': _on_profile and _tab != 'debts' and _section != 'settings'},
+  {'key': 'spending', 'label': 'خرج‌ها', 'full': 'خرج‌ها', 'href': '/dashboard?tab=daily',
+   'active': _path == '/dashboard' and _tab == 'daily'},
+  {'key': 'debts', 'label': 'بدهی‌ها', 'full': 'بدهی‌ها و هزینهٔ ماهانه', 'href': '/profile?tab=debts',
+   'active': _on_profile and _tab == 'debts'},
+  {'key': 'settings', 'label': 'تنظیمات', 'full': 'تنظیمات', 'href': '/profile?section=settings#account-settings',
+   'active': _on_profile and _section == 'settings' and _tab != 'debts'},
+] -%}
+<nav class="main-nav" id="main-nav" aria-label="بخش‌های اصلی" data-main-nav>
+  {%- for item in nav_items %}
+  <a class="main-nav-item{% if item.active %} is-active{% endif %}" href="{{ item.href }}" data-nav="{{ item.key }}"{% if item.full != item.label %} aria-label="{{ item.full }}" title="{{ item.full }}"{% endif %}{% if item.active %} aria-current="page"{% endif %}>
+    <span class="main-nav-pill">{{ nav_icon(item.key, filled=item.active) }}</span>
+    <span class="main-nav-label">{{ item.label }}</span>{% if item.full != item.label %}<span class="main-nav-label-rest" aria-hidden="true">{{ item.full[item.label|length:] }}</span>{% endif %}
+  </a>
+  {%- endfor %}
+</nav>

@@ -24,21 +24,16 @@
   <script src="/static/theme.js?v={{ static_v }}" defer></script>
   {% block head %}{% endblock %}
 </head>
-<body class="app-body">
+<body class="app-body{% if user %} has-main-nav{% endif %}">
   <a class="skip-link" href="#main">رفتن به محتوا</a>
   <header class="top">
     <div class="top-inner">
-      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
       <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
         <img class="brand-logo" src="/static/logo.svg" width="36" height="36" alt="">
         <span class="brand-name">موجودی من</span>
       </a>
-      {% if user %}
-      <nav class="top-tabs" aria-label="بخش‌های اصلی">
-        <a class="tab {% if request.url.path == '/dashboard' and request.query_params.get('tab') != 'daily' %}is-active{% endif %}" href="/dashboard" {% if request.url.path == '/dashboard' and request.query_params.get('tab') != 'daily' %}aria-current="page"{% endif %}>پرتفوی</a>
-        <a class="tab {% if request.url.path == '/dashboard' and request.query_params.get('tab') == 'daily' %}is-active{% endif %}" href="/dashboard?tab=daily" {% if request.url.path == '/dashboard' and request.query_params.get('tab') == 'daily' %}aria-current="page"{% endif %}>خرج روزانه</a>
-      </nav>
-      {% endif %}
+      {% if user %}{% include "partials/main_nav.html" %}{% endif %}
+      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
     </div>
   </header>
   <div class="side-backdrop" id="side-backdrop" aria-hidden="true"></div>
@@ -125,6 +120,24 @@
       });
     })();
   </script>
+  {% if user %}
+  <script>
+    (function () {
+      // While a text field is focused on a phone the keyboard is open: hide the bottom bar so it never covers the form.
+      var root = document.documentElement;
+      var noKbd = /^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/;
+      function isTyping(el) {
+        if (!el || !el.tagName) return false;
+        if (el.isContentEditable || el.tagName === "TEXTAREA" || el.tagName === "SELECT") return true;
+        return el.tagName === "INPUT" && !noKbd.test((el.type || "text").toLowerCase());
+      }
+      document.addEventListener("focusin", function (e) { if (isTyping(e.target)) root.classList.add("is-typing"); });
+      document.addEventListener("focusout", function () {
+        setTimeout(function () { if (!isTyping(document.activeElement)) root.classList.remove("is-typing"); }, 0);
+      });
+    })();
+  </script>
+  {% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

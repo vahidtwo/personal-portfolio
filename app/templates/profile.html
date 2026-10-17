@@ -255,7 +255,7 @@
       <button type="submit" class="btn btn-primary">ذخیره</button>
     </div>
   </form>
-  <h2 class="section-gap">حساب و رمز عبور</h2>
+  <h2 class="section-gap" id="account-settings">حساب و رمز عبور</h2>
   <form method="post" action="/profile/account" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% if account_error %}<p class="toast toast-warn" role="alert">{{ account_error }}</p>{% endif %}

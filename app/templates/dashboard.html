@@ -15,6 +15,8 @@
 {% for row in rows %}{% if (row.sort_qty | float) != 0 or (row.sort_value | float) != 0 %}{% set _ = visible_rows.append(row) %}{% endif %}{% endfor %}
 {% set hidden_zero_count = rows | length - visible_rows | length %}
 {% set visible_keys = visible_rows | map(attribute='key') | list %}
+{# If the default asset is now hidden (zero), fall back to the total (select value drives dashboard.js). #}
+{% set chart_default_key = default_chart_asset_key if (default_chart_asset_key == 'total' or default_chart_asset_key in visible_keys) else 'total' %}
 <section class="summary summary-grid" dir="rtl" aria-labelledby="total-heading">
   <div class="summary-main">
     <div class="summary-text">
@@ -112,7 +114,7 @@
           <select id="chart-asset-select" class="chart-asset-select" {% if not chart_asset_options %}disabled{% endif %} aria-label="انتخاب نمای نمودار">
             {% if chart_asset_options %}
             {% for opt in chart_asset_options if opt.key == 'total' or opt.key in visible_keys %}
-            <option value="{{ opt.key }}" {% if opt.key == default_chart_asset_key %}selected{% endif %}>{{ opt.name_fa }}</option>
+            <option value="{{ opt.key }}" {% if opt.key == chart_default_key %}selected{% endif %}>{{ opt.name_fa }}</option>
             {% endfor %}
             {% else %}
             <option value="">هنوز دارایی ثبت نشده</option>

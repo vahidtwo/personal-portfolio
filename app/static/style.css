@@ -1856,6 +1856,21 @@ input:focus {
   .pager .btn { min-width: 88px; }
 }
 
+.url-block {
+  display: block;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  margin-top: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.landing-steps li.has-url { flex-wrap: wrap; }
+.landing-steps li.has-url .url-block { flex: 1 0 100%; word-break: normal; overflow-wrap: anywhere; }
+
 /* labeled privacy toggle (values shown by default) */
 .privacy-btn { display: inline-flex; align-items: center; gap: 4px; }
 .privacy-label { font-size: 12px; font-weight: 600; white-space: nowrap; }

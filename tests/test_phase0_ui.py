@@ -133,3 +133,44 @@ def test_chart_picker_hides_zero_assets_like_the_table(client, no_network):
     assert "gold" in opts  # quantity > 0 but no price (value 0): still shown, same as the table
     client.post("/profile", data={"btc": "2", "gold_grams": "1", "eth": "1", "csrf": _csrf(client)})
     assert "eth" in picker()
+
+
+def test_chart_default_falls_back_to_total_when_default_asset_hidden(client, no_network, monkeypatch):
+    import re
+    import app.dashboard as dash
+    real_render = dash.render
+
+    def render(request, name, db, **ctx):
+        if name == "dashboard.html" and "default_chart_asset_key" in ctx:
+            ctx["default_chart_asset_key"] = monkeypatch_key["key"]
+        return real_render(request, name, db, **ctx)
+    monkeypatch_key = {"key": "eth"}
+    monkeypatch.setattr(dash, "render", render)
+    _register(client)
+    _set_price("btc", "1000000")
+    _set_price("eth", "500000")
+    client.post("/profile", data={"btc": "2", "csrf": _csrf(client)})
+
+    def selected():
+        html = client.get("/dashboard").text
+        sel = html[html.index('id="chart-asset-select"'):html.index("</select>", html.index('id="chart-asset-select"'))]
+        return re.findall(r'<option value="([^"]*)"\s+selected', sel)
+
+    assert selected() == ["total"]  # eth is zero -> hidden -> total is selected (dashboard.js reads select.value)
+    monkeypatch_key["key"] = "btc"
+    assert selected() == ["btc"]  # a visible default is kept
+
+
+def test_landing_android_url_in_own_ltr_block(client):
+    html = client.get("/").text
+    assert '<span class="url-block" dir="ltr">https://portfolio.vahidtwo.ir</span>' in html
+
+
+def test_profile_mcp_url_uses_request_or_public_base_url(client, no_network, monkeypatch):
+    _register(client)
+    html = client.get("/profile").text
+    assert "POST http://testserver/mcp" in html
+    import app.profile as profile
+    monkeypatch.setattr(profile, "PUBLIC_BASE_URL", "https://portfolio.vahidtwo.ir")
+    html = client.get("/profile").text
+    assert "POST https://portfolio.vahidtwo.ir/mcp" in html and "127.0.0.1" not in html

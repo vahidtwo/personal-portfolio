@@ -320,7 +320,7 @@
 </section>
 <section class="card auth-card wide">
   <h2>توکن MCP</h2>
-  <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr">POST {{ request.base_url }}mcp</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
+  <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr" class="url-block">POST {{ mcp_url }}</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
   {% if mcp_token %}
   <p class="field-hint">این تنظیم یک بار نشان داده می‌شود. در Cursor بروید به Settings → MCP و کل JSON را در mcp.json بگذارید.</p>
   <textarea id="mcp-cursor-config" readonly rows="12" dir="ltr">{{ mcp_cursor_config }}</textarea>

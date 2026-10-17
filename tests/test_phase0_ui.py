@@ -258,7 +258,9 @@ def test_mcp_box_in_collapsed_advanced_section_and_actions_work(client, no_netwo
     assert "<summary class=\"advanced-summary\">پیشرفته</summary>" in box
     assert "دستیارهای هوش مصنوعی" in box and "http://testserver/mcp" in box
     assert 'action="/profile/mcp-token"' in box and "ساخت توکن" in box
-    assert html.rfind("</details>") > html.rfind("</section>"), "advanced section is last on the page"
+    # advanced is the last settings section; only the Phase 1 admin/logout rows (per mockup) follow it
+    after = html[html.rfind("</details>"):]
+    assert after.count("<section") == 1 and 'id="settings-account-actions"' in after, "advanced section is last before the logout rows"
     # issue: details opens so the one-time config is visible, and the token works
     html = client.post("/profile/mcp-token", data={"csrf": _csrf(client)}).text  # follows redirect to /profile
     assert 'id="advanced" open>' in html

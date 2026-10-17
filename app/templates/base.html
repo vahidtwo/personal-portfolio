@@ -33,7 +33,7 @@
         <span class="brand-name">موجودی من</span>
       </a>
       {% if user %}{% include "partials/main_nav.html" %}{% endif %}
-      <button type="button" class="btn btn-ghost btn-sm menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="side-panel">منو</button>
+      <button type="button" class="btn btn-ghost btn-sm menu-toggle{% if user %} has-avatar{% endif %}" id="menu-toggle" aria-expanded="false" aria-controls="side-panel"{% if user %} aria-label="منو و حساب"{% endif %}><span class="menu-toggle-text">منو</span>{% if user %}<span class="avatar" aria-hidden="true">{{ (user.full_name or user.username or "?")[:1] | upper }}</span>{% endif %}</button>
     </div>
   </header>
   <div class="side-backdrop" id="side-backdrop" aria-hidden="true"></div>
@@ -48,7 +48,7 @@
       {% if is_admin %}<a class="nav-link {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">مدیریت</a>{% endif %}
       <form method="post" action="/logout" class="side-logout">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" class="btn btn-ghost">خروج</button>
+        <button type="submit" class="btn btn-ghost">خروج از حساب</button>
       </form>
       {% else %}
       {% block guest_nav %}

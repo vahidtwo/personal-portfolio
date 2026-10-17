@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows
 from app.expenses import expense_form_for_request
@@ -65,8 +66,9 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     flash_message, flash_error = pop_flash(request)
     mcp_token = request.session.pop("mcp_token_once", None)
     mcp_cursor_config = None
+    # Display only: /mcp is served by this same app (public at <site>/mcp).
+    mcp_url = (PUBLIC_BASE_URL or str(request.base_url).rstrip("/")) + "/mcp"
     if mcp_token:
-        mcp_url = str(request.base_url).rstrip("/") + "/mcp"
         mcp_cursor_config = json.dumps(
             {
                 "mcpServers": {
@@ -85,6 +87,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         db,
         mcp_token=mcp_token,
         mcp_cursor_config=mcp_cursor_config,
+        mcp_url=mcp_url,
         error=None,
         flash=flash_message,
         flash_error=flash_error,

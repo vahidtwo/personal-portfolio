@@ -17,8 +17,8 @@ def _run(expr: str):
     return json.loads(out)
 
 
-def test_no_chip_above_100x_the_typed_value():
-    for typed in ("150000", "1", "37.5", "999", "1500000000"):
+def test_no_chip_above_100x_the_typed_value_from_1000_up():
+    for typed in ("150000", "1000", "1234.5", "1500000000"):
         opts = _run(f"m.chipOptions({json.dumps(typed)})")
         for o in opts:
             assert float(o["plain"]) <= float(typed) * 100, (typed, o)
@@ -42,3 +42,21 @@ def test_zero_or_empty_has_no_chips_and_persian_input_parses():
     assert _run('m.chipOptions("")') == []
     assert _run('m.chipOptions("0")') == []
     assert _run('m.plainNumber("۱۵۰٬۰۰۰")') == "150000"
+
+
+def test_under_1000_offers_exactly_one_thousand_times_chip():
+    assert _run('m.chipOptions("150")') == [{"plain": "150000", "label": "۱۵۰ هزار تومان"}]
+    assert _run('m.chipOptions("999")') == [{"plain": "999000", "label": "۹۹۹ هزار تومان"}]
+    assert _run('m.chipOptions("2.5")') == [{"plain": "2500", "label": "۲٫۵ هزار تومان"}]
+    assert len(_run('m.chipOptions("1000")')) == 2 and all(
+        float(o["plain"]) <= 100_000 for o in _run('m.chipOptions("1000")'))
+
+
+def test_words_line_uses_approx_sign_only_when_rounded():
+    assert _run("m.amountWordsLine(1234567)") == "≈ ۱٫۲۳ میلیون تومان"
+    assert _run("m.amountWordsLine(1234)") == "≈ ۱٫۲۳ هزار تومان"
+    assert _run("m.amountWordsLine(150000)") == "= ۱۵۰ هزار تومان"
+    assert _run("m.amountWordsLine(1500000)") == "= ۱٫۵ میلیون تومان"
+    assert _run("m.amountWordsLine(1230000)") == "= ۱٫۲۳ میلیون تومان"
+    assert _run("m.amountWordsLine(950)") == "= ۹۵۰ تومان"
+    assert _run("m.amountWordsLine(0)") == ""

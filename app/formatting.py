@@ -147,9 +147,21 @@ def format_when(value: datetime | None) -> str:
     return format_chart_jalali(value)
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def tehran_today() -> jdatetime.date:
+    """Today's Jalali date in Tehran, whatever the server's own timezone (prod runs in UTC).
+
+    THE "today" for due dates, monthly costs and daily spends, so every page agrees.
+    """
+    return jdatetime.date.fromgregorian(date=_utcnow().astimezone(TEHRAN).date())
+
+
 def next_jalali_due(day: int, today: jdatetime.date | None = None) -> jdatetime.date | None:
-    """First Jalali date on or after today whose day-of-month is `day`."""
-    today = today or jdatetime.date.today()
+    """First Jalali date on or after today (Tehran) whose day-of-month is `day`."""
+    today = today or tehran_today()
     year, month = today.year, today.month
     for _ in range(26):
         try:

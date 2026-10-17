@@ -19,7 +19,7 @@ from app.expenses import monthly_view
 from app.daily_spend import JALALI_MONTHS, month_chart
 from app.formatting import (
     MILLION, MONEY_DECIMALS, TEHRAN, format_chart_jalali, format_millions, format_number, format_qty,
-    format_share_label, format_toman, format_usd, format_when, next_jalali_due, persian_digits,
+    format_share_label, format_toman, format_usd, format_when, next_jalali_due, persian_digits, tehran_today,
 )
 from app.jobs import refresh_market_prices_for_user, refresh_user_sanjeh_car
 from app.models import DailySpend, Debt, PortfolioSnapshot, User, utcnow
@@ -469,8 +469,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         usd_portfolio_label = _format_usd(view.total_toman / usd_price)
     else:
         usd_portfolio_label = "—"
-    # Same "today" as the debts and spending pages (they use jdatetime.date.today()).
-    today_j = jdatetime.date.today()
+    today_j = tehran_today()  # same "today" as the debts and spending pages
     tab = request.query_params.get("tab", "portfolio")
     if tab not in ("portfolio", "daily"):
         tab = "portfolio"

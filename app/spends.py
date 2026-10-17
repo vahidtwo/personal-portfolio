@@ -18,7 +18,7 @@ from app.daily_spend import (
     shift_jalali_month,
 )
 from app.db import get_db
-from app.formatting import format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
+from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
 from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
@@ -27,7 +27,7 @@ from app.web import flash, render
 router = APIRouter()
 
 def _viewed_jalali_month(request: Request, jy: str | None = None, jm: str | None = None) -> tuple[int, int]:
-    today = jdatetime.date.today()
+    today = tehran_today()
     year_raw = jy if jy is not None else request.query_params.get("jy", "")
     month_raw = jm if jm is not None else request.query_params.get("jm", "")
     try:
@@ -61,7 +61,7 @@ def daily_view(
         .order_by(DailySpend.spent_on.desc(), DailySpend.id.desc())
         .all()
     )
-    today_g = jdatetime.date.today().togregorian()
+    today_g = tehran_today().togregorian()
     today_total = sum(
         (
             Decimal(row.amount_toman)
@@ -117,7 +117,7 @@ def daily_view(
             "note": editing["note"],
         }
     if spend_form is None:
-        today = jdatetime.date.today()
+        today = tehran_today()
         first_parent = parents[0].id if parents else ""
         first_child = next((child.id for child in children if child.parent_id == first_parent), "")
         spend_form = {
@@ -376,7 +376,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     )
     if child is None:
         return JSONResponse({"ok": False, "error": "category"}, status_code=500)
-    today = jdatetime.date.today()
+    today = tehran_today()
     spent_on = today.togregorian()
     duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
     if idem:

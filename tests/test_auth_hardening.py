@@ -35,10 +35,10 @@ def test_register_rejects_mismatched_confirm(client: TestClient):
     assert "یکسان نیستند" in resp.text
 
 
-def test_register_success_redirects_to_profile(client: TestClient):
+def test_register_success_redirects_to_assets(client: TestClient):
     resp = _register(client, "gooduser")
     assert resp.status_code == 303
-    assert resp.headers["location"] == "/profile"
+    assert resp.headers["location"] == "/assets"  # Phase 1: assets have their own page
 
 
 def test_login_locks_after_repeated_failures(client: TestClient):

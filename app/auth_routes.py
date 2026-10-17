@@ -99,8 +99,8 @@ async def register(
     db.commit()
     rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session["user_id"] = user.id
-    flash(request, "حساب شما ساخته شد. موجودی را در پروفایل وارد کنید.")
-    return RedirectResponse("/profile", status_code=303)
+    flash(request, "حساب شما ساخته شد. دارایی‌هایتان را در صفحهٔ دارایی‌ها وارد کنید.")
+    return RedirectResponse("/assets", status_code=303)
 
 
 @router.get("/login", response_class=HTMLResponse)

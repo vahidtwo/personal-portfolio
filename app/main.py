@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.admin_users import router as admin_users_router
+from app.assets_page import router as assets_router
 from app.auth_routes import router as auth_router
 from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY, SESSION_COOKIE_NAME
 from app.dashboard import router as dashboard_router
@@ -83,6 +84,7 @@ app.include_router(dashboard_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)
 app.include_router(mcp_router)
+app.include_router(assets_router)
 app.include_router(profile_router)
 app.include_router(debts_router)
 app.include_router(expenses_router)

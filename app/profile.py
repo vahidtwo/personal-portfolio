@@ -41,12 +41,15 @@ router = APIRouter()
 
 @router.get("/profile", response_class=HTMLResponse)
 async def profile_form(request: Request, db: Session = Depends(get_db)):
+    tab = request.query_params.get("tab", "settings")
+    if tab == "assets":
+        # Phase 1: assets moved to their own page. Old links keep working (session cookie untouched).
+        return RedirectResponse("/assets", status_code=303)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
-    tab = request.query_params.get("tab", "assets")
-    if tab not in ("assets", "debts"):
-        tab = "assets"
+    if tab != "debts":
+        tab = "settings"
     debts, debt_total, next_debt_label = debt_rows(
         db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
     )
@@ -201,7 +204,7 @@ def _render_account_error(request, db, user, message: str, account: dict):
         has_sanjeh_token=bool(user.sanjeh_token),
         car_fetched_label=format_when(user.car_fetched_at),
         car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        tab="assets",
+        tab="settings",
         account=account,
         account_error=message,
     )
@@ -330,18 +333,10 @@ async def profile_save(
         user.usd = parse_decimal(usd, field="usd")
         user.cash_toman = parse_decimal(cash_toman, field="cash")
     except Exception:
-        return render(
-            request,
-            "profile.html",
-            db,
-            error="یکی از مقادیر وارد شده نامعتبر است",
-            flash=None,
-            form=form,
-            account=_account_form(user),
-            has_sanjeh_token=bool(user.sanjeh_token),
-            car_fetched_label=format_when(user.car_fetched_at),
-            car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        )
+        from app.assets_page import render_assets
+
+        # Nothing is committed on this path; the typed values are shown again on the Assets page.
+        return render_assets(request, db, user, form=form, error="یکی از مقادیر وارد شده نامعتبر است")
     if clear_sanjeh == "1":
         user.sanjeh_token = None
         user.car_toman = Decimal("0")

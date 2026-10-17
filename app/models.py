@@ -197,3 +197,17 @@ class DailySpend(Base):
 
     user: Mapped[User] = relationship(back_populates="daily_spends")
     category: Mapped[SpendCategory] = relationship()
+
+
+class AdminAuditLog(Base):
+    """Append-only log of destructive admin actions (e.g. batch user delete)."""
+
+    __tablename__ = "admin_audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_username: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(32))
+    targets_json: Mapped[str] = mapped_column(Text)
+    counts_json: Mapped[str] = mapped_column(Text)
+    backup_filename: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

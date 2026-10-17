@@ -21,11 +21,12 @@ MONEY_DECIMALS = 2
 QTY_DECIMALS = 8
 
 
-def format_number(value, max_decimals: int = MONEY_DECIMALS) -> str:
+def format_number(value, max_decimals: int = MONEY_DECIMALS, min_decimals: int = 0) -> str:
     """THE display formatter (mirrored by app/static/number-format.js).
 
     Persian digits, ٬ thousands, ٫ decimals, round half-up to max_decimals, no trailing
-    zeros, "−" for negatives. Display only: never use for <input> values, JSON or APIs.
+    zeros beyond min_decimals, "−" for negatives. Display only: never use for <input>
+    values, JSON or APIs.
     """
     if value is None or value == "":
         return ""
@@ -45,6 +46,8 @@ def format_number(value, max_decimals: int = MONEY_DECIMALS) -> str:
     q = abs(q)
     whole, _, frac = format(q, "f").partition(".")
     frac = frac.rstrip("0")
+    if len(frac) < min_decimals:
+        frac = frac.ljust(min_decimals, "0")
     out = f"{int(whole):,}".replace(",", "٬") + (f"٫{frac}" if frac else "")
     if negative and q != 0:
         out = "−" + out
@@ -58,10 +61,28 @@ def format_toman(value: Decimal | None) -> str:
     return format_number(value, 0)
 
 
-def format_usd(value: Decimal | None) -> str:
+def format_usd(value: Decimal | None, *, fixed: bool = False) -> str:
+    """Dollar amount. fixed=True always shows exactly 2 decimals (dashboard: 9٬102٫30)."""
     if value is None:
         return "—"
-    return format_number(value, MONEY_DECIMALS)
+    return format_number(value, MONEY_DECIMALS, MONEY_DECIMALS if fixed else 0)
+
+
+MILLION = Decimal("1000000")
+
+
+def format_millions(value: Decimal | None, decimals: int = 1) -> tuple[str, bool]:
+    """Toman amount in millions for big-number tiles («۱٬۱۱۳» + «میلیون تومان»).
+
+    Returns (label, approx); approx is True when rounding dropped digits, so the template
+    can prefix «≈». The exact amount stays available via format_toman.
+    """
+    if value is None:
+        return "—", False
+    millions = Decimal(value) / MILLION
+    label = format_number(millions, decimals)
+    exact = millions == millions.quantize(Decimal(1).scaleb(-decimals))
+    return label, not exact
 
 
 def format_qty(value: Decimal, places: int) -> str:

@@ -260,3 +260,29 @@ def test_dashboard_without_history_shows_dash(client, no_network):
     assert 'data-change="24h"><bdi>—</bdi>' in html and 'data-change="7d"><bdi>—</bdi>' in html
     assert "سابقهٔ قیمت کافی نیست" in html
     assert "قسطی ثبت نشده" in html
+
+
+def test_four_assets_with_different_moves_show_four_different_7d_chips(client, no_network):
+    """Each asset's «۷ روز» chip uses its own unit price vs its own price 7 days ago."""
+    from app.db import SessionLocal
+    from app.models import PortfolioSnapshot, User
+
+    _register(client)
+    now_prices = {"btc": "1100000", "eth": "950000", "gold": "1000000", "usd": "102500"}
+    then_prices = {"btc": "1000000", "eth": "1000000", "gold": "1000000", "usd": "100000"}
+    for key, price in now_prices.items():
+        _set_price(key, price)
+    client.post("/profile", data={"btc": "1", "eth": "1", "gold_grams": "1", "usd": "10", "csrf": _csrf(client)})
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == "alice").one()
+    db.add(PortfolioSnapshot(user_id=user.id, taken_at=datetime.now(timezone.utc) - timedelta(days=7),
+                             total_toman=Decimal("1"),
+                             breakdown_json=json.dumps({"total": "1", "unit_price": then_prices})))
+    db.commit()
+    db.close()
+    html = client.get("/dashboard").text
+    table = html[html.index('id="portfolio-table"'):html.index("<tfoot>")]
+    chips = dict(re.findall(r'<span>([^<]+?)(?: <span class="badge[^"]*">[^<]*</span>)?</span>\s*</div>.*?'
+                            r'<span class="chg [a-z]+">([^<]+)</span>', table, re.S))
+    assert chips == {"بیت‌کوین": "▲ ۱۰٪", "اتریوم": "▼ ۵٪", "طلا ۱۸ عیار": "بدون تغییر", "دلار آمریکا": "▲ ۲٫۵٪"}
+    assert len(set(chips.values())) == 4

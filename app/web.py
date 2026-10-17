@@ -45,7 +45,33 @@ templates.env.globals["auth_rules"] = {
 }
 
 
+def page_url_for(name: str, context: dict) -> str | None:
+    """The GET URL of the page a POST re-rendered (e.g. a validation error), so the address bar can show it
+    with history.replaceState instead of the form's action URL. None = leave the address bar alone."""
+    if name == "assets.html":
+        return "/assets"
+    if name == "profile.html":
+        if context.get("tab") != "debts":
+            return "/profile"
+        url = "/profile?tab=debts"
+        if context.get("editing_id"):
+            url += f"&edit={int(context['editing_id'])}"
+        elif context.get("editing_expense_id"):
+            url += f"&spend={int(context['editing_expense_id'])}"
+        return url
+    if name == "dashboard.html" and context.get("tab") == "daily":
+        url = "/dashboard?tab=daily"
+        if context.get("daily_year") and context.get("daily_month"):
+            url += f"&jy={int(context['daily_year'])}&jm={int(context['daily_month'])}"
+        if context.get("editing_spend_id"):
+            url += f"&edit_spend={int(context['editing_spend_id'])}"
+        return url
+    return None
+
+
 def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
+    if request.method == "POST" and "page_url" not in context:
+        context["page_url"] = page_url_for(name, context)
     current = get_current_user(request, db)
     push_cfg = firebase_web_config()
     context.update(

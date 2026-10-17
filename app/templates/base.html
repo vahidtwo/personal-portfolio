@@ -21,6 +21,7 @@
       if (localStorage.getItem("privacy-salary") !== "1") document.documentElement.dataset.showSalary = "1";
     } catch (e) {}
   </script>
+  {% if page_url %}<script>try { history.replaceState(history.state, "", {{ page_url | tojson }}); } catch (e) {}</script>{% endif %}
   <script src="/static/theme.js?v={{ static_v }}" defer></script>
   {% block head %}{% endblock %}
 </head>

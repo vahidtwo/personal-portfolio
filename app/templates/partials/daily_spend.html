@@ -1,12 +1,12 @@
 <section class="card daily-section daily-add" aria-labelledby="daily-add-heading">
   <h1 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}ثبت خرج امروز{% endif %}</h1>
-  <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form">
+  <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form" data-leave-warn>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="jy" value="{{ daily_year }}">
     <input type="hidden" name="jm" value="{{ daily_month }}">
     <label>
       <span class="label-text">مبلغ (تومان)</span>
-      <input name="amount_toman" value="{{ spend_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest autocomplete="off" required>
+      <input name="amount_toman" value="{{ spend_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest required>
     </label>
     <label>
       <span class="label-text">دسته</span>

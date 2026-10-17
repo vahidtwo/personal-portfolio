@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 from app.firebase_push import service_worker_firebase_snippet
 from app.web import BASE_DIR
 
-from app.config import STATIC_ASSET_VERSION
+from app.config import SESSION_MAX_AGE_SECONDS, STATIC_ASSET_VERSION
 
 router = APIRouter()
 
@@ -37,6 +37,7 @@ def download_android_apk():
 def service_worker():
     body = (BASE_DIR / "static" / "sw.js").read_text(encoding="utf-8")
     body = body.replace("__STATIC_ASSET_VERSION__", STATIC_ASSET_VERSION)
+    body = body.replace("__SESSION_MAX_AGE_MS__", str(SESSION_MAX_AGE_SECONDS * 1000))
     body += service_worker_firebase_snippet()
     return Response(
         content=body,

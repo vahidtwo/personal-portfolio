@@ -14,7 +14,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.admin_users import router as admin_users_router
 from app.assets_page import router as assets_router
 from app.auth_routes import router as auth_router
-from app.config import DATA_DIR, ENABLE_INTERNAL_SCHEDULER, HTTPS_ONLY, SECRET_KEY, SESSION_COOKIE_NAME
+from app.config import (
+    DATA_DIR,
+    ENABLE_INTERNAL_SCHEDULER,
+    HTTPS_ONLY,
+    SECRET_KEY,
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE_SECONDS,
+)
 from app.dashboard import router as dashboard_router
 from app.db import init_db
 from app.db_admin import router as db_admin_router
@@ -67,19 +74,37 @@ app.add_middleware(
     session_cookie=SESSION_COOKIE_NAME,
     same_site="lax",
     https_only=HTTPS_ONLY,
-    max_age=60 * 60 * 24 * 30,
+    max_age=SESSION_MAX_AGE_SECONDS,
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+
+# Pages with a form the user types into. They get "no-cache" instead of "no-store" so Back/Forward
+# (bfcache and the browser's form restore) brings the typed values back; "no-cache" still makes every
+# normal load revalidate with the server, so a deploy is picked up on the next load. "private" keeps
+# shared proxies from storing them.
+FORM_PAGE_PATHS = frozenset({"/assets", "/profile", "/login", "/register"})
+FORM_PAGE_CACHE_CONTROL = "no-cache, private"
+
+
+def is_form_page(path: str, query_params) -> bool:
+    if path in FORM_PAGE_PATHS:
+        return True
+    return path == "/dashboard" and query_params.get("tab") == "daily"  # the daily spend form
 
 
 @app.middleware("http")
 async def no_store_html(request, call_next):
     """Never let a browser, proxy or WebView HTTP cache keep an HTML page: after a deploy the next load
-    must come from the server. Versioned /static assets keep their normal caching. The service worker's
+    must come from the server. Form pages (GET only) use "no-cache, private" instead so typed input
+    survives Back/Forward. Versioned /static assets keep their normal caching. The service worker's
     own offline copy of the dashboard (Cache API) is not affected by this header."""
     response = await call_next(request)
     if not request.url.path.startswith("/static/") and response.headers.get("content-type", "").startswith("text/html"):
-        response.headers["Cache-Control"] = "no-store"
+        if request.method == "GET" and response.status_code == 200 and is_form_page(request.url.path, request.query_params):
+            response.headers["Cache-Control"] = FORM_PAGE_CACHE_CONTROL
+        else:
+            response.headers["Cache-Control"] = "no-store"
     return response
 
 

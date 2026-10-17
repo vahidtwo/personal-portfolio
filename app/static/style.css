@@ -47,6 +47,7 @@
   --accent-violet: #6d5ce8;
   --accent-muted: rgba(13, 159, 122, 0.12);
   --accent-glow: rgba(13, 159, 122, 0.2);
+  --chip-text: #077257;
   --success: #15803d;
   --success-bg: #dcfce7;
   --warn: #b45309;
@@ -1692,9 +1693,11 @@ input:focus {
 }
 .row-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px; /* at least 12px between «ویرایش» and «حذف» (mis-tap guard) */
   align-items: center;
 }
+/* «حذف» always sits at the far (inline-end) side of the row, away from «ویرایش». */
+.row-actions .inline-form { margin-inline-start: auto; }
 .monthly-block {
   margin-top: 28px;
   padding-top: 20px;
@@ -1797,11 +1800,13 @@ input:focus {
   .top-inner { gap: 8px; }
   .brand-name { font-size: 15px; }
   .data-table .row-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 140px;
   }
-  .data-table .row-actions .btn { width: 100%; min-height: 44px; }
+  .data-table .row-actions .btn { min-width: 64px; min-height: 44px; }
   .summary { padding: 20px 18px; }
   .grid-form { grid-template-columns: 1fr; }
   .grid-form .span-2 { grid-column: auto; }
@@ -2186,7 +2191,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
   border: 1px dashed var(--border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
-  color: var(--accent);
+  color: var(--chip-text, var(--accent)); /* light theme: darker teal, 5.9:1 on the card (was 3.32:1) */
   font: inherit;
   font-size: 14px;
   font-weight: 500;

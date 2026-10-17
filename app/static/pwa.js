@@ -123,4 +123,30 @@
     },
     true
   );
+
+  // Back/Forward after logging out must not bring a private page back from the back/forward cache
+  // (form pages are "no-cache", so the browser may keep them there). Mark the logout; a page restored
+  // from that cache which was loaded before the mark reloads, and the server sends it to /login.
+  var LOGOUT_KEY = "inventory-logged-out-at";
+  var loadedAt = Date.now();
+  document.addEventListener(
+    "submit",
+    function (event) {
+      var form = event.target;
+      if (event.defaultPrevented || !form || !form.getAttribute) return;
+      if ((form.getAttribute("action") || "") !== "/logout") return;
+      try {
+        localStorage.setItem(LOGOUT_KEY, String(Date.now()));
+      } catch (e) {}
+    },
+    true
+  );
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted || !document.body.classList.contains("has-main-nav")) return;
+    var loggedOutAt = 0;
+    try {
+      loggedOutAt = Number(localStorage.getItem(LOGOUT_KEY)) || 0;
+    } catch (e) {}
+    if (loggedOutAt > loadedAt) window.location.reload();
+  });
 })();

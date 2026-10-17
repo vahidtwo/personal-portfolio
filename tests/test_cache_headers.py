@@ -1,4 +1,5 @@
-"""Every HTML response is sent with Cache-Control: no-store; versioned static assets are left alone."""
+"""HTML responses are no-store, except GET form pages (no-cache, private) so Back/Forward restores typed
+input; versioned static assets are left alone."""
 from pathlib import Path
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
@@ -10,19 +11,30 @@ def _no_store(r):
     return r.headers.get("cache-control") == "no-store"
 
 
-def test_anonymous_html_pages_are_no_store(client):
-    for path in ("/", "/login", "/register", "/offline.html"):
+def _form_page(r):
+    cc = r.headers.get("cache-control", "")
+    return "no-cache" in cc and "private" in cc and "no-store" not in cc
+
+
+def test_anonymous_html_pages(client):
+    for path in ("/", "/offline.html"):
         r = client.get(path)
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/html"), path
         assert _no_store(r), path
+    for path in ("/login", "/register"):  # form pages
+        r = client.get(path)
+        assert r.status_code == 200 and _form_page(r), path
 
 
-def test_logged_in_html_pages_are_no_store(client, no_network):
+def test_logged_in_html_pages(client, no_network):
     _register(client)
-    for path in ("/dashboard", "/dashboard?tab=daily", "/assets", "/profile", "/profile?tab=debts"):
+    for path in ("/dashboard", "/dashboard?tab=portfolio"):
         r = client.get(path)
         assert r.status_code == 200 and _no_store(r), path
-    # an HTML error page (validation error re-render) too
+    for path in ("/dashboard?tab=daily", "/assets", "/profile", "/profile?tab=debts", "/profile?section=settings"):
+        r = client.get(path)
+        assert r.status_code == 200 and _form_page(r), (path, r.headers.get("cache-control"))
+    # an HTML error page (validation error re-render of a POST) stays no-store
     r = client.post("/profile", data={"btc": "x.y.z", "csrf": _csrf(client, "/assets")})
     assert r.status_code == 200 and _no_store(r)
 
@@ -45,5 +57,5 @@ def test_service_worker_registration_never_auto_reloads():
     assert "نسخه جدید، تازه‌سازی" in js
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
     # HTML stays network-first; the cache is only the offline fallback; logout still clears the page cache
-    assert 'request.mode === "navigate"' in sw and "fetch(request).catch(" in sw
-    assert "await caches.delete(PAGE_CACHE)" in sw and 'finalUrl.pathname === "/login"' in sw
+    assert 'request.mode === "navigate"' in sw and "response = await fetch(request);" in sw and ".catch(async () =>" in sw
+    assert "caches.delete(PAGE_CACHE)" in sw and 'url.pathname === "/login"' in sw

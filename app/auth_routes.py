@@ -157,4 +157,7 @@ async def logout(request: Request, csrf: str = Form("")):
     require_csrf(request, csrf)
     invalidate_session(request)
     response = RedirectResponse("/login", status_code=303)
+    # Drop the browser's HTTP cache (and back/forward cache) for this site: no private page after logout.
+    # The service worker deletes its own offline copy of the dashboard on this same response.
+    response.headers["Clear-Site-Data"] = '"cache"'
     return attach_session_cookie_deletion(response)

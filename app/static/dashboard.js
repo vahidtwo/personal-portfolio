@@ -29,18 +29,11 @@
     return String(text).replace(/\d/g, (d) => FA_DIGITS[d]);
   }
 
-  function formatAxisCompact(v, divisor, suffix, decimals, fixedDecimals) {
-    const n = v / divisor;
-    let raw;
-    if (decimals > 0) {
-      raw = n.toFixed(decimals);
-      if (!fixedDecimals) {
-        raw = raw.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-      }
-    } else {
-      raw = String(Math.round(n));
-    }
-    return toPersianDigits(raw) + suffix;
+  // Shared display formatter (number-format.js, mirrors Python format_number).
+  const fmtNum = (v, d) => window.NumberFa.format(v, d);
+
+  function formatAxisCompact(v, divisor, suffix, decimals) {
+    return fmtNum(v / divisor, decimals) + suffix;
   }
 
   function axisLabelDecimals(step, divisor) {
@@ -137,10 +130,7 @@
 
   function formatToman(v) {
     if (v == null || Number.isNaN(v)) return "—";
-    const grouped = Math.round(v)
-      .toLocaleString("en-US")
-      .replace(/,/g, "٬");
-    return toPersianDigits(grouped) + " تومان";
+    return fmtNum(v, 0) + " تومان";
   }
 
   /** Percent change vs previous point in the same series. */
@@ -159,13 +149,11 @@
       return null;
     }
     const pct = ((current - previous) / Math.abs(previous)) * 100;
-    const abs = Math.abs(pct);
-    const body =
-      abs >= 100 ? abs.toFixed(0) : abs.toFixed(1).replace(/\.0$/, "");
+    const body = fmtNum(Math.abs(pct), 2);
     let sign = "";
     if (pct > 0) sign = "+";
     else if (pct < 0) sign = "−";
-    return sign + toPersianDigits(body) + "٪";
+    return sign + body + "٪";
   }
 
   function changeLabelForPoint(ctx) {
@@ -501,7 +489,8 @@
     const labels = payload.labels || [];
     const series = payload.series || [];
     const assetOptions = payload.assetOptions || [];
-    if (!labels.length || !series.length) {
+    // A single point is not a trend: show the empty state until there are 2+ points.
+    if (labels.length < 2 || !series.length) {
       chartWrap?.classList.add("hidden");
       panel?.classList.add("is-empty");
       const empty = document.getElementById("chart-empty");

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 import jdatetime
@@ -17,26 +17,88 @@ def persian_digits(text: str) -> str:
     return str(text).translate(_PERSIAN_DIGITS)
 
 
+MONEY_DECIMALS = 2
+QTY_DECIMALS = 8
+
+
+def format_number(value, max_decimals: int = MONEY_DECIMALS) -> str:
+    """THE display formatter (mirrored by app/static/number-format.js).
+
+    Persian digits, ٬ thousands, ٫ decimals, round half-up to max_decimals, no trailing
+    zeros, "−" for negatives. Display only: never use for <input> values, JSON or APIs.
+    """
+    if value is None or value == "":
+        return ""
+    if isinstance(value, float):
+        d = Decimal(repr(value))
+    elif isinstance(value, str):
+        from app.number_input import normalize_number_text
+
+        text = normalize_number_text(value)
+        if text == "":
+            return ""
+        d = Decimal(text)
+    else:
+        d = Decimal(value)
+    q = d.quantize(Decimal(1).scaleb(-max_decimals), rounding=ROUND_HALF_UP)
+    negative = q < 0
+    q = abs(q)
+    whole, _, frac = format(q, "f").partition(".")
+    frac = frac.rstrip("0")
+    out = f"{int(whole):,}".replace(",", "٬") + (f"٫{frac}" if frac else "")
+    if negative and q != 0:
+        out = "−" + out
+    return persian_digits(out)
+
+
 def format_toman(value: Decimal | None) -> str:
+    """Toman amount for display (whole toman; «تومان» is written after it in templates)."""
     if value is None:
         return "—"
-    quantized = Decimal(value).quantize(Decimal("1"))
-    sign = "−" if quantized < 0 else ""
-    formatted = f"{abs(int(quantized)):,}".replace(",", "٬")
-    return sign + persian_digits(formatted)
+    return format_number(value, 0)
+
+
+def format_usd(value: Decimal | None) -> str:
+    if value is None:
+        return "—"
+    return format_number(value, MONEY_DECIMALS)
 
 
 def format_qty(value: Decimal, places: int) -> str:
-    quantized = Decimal(value).quantize(Decimal("1") if places == 0 else Decimal("0." + "0" * (places - 1) + "1"))
-    text = format(quantized, "f")
+    """Asset quantity for display (max 8 decimals)."""
+    return format_number(Decimal(value or 0), min(places, QTY_DECIMALS)) or "۰"
+
+
+def _input_text(value) -> str:
+    """Exact stored value as plain Latin text ('' for zero): never rounded, no trailing zeros."""
+    d = Decimal(value or 0)
+    if d == 0:
+        return ""
+    text = format(d, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return persian_digits(text or "0")
+    return text
+
+
+def format_qty_input(value: Decimal, places: int | None = None) -> str:
+    """Quantity <input> value: full stored precision (no rounding), Persian digits, ٫ decimal,
+    no grouping; '' when zero. app.number_input parses it back exactly. `places` is ignored."""
+    return persian_digits(_input_text(value).replace(".", "٫"))
+
+
+def format_amount_input(value: Decimal) -> str:
+    """Toman <input> value: like format_qty_input but with ٬ thousands grouping."""
+    text = _input_text(value)
+    if text == "":
+        return ""
+    negative = text.startswith("-")
+    whole, _, frac = text.lstrip("-").partition(".")
+    out = f"{int(whole):,}".replace(",", "٬") + (f"٫{frac}" if frac else "")
+    return persian_digits(("-" if negative else "") + out)
 
 
 def format_share_label(share: Decimal) -> str:
-    text = format(share, "f").rstrip("0").rstrip(".")
-    return persian_digits(text)
+    return format_number(share, MONEY_DECIMALS)
 
 
 def _to_tehran(value: datetime) -> datetime:
@@ -88,11 +150,9 @@ def format_jalali_date(value: jdatetime.date) -> str:
 
 def parse_jalali_parts(year: str, month: str, day: str) -> tuple[jdatetime.date | None, str | None]:
     try:
-        parsed = jdatetime.date(
-            int(year.strip().translate(_TO_ASCII)),
-            int(month.strip().translate(_TO_ASCII)),
-            int(day.strip().translate(_TO_ASCII)),
-        )
+        from app.number_input import parse_int_required
+
+        parsed = jdatetime.date(parse_int_required(year), parse_int_required(month), parse_int_required(day))
     except (TypeError, ValueError):
         return None, "تاریخ جلالی نامعتبر است"
     return parsed, None

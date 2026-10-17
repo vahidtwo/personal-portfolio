@@ -4,9 +4,9 @@
 
   function isHidden(kind) {
     try {
-      return localStorage.getItem(keys[kind]) !== "0";
+      return localStorage.getItem(keys[kind]) === "1";
     } catch (e) {
-      return true;
+      return false;
     }
   }
 

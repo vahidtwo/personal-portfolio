@@ -18,8 +18,9 @@ from app.daily_spend import (
     shift_jalali_month,
 )
 from app.db import get_db
-from app.formatting import format_jalali_date, format_toman, parse_jalali_parts, persian_digits
+from app.formatting import format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
+from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -27,12 +28,11 @@ router = APIRouter()
 
 def _viewed_jalali_month(request: Request, jy: str | None = None, jm: str | None = None) -> tuple[int, int]:
     today = jdatetime.date.today()
-    trans = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
     year_raw = jy if jy is not None else request.query_params.get("jy", "")
     month_raw = jm if jm is not None else request.query_params.get("jm", "")
     try:
-        year = int(str(year_raw).translate(trans))
-        month = int(str(month_raw).translate(trans))
+        year = parse_int_required(str(year_raw))
+        month = parse_int_required(str(month_raw))
         jdatetime.date(year, month, 1)
     except (TypeError, ValueError):
         return today.year, today.month
@@ -90,7 +90,7 @@ def daily_view(
                 "day": spent.day,
                 "parent_id": parent.id if parent else "",
                 "category_id": row.category_id,
-                "amount_raw": format(Decimal(row.amount_toman), "f").rstrip("0").rstrip("."),
+                "amount_raw": format_amount_input(Decimal(row.amount_toman)),
             }
         )
     edit_raw = request.query_params.get("edit_spend", "")
@@ -101,7 +101,7 @@ def daily_view(
     page_count = max(1, (len(rows) + page_size - 1) // page_size)
     page_raw = request.query_params.get("page", "1")
     try:
-        page = int(str(page_raw).translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")))
+        page = parse_int_required(str(page_raw))
     except ValueError:
         page = 1
     page = min(max(page, 1), page_count)

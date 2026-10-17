@@ -318,29 +318,33 @@
     <p id="android-phrase-status" class="field-hint" role="status" hidden></p>
   </form>
 </section>
-<section class="card auth-card wide">
-  <h2>توکن MCP</h2>
-  <p class="card-desc">عامل محلی با این توکن فقط موجودی، حقوق، بدهی و اسنپ‌شات همین حساب را می‌خواند. آدرس: <code dir="ltr" class="url-block">POST {{ mcp_url }}</code> — هدر <code dir="ltr">Authorization: Bearer …</code></p>
-  {% if mcp_token %}
-  <p class="field-hint">این تنظیم یک بار نشان داده می‌شود. در Cursor بروید به Settings → MCP و کل JSON را در mcp.json بگذارید.</p>
-  <textarea id="mcp-cursor-config" readonly rows="12" dir="ltr">{{ mcp_cursor_config }}</textarea>
-  <button type="button" class="btn btn-ghost btn-sm" id="mcp-copy-config">کپی تنظیمات Cursor</button>
-  {% elif user.mcp_token_hash %}
-  <p class="field-status">توکن ذخیره شده است.</p>
-  {% else %}
-  <p class="field-hint">هنوز توکنی ساخته نشده است.</p>
-  {% endif %}
-  <form method="post" action="/profile/mcp-token" class="inline-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="btn btn-primary btn-sm">{% if user.mcp_token_hash %}توکن جدید{% else %}ساخت توکن{% endif %}</button>
-  </form>
-  {% if user.mcp_token_hash %}
-  <form method="post" action="/profile/mcp-token/revoke" class="inline-form" onsubmit="return confirm('توکن MCP حذف شود؟');">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="btn btn-danger btn-sm">حذف توکن</button>
-  </form>
-  {% endif %}
-</section>
+<details class="card auth-card wide advanced-card" id="advanced"{% if mcp_token %} open{% endif %}>
+  <summary class="advanced-summary">پیشرفته</summary>
+  <section class="advanced-body" aria-labelledby="mcp-heading">
+  <h2 id="mcp-heading">توکن MCP</h2>
+  <p class="card-desc">با این توکن شخصی می‌توانید دستیارهای هوش مصنوعی یا ابزارهای دیگر را به حسابتان وصل کنید تا موجودی و گزارش‌های شما را فقط بخوانند.</p>
+  <p class="field-hint">آدرس: <code dir="ltr" class="url-block">{{ mcp_url }}</code> — درخواست POST با هدر <code dir="ltr">Authorization: Bearer …</code></p>
+    {% if mcp_token %}
+    <p class="field-hint">این تنظیم یک بار نشان داده می‌شود. در Cursor بروید به Settings → MCP و کل JSON را در mcp.json بگذارید.</p>
+    <textarea id="mcp-cursor-config" readonly rows="12" dir="ltr">{{ mcp_cursor_config }}</textarea>
+    <button type="button" class="btn btn-ghost btn-sm" id="mcp-copy-config">کپی تنظیمات Cursor</button>
+    {% elif user.mcp_token_hash %}
+    <p class="field-status">توکن ذخیره شده است.</p>
+    {% else %}
+    <p class="field-hint">هنوز توکنی ساخته نشده است.</p>
+    {% endif %}
+    <form method="post" action="/profile/mcp-token" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn btn-primary btn-sm">{% if user.mcp_token_hash %}توکن جدید{% else %}ساخت توکن{% endif %}</button>
+    </form>
+    {% if user.mcp_token_hash %}
+    <form method="post" action="/profile/mcp-token/revoke" class="inline-form" onsubmit="return confirm('توکن MCP حذف شود؟');">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn btn-danger btn-sm">حذف توکن</button>
+    </form>
+    {% endif %}
+  </section>
+</details>
 {% endblock %}
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>

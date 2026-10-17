@@ -169,11 +169,11 @@ def test_landing_android_url_in_own_ltr_block(client):
 def test_profile_mcp_url_uses_request_or_public_base_url(client, no_network, monkeypatch):
     _register(client)
     html = client.get("/profile").text
-    assert "POST http://testserver/mcp" in html
+    assert '<code dir="ltr" class="url-block">http://testserver/mcp</code>' in html
     import app.profile as profile
     monkeypatch.setattr(profile, "PUBLIC_BASE_URL", "https://portfolio.vahidtwo.ir")
     html = client.get("/profile").text
-    assert "POST https://portfolio.vahidtwo.ir/mcp" in html and "127.0.0.1" not in html
+    assert ">https://portfolio.vahidtwo.ir/mcp</code>" in html and "127.0.0.1" not in html
 
 
 def test_android_setup_prefills_public_server_url():
@@ -246,3 +246,30 @@ def test_debt_year_placeholder_is_current_jalali_year(client, no_network):
     _register(client)
     html = client.get("/profile?tab=debts").text
     assert f'name="due_year" value="" inputmode="numeric" placeholder="{persian_digits(str(jdatetime.date.today().year))}"' in html
+
+
+def test_mcp_box_in_collapsed_advanced_section_and_actions_work(client, no_network):
+    import re
+    _register(client)
+    html = client.get("/profile").text
+    m = re.search(r'<details class="card auth-card wide advanced-card" id="advanced">(.*?)</details>', html, re.S)
+    assert m, "advanced section must be a collapsed <details> for every user"
+    box = m.group(1)
+    assert "<summary class=\"advanced-summary\">پیشرفته</summary>" in box
+    assert "دستیارهای هوش مصنوعی" in box and "http://testserver/mcp" in box
+    assert 'action="/profile/mcp-token"' in box and "ساخت توکن" in box
+    assert html.rfind("</details>") > html.rfind("</section>"), "advanced section is last on the page"
+    # issue: details opens so the one-time config is visible, and the token works
+    html = client.post("/profile/mcp-token", data={"csrf": _csrf(client)}).text  # follows redirect to /profile
+    assert 'id="advanced" open>' in html
+    cfg = re.search(r'<textarea id="mcp-cursor-config"[^>]*>(.*?)</textarea>', html, re.S).group(1)
+    token = re.search(r"Bearer ([A-Za-z0-9_\-]+)", cfg).group(1)
+    rpc = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    hdr = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    assert client.post("/mcp", json=rpc, headers=hdr).status_code == 200
+    # later views: collapsed again, regenerate + revoke offered
+    html = client.get("/profile").text
+    assert 'id="advanced">' in html and "توکن جدید" in html and 'action="/profile/mcp-token/revoke"' in html
+    client.post("/profile/mcp-token/revoke", data={"csrf": _csrf(client)})
+    assert client.post("/mcp", json=rpc, headers=hdr).status_code == 401
+    assert client.post("/mcp", json=rpc, headers={"Accept": "application/json"}).status_code == 401

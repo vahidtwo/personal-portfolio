@@ -70,7 +70,7 @@ def test_debts_expenses_spends_empty_states(client, no_network):
     assert "هنوز بدهی یا قسطی ثبت نکرده‌اید" in html and 'href="#debt-form"' in html
     assert "هنوز هزینهٔ ماهانه‌ای ثبت نکرده‌اید" in html and 'href="#expense-form"' in html
     daily = client.get("/dashboard?tab=daily").text
-    assert "در این ماه خرجی ثبت نشده است" in daily
+    assert "اولین خرجتان را ثبت کنید" in daily  # spending v2 first-time empty state
 
 
 def test_daily_form_on_top_with_today_in_persian_digits(client, no_network):
@@ -78,7 +78,8 @@ def test_daily_form_on_top_with_today_in_persian_digits(client, no_network):
     from app.formatting import persian_digits
     _register(client)
     html = client.get("/dashboard?tab=daily").text
-    assert html.index('id="daily-spend-form"') < html.index('id="daily-report-heading"')
+    # Spending v2: summary and list first; the form is a side card (≥900px) or a bottom sheet (mobile).
+    assert html.index('id="daily-report-heading"') < html.index('id="daily-spend-form"')
     from app.formatting import tehran_today
     today = tehran_today()
     assert f'name="year" value="{persian_digits(str(today.year))}"' in html

@@ -90,15 +90,16 @@ DAILY_SPEND_TREE: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
 )
 
 PARENT_COLORS = {
-    "food": "#e85d04",
+    # Darkened so a white initial reaches >=4.5:1; «قبض» and «پیامک» no longer share a colour.
+    "food": "#c2410c",
     "transport": "#1d4ed8",
     "gifts": "#be185d",
     "shopping": "#7c3aed",
-    "health": "#059669",
-    "fun": "#d97706",
+    "health": "#047857",
+    "fun": "#b45309",
     "bills": "#0f766e",
-    "other": "#64748b",
-    "sms": "#0f766e",
+    "other": "#475569",
+    "sms": "#0e7490",
 }
 _EXTRA_COLORS = ("#0369a1", "#b45309", "#4d7c0f", "#9333ea", "#be123c", "#0e7490")
 

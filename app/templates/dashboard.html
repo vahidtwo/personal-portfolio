@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% block title %}داشبورد · موجودی من{% endblock %}
+{% block title %}{% if tab == "daily" %}خرج‌ها، موجودی من{% else %}داشبورد، موجودی من{% endif %}{% endblock %}
 {% block head %}
+{% if tab != 'daily' %}
 <script src="/static/vendor/chart.umd.min.js?v={{ static_v }}" defer></script>
 <script src="/static/vendor/hammer.min.js?v={{ static_v }}" defer></script>
 <script src="/static/vendor/chartjs-plugin-zoom.min.js?v={{ static_v }}" defer></script>
+{% endif %}
 {% endblock %}
 {% block content %}
 {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}

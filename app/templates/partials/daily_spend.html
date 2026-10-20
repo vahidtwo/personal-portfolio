@@ -8,25 +8,112 @@
   </div>
 </section>
 <script src="/static/sms-offer.js?v={{ static_v }}" defer></script>
-<section class="card daily-section daily-add" aria-labelledby="daily-add-heading">
-  <h1 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}ثبت خرج امروز{% endif %}</h1>
-  <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form" data-leave-warn>
+{% set qs = "/dashboard?tab=daily&jy=" ~ daily_year ~ "&jm=" ~ daily_month %}
+{% set e = spend_errors %}
+<div class="sp-page" data-sp-page{% if e or editing_spend_id %} data-sp-open{% endif %}>
+<section class="card sp-sum" aria-labelledby="sp-h" data-sp-sum>
+  <h1 id="sp-h">خرج‌ها</h1>
+  <div class="sp-mnav">
+    <a href="/dashboard?tab=daily&jy={{ daily_prev_year }}&jm={{ daily_prev_month }}" aria-label="ماه قبل" data-sp-month><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>
+    <strong aria-live="polite" data-sp-title>{{ daily_month_title }}</strong>
+    <a href="/dashboard?tab=daily&jy={{ daily_next_year }}&jm={{ daily_next_month }}" aria-label="ماه بعد" data-sp-month><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>
+  </div>
+  {% if daily_has_any %}
+  <div class="sp-tiles{% if not daily_is_current_month %} one{% endif %}">
+    {% if daily_is_current_month %}
+    <div class="sp-tile"><span>امروز</span><b class="num">{{ daily_today_label }}</b><small>تومان</small></div>
+    <div class="sp-tile"><span>این ماه</span><b class="num">{{ daily_month_label }}</b><small>تومان</small></div>
+    {% else %}
+    <div class="sp-tile"><span>جمع {{ daily_month_name }}</span><b class="num">{{ daily_month_label }}</b><small>تومان</small></div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if daily_top %}
+  <ul class="sp-bars" aria-label="خرج این ماه به تفکیک دسته">
+    {% for s in daily_top + daily_rest %}
+    <li{% if loop.index > 4 %} hidden data-sp-rest{% endif %}><span>{{ s.label }}</span><span class="v"><b>{{ s.amount_label }}</b> تومان، {{ s.share_label }}</span><span class="bar" aria-hidden="true"><i style="width:{{ [s.share, 2] | max }}%;background:{{ s.color }}"></i></span></li>
+    {% endfor %}
+  </ul>
+  {% if daily_rest %}<button type="button" class="sp-more-cats" aria-expanded="false" data-sp-rest-toggle>{{ daily_rest_label }} دستهٔ دیگر</button>{% endif %}
+  {% endif %}
+  <p class="sp-note">جدا از هزینهٔ ماهانه حساب می‌شود و روی مانده و ارزش دارایی‌ها اثری ندارد.</p>
+</section>
+
+<section class="card sp-list" aria-labelledby="daily-report-heading" data-sp-list>
+  <h2 id="daily-report-heading">فهرست خرج‌ها</h2>
+  {% if daily_groups %}
+  <p class="sp-count" data-sp-count>{{ daily_count_label }}</p>
+  <div class="sp-days" data-sp-days>
+    {% for g in daily_groups %}
+    <section class="sp-day" aria-label="{{ g.label }}">
+      <div class="sp-dayh"><b>{{ g.label }}</b><span><span class="num">{{ g.total_label }}</span> تومان</span></div>
+      <ul class="sp-rows">
+        {% for row in g.rows %}
+        <li class="sp-row" data-sp-row="{{ row.id }}" data-sp-amount="{{ row.amount_label }}" data-sp-name="{{ row.name }}" data-sp-note="{{ row.note_display }}" data-sp-rel="{{ row.rel_label }}">
+          <span class="sp-ic" style="background:{{ row.color }}" aria-hidden="true">{{ row.initial }}</span>
+          <span class="t"><b>{{ row.name }}</b><small>{% if row.from_sms %}<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>{% endif %}{{ row.parent_name }}{% if row.note_display %}، {{ row.note_display }}{% endif %}</small></span>
+          <span class="a"><span class="num">{{ row.amount_label }}</span><small>تومان</small></span>
+          <button type="button" class="sp-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های خرج {{ row.amount_label }} تومان، {{ row.name }}" data-sp-dots><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
+          <div class="sp-menu" role="menu" hidden>
+            <a role="menuitem" href="{{ qs }}&page={{ daily_page }}&edit_spend={{ row.id }}" data-sp-edit>ویرایش</a>
+            <button type="button" role="menuitem" class="d" data-sp-del>حذف…</button>
+          </div>
+          <noscript><a href="{{ qs }}&page={{ daily_page }}&edit_spend={{ row.id }}">ویرایش</a></noscript>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </div>
+  {% if daily_has_more %}<a class="btn btn-ghost sp-loadmore" href="{{ qs }}&page={{ daily_page + 1 }}" data-sp-more>{{ daily_more_label }}</a>{% endif %}
+  {% elif not daily_has_any %}
+  <div class="sp-empty" data-sp-empty>
+    <h3>اولین خرجتان را ثبت کنید</h3>
+    <p>هر خرج روزانه را با مبلغ و دسته ثبت کنید تا ببینید پولتان بیشتر کجا می‌رود.</p>
+    <ol class="sp-steps">
+      <li><span class="n">۱</span><span class="t">مبلغ و دسته را بزنید<small>تاریخ امروز از قبل انتخاب شده است</small></span></li>
+      <li><span class="n">۲</span><span class="t">در اپ اندروید، خودکار از پیامک<small>پیامک‌های «برداشت» بانک خودکار ثبت می‌شوند</small></span></li>
+    </ol>
+    <a class="btn btn-primary" href="#daily-spend-form" data-sp-open-form>ثبت اولین خرج</a>
+  </div>
+  {% else %}
+  <div class="sp-empty" data-sp-empty>
+    <h3>در {{ daily_month_name }} خرجی ثبت نشده است</h3>
+    <p>اگر خرجی جا مانده، همین حالا ثبتش کنید؛ تاریخ را می‌توانید عوض کنید.</p>
+    <a class="btn btn-ghost" href="#daily-spend-form" data-sp-open-form data-sp-month-start><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>ثبت خرج در {{ daily_month_name }}</span></a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card daily-section daily-add sp-form" aria-labelledby="daily-add-heading" id="sp-form" data-sp-form-card>
+  <div class="sp-shead"><h2 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}ثبت خرج{% endif %}</h2><button type="button" class="sp-x" aria-label="بستن" data-sp-close>✕</button></div>
+  {% if spend_error_summary %}
+  <div class="v2-banner err sp-summary" role="alert" tabindex="-1" data-sp-summary><div><strong>{{ spend_error_summary }}</strong>{% for f, label in spend_error_links %}<a href="#sp-{{ f }}">{{ label }}</a>{% if not loop.last %}، {% endif %}{% endfor %}</div></div>
+  {% endif %}
+  <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form" data-leave-warn novalidate data-sp-form>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="jy" value="{{ daily_year }}">
     <input type="hidden" name="jm" value="{{ daily_month }}">
-    <label>
-      <span class="label-text">مبلغ (تومان)</span>
-      <input name="amount_toman" value="{{ spend_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest required>
+    <label class="span-2{% if e.amount_toman %} sp-invalid{% endif %}">
+      <span class="label-text">مبلغ</span>
+      <span class="sp-amt"><input id="sp-amount_toman" name="amount_toman" value="{{ spend_form.amount_toman }}" inputmode="numeric" dir="ltr" data-thousands data-amount-suggest required{% if editing_spend_id and spend_orig_amount %} data-sp-orig="{{ spend_orig_amount }}"{% endif %} aria-describedby="err-amount_toman"{% if e.amount_toman %} aria-invalid="true"{% endif %}><span class="u" aria-hidden="true">تومان</span></span>
+      <span class="sp-err" id="err-amount_toman" data-sp-err>{{ e.amount_toman or "" }}</span>
     </label>
-    <label>
+    <div class="span-2 sp-cats">
+      <span class="sp-flabel" id="sp-pl">دسته</span>
+      <div class="sp-chips" role="group" aria-labelledby="sp-pl" data-sp-pchips></div>
+      <span class="sp-flabel" id="sp-cl">زیردسته</span>
+      <div class="sp-chips" role="group" aria-labelledby="sp-cl" data-sp-cchips></div>
+    </div>
+    <label class="sp-sel">
       <span class="label-text">دسته</span>
       <select name="parent_id" id="spend-parent">
         {% for parent in daily_parents %}
-        <option value="{{ parent.id }}" {% if spend_form.parent_id|string == parent.id|string %}selected{% endif %}>{{ parent.name }}</option>
+        <option value="{{ parent.id }}" data-color="{{ parent.color }}" data-slug="{{ parent.slug }}" {% if spend_form.parent_id|string == parent.id|string %}selected{% endif %}>{{ parent.name }}</option>
         {% endfor %}
       </select>
     </label>
-    <label>
+    <label class="sp-sel{% if e.category_id %} sp-invalid{% endif %}">
       <span class="label-text">زیردسته</span>
       <select name="category_id" id="spend-child" required>
         {% for child in daily_children %}
@@ -34,145 +121,40 @@
         {% endfor %}
       </select>
     </label>
-    <label>
+    <span class="sp-err span-2" id="sp-category_id" data-sp-err>{{ e.category_id or "" }}</span>
+    <label class="span-2">
       <span class="label-text">یادداشت</span>
-      <input name="note" value="{{ spend_form.note }}" maxlength="120" placeholder="اختیاری، مثلاً نان">
+      <input name="note" value="{{ spend_form.note }}" maxlength="120" placeholder="اختیاری، مثلاً نان و شیر">
     </label>
-    <div class="span-2">
-      <span class="label-text">تاریخ (جلالی) <span class="field-hint-inline">— پیش‌فرض: امروز</span></span>
-      <div class="jalali-row">
-        <label>
-          <span class="label-text">سال</span>
-          <input name="year" value="{{ spend_form.year | fa }}" inputmode="numeric" dir="ltr" required>
+    <div class="span-2 sp-date">
+      <span class="sp-flabel" id="sp-dl">تاریخ</span>
+      <div class="sp-chips" role="group" aria-labelledby="sp-dl" data-sp-dchips data-today="{{ daily_today_parts | join('-') }}" data-yesterday="{{ daily_yesterday_parts | join('-') }}">
+        <button type="button" aria-pressed="false" data-sp-day="today">{{ daily_today_chip }}</button>
+        <button type="button" aria-pressed="false" data-sp-day="yesterday">دیروز</button>
+        <button type="button" aria-pressed="false" aria-expanded="false" aria-controls="sp-custom" data-sp-day="other">تاریخ دیگر</button>
+      </div>
+      <div class="jalali-row sp-custom" id="sp-custom" data-sp-custom>
+        {% for f, label in [("year", "سال"), ("month", "ماه"), ("day", "روز")] %}
+        <label{% if e[f] %} class="sp-invalid"{% endif %}>
+          <span class="label-text">{{ label }}</span>
+          <input id="sp-{{ f }}" name="{{ f }}" value="{{ spend_form[f] | fa }}" inputmode="numeric" dir="ltr" required aria-describedby="err-{{ f }}"{% if e[f] %} aria-invalid="true"{% endif %}>
+          <span class="sp-err" id="err-{{ f }}" data-sp-err>{{ e[f] or "" }}</span>
         </label>
-        <label>
-          <span class="label-text">ماه</span>
-          <input name="month" value="{{ spend_form.month | fa }}" inputmode="numeric" dir="ltr" required>
-        </label>
-        <label>
-          <span class="label-text">روز</span>
-          <input name="day" value="{{ spend_form.day | fa }}" inputmode="numeric" dir="ltr" required>
-        </label>
+        {% endfor %}
       </div>
     </div>
     <div class="form-actions span-2">
-      <a class="btn btn-ghost" href="/dashboard?tab=daily&jy={{ daily_year }}&jm={{ daily_month }}&page={{ daily_page }}">انصراف</a>
-      <button type="submit" class="btn btn-primary">{% if editing_spend_id %}ذخیره خرج{% else %}افزودن خرج{% endif %}</button>
+      <a class="btn btn-ghost" href="{{ qs }}&page={{ daily_page }}" data-sp-cancel>انصراف</a>
+      <button type="submit" class="btn btn-primary" data-sp-submit>{% if editing_spend_id %}ذخیرهٔ تغییرات{% else %}ثبت خرج{% endif %}</button>
     </div>
   </form>
 </section>
-
-<section class="card daily-section" aria-labelledby="daily-report-heading">
-  <h2 id="daily-report-heading">گزارش خرج روزانه</h2>
-  <p class="card-desc">خرج روزانه جدا از هزینهٔ ماهانه ثبت می‌شود و روی مانده گزارش ماهانه و ارزش پرتفوی اثری ندارد.</p>
-  <div class="month-nav">
-    <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_prev_year }}&jm={{ daily_prev_month }}">ماه قبل</a>
-    <strong>{{ daily_month_title }}</strong>
-    <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_next_year }}&jm={{ daily_next_month }}">ماه بعد</a>
-  </div>
-  <p class="debt-total">امروز: <span class="num">{{ daily_today_label }}</span> تومان · این ماه: <span class="num">{{ daily_month_label }}</span> تومان</p>
-  {% if daily_slices %}
-  <div class="daily-chart"><canvas id="daily-spend-chart" aria-label="نمودار خرج این ماه"></canvas></div>
-  {% else %}
-  <div class="empty-state">
-    <p class="empty-state-title">در این ماه خرجی ثبت نشده است</p>
-    <p class="empty-state-hint">هر خرج را با فرم بالای صفحه ثبت کنید؛ تاریخ امروز از قبل پر شده است. در اپ اندروید، پیامک‌های بانکی دارای «برداشت» خودکار ثبت می‌شوند.</p>
-    <a class="btn btn-ghost btn-sm" href="#daily-spend-form">ثبت خرج</a>
-  </div>
-  {% endif %}
-  {% if daily_rows %}
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th scope="col">تاریخ</th>
-          <th scope="col">دسته</th>
-          <th scope="col">زیردسته</th>
-          <th scope="col">مبلغ</th>
-          <th scope="col">یادداشت</th>
-          <th scope="col">ویرایش</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in daily_rows %}
-        <tr>
-          <td class="num">{{ row.date_label }}</td>
-          <td>{{ row.parent_name }}</td>
-          <td>{{ row.child_name }}</td>
-          <td class="num">{{ row.amount_label }}</td>
-          <td>{% if row.from_sms %}<span class="tag tag-sms" title="ثبت خودکار از پیامک">از پیامک</span> {% endif %}{{ row.note_display or "—" }}</td>
-          <td class="row-actions">
-            <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_year }}&jm={{ daily_month }}&page={{ daily_page }}&edit_spend={{ row.id }}">ویرایش</a>
-            <form method="post" action="/profile/spends/{{ row.id }}/delete" class="inline-form" onsubmit="return confirm('این خرج حذف شود؟');">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <input type="hidden" name="jy" value="{{ daily_year }}">
-              <input type="hidden" name="jm" value="{{ daily_month }}">
-              <input type="hidden" name="page" value="{{ daily_page }}">
-              <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if daily_page_count > 1 %}
-  <nav class="pager" aria-label="صفحه‌های فهرست">
-    {% if daily_page > 1 %}
-    <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_year }}&jm={{ daily_month }}&page={{ daily_page - 1 }}">قبلی</a>
-    {% else %}
-    <span></span>
-    {% endif %}
-    <span>صفحه {{ daily_page_label }} از {{ daily_page_count_label }}</span>
-    {% if daily_page < daily_page_count %}
-    <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_year }}&jm={{ daily_month }}&page={{ daily_page + 1 }}">بعدی</a>
-    {% else %}
-    <span></span>
-    {% endif %}
-  </nav>
-  {% endif %}
-  {% endif %}
-</section>
-<script src="/static/vendor/chart.umd.min.js?v={{ static_v }}"></script>
-<script>
-(function () {
-  const parent = document.getElementById("spend-parent");
-  const child = document.getElementById("spend-child");
-  function filterChildren() {
-    if (!parent || !child) return;
-    const want = parent.value;
-    let first = null;
-    Array.from(child.options).forEach(function (option) {
-      const show = option.getAttribute("data-parent") === want;
-      option.hidden = !show;
-      option.disabled = !show;
-      if (show && !first) first = option;
-    });
-    const current = child.selectedOptions[0];
-    if (!current || current.disabled) {
-      if (first) child.value = first.value;
-    }
-  }
-  if (parent) {
-    parent.addEventListener("change", filterChildren);
-    filterChildren();
-  }
-  const slices = {{ daily_slices | tojson }};
-  const canvas = document.getElementById("daily-spend-chart");
-  if (canvas && window.Chart && slices.length) {
-    new Chart(canvas, {
-      type: "doughnut",
-      data: {
-        labels: slices.map(function (row) { return row.label; }),
-        datasets: [{
-          data: slices.map(function (row) { return row.amount; }),
-          backgroundColor: slices.map(function (row) { return row.color; }),
-        }],
-      },
-      options: {
-        plugins: { legend: { position: "bottom" } },
-      },
-    });
-  }
-})();
-</script>
+</div>
+<form method="post" action="" id="sp-del-form" hidden>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="jy" value="{{ daily_year }}">
+  <input type="hidden" name="jm" value="{{ daily_month }}">
+  <input type="hidden" name="page" value="{{ daily_page }}">
+</form>
+{% if daily_has_any %}<div class="sp-addbar" data-sp-addbar><a class="btn btn-primary" href="#daily-spend-form" data-sp-open-form><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>ثبت خرج</span></a></div>{% endif %}
+<script src="/static/spending-page.js?v={{ static_v }}" defer></script>

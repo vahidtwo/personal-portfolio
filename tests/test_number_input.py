@@ -66,7 +66,10 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     child = db.query(SpendCategory).filter(SpendCategory.user_id == alice.id, SpendCategory.parent_id.is_not(None)).first()
     parent_id, child_id = child.parent_id, child.id
     db.close()
-    client.post("/profile/spends", data={"amount_toman": raw, "year": "۱۴۰۵", "month": "۱", "day": "۱", "parent_id": str(parent_id),
+    # Spends are whole toman (spending v2 spec): a decimal amount is rejected at the field, not rounded.
+    spend_raw = raw if want == want.to_integral_value() else "۱۲"
+    spend_want = want if want == want.to_integral_value() else Decimal("12")
+    client.post("/profile/spends", data={"amount_toman": spend_raw, "year": "۱۴۰۵", "month": "۱", "day": "۱", "parent_id": str(parent_id),
                                          "category_id": str(child_id), "note": "form", "csrf": _csrf(client)})
     assert client.post("/api/sms-spend", json={"amount_toman": raw, "note": "sms"}).status_code == 200
     db, alice = _alice()
@@ -75,7 +78,7 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
         assert db.query(Debt).filter_by(user_id=alice.id).one().monthly_toman == want
         assert db.query(MonthlyExpense).filter_by(user_id=alice.id).one().amount_toman == want
         amounts = sorted(Decimal(s.amount_toman) for s in db.query(DailySpend).filter_by(user_id=alice.id))
-        assert amounts == [want, want]
+        assert amounts == sorted([want, spend_want])
     finally:
         db.close()
 

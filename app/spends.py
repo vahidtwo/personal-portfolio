@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 import jdatetime
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.daily_spend import (
     JALALI_MONTHS,
+    _color_for,
     categories_for_user,
     ensure_spend_categories,
     jalali_month_bounds,
@@ -21,6 +23,7 @@ from app.db import get_db
 from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
 from app.number_input import parse_int_required
+from app.spend_validation import CATEGORY_MSG, FIELD_ORDER, FIELD_SHORT, summary_fa, validate_spend
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -41,6 +44,23 @@ def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, 
     return False, note
 
 router = APIRouter()
+
+
+def _day_label(spent, today, yesterday) -> str:
+    base = f"{persian_digits(str(spent.day))} {JALALI_MONTHS[spent.month - 1]}"
+    if spent == today:
+        return f"امروز، {base}"
+    if spent == yesterday:
+        return f"دیروز، {base}"
+    return base
+
+
+def _rel_label(spent, today, yesterday) -> str:
+    if spent == today:
+        return "امروز"
+    if spent == yesterday:
+        return "دیروز"
+    return f"{persian_digits(str(spent.day))} {JALALI_MONTHS[spent.month - 1]}"
 
 def _viewed_jalali_month(request: Request, jy: str | None = None, jm: str | None = None) -> tuple[int, int]:
     today = tehran_today()
@@ -64,8 +84,10 @@ def daily_view(
     jy: str | None = None,
     jm: str | None = None,
     editing_spend_id: int | None = None,
+    spend_errors: dict | None = None,
 ) -> dict:
     ensure_spend_categories(db, user)
+    has_any = db.query(DailySpend.id).filter(DailySpend.user_id == user.id).first() is not None
     year, month = _viewed_jalali_month(request, jy, jm)
     parents, children = categories_for_user(db, user)
     parent_by_id = {row.id: row for row in parents}
@@ -88,17 +110,33 @@ def daily_view(
         Decimal("0"),
     )
     slices, month_total = month_chart(db, user, year, month)
+    parent_index = {row.id: i for i, row in enumerate(parents)}
+    today_j = tehran_today()
+    yesterday_j = today_j - timedelta(days=1)
+    day_totals: dict = {}
+    for row in spends:
+        day_totals[row.spent_on] = day_totals.get(row.spent_on, Decimal("0")) + Decimal(row.amount_toman)
     rows = []
     for row in spends:
         child = child_by_id.get(row.category_id)
         parent = parent_by_id.get(child.parent_id) if child and child.parent_id else None
+        if child is None and row.category_id in parent_by_id:
+            parent = parent_by_id[row.category_id]  # stored on the parent itself: show the parent, never «—»
         spent = jdatetime.date.fromgregorian(date=row.spent_on)
+        name = child.name if child else (parent.name if parent else "سایر")
+        parent_name = parent.name if parent else name
         rows.append(
             {
                 "id": row.id,
                 "date_label": format_jalali_date(spent),
-                "parent_name": parent.name if parent else "—",
-                "child_name": child.name if child else "—",
+                "spent_on": row.spent_on,
+                "day_label": _day_label(spent, today_j, yesterday_j),
+                "rel_label": _rel_label(spent, today_j, yesterday_j),
+                "parent_name": parent_name,
+                "child_name": name,
+                "name": name,
+                "color": _color_for(parent, parent_index.get(parent.id, 0)) if parent else "#475569",
+                "initial": parent_name[:1],
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
                 "from_sms": sms_spend_parts(row.note, child.slug if child else None)[0],
@@ -123,7 +161,19 @@ def daily_view(
     except ValueError:
         page = 1
     page = min(max(page, 1), page_count)
-    visible = rows[(page - 1) * page_size : page * page_size]
+    visible = rows[: page * page_size]  # «نمایش ۱۵ خرج بیشتر» grows the list instead of replacing it
+    groups: list[dict] = []
+    for row in visible:
+        if not groups or groups[-1]["date"] != row["spent_on"]:
+            groups.append({"date": row["spent_on"], "label": row["day_label"],
+                           "total_label": format_toman(day_totals[row["spent_on"]]), "rows": []})
+        groups[-1]["rows"].append(row)
+    month_name = JALALI_MONTHS[month - 1]
+    sorted_slices = sorted(slices, key=lambda x: -x["amount"])
+    for item in sorted_slices:
+        item["share"] = round(item["amount"] * 100 / float(month_total)) if month_total else 0
+        item["share_label"] = persian_digits(str(item["share"])) + "٪"
+        item["amount_label"] = format_toman(Decimal(str(item["amount"])))
     if spend_form is None and editing:
         spend_form = {
             "amount_toman": editing["amount_raw"],
@@ -155,7 +205,10 @@ def daily_view(
         "daily_page_count": page_count,
         "daily_page_label": persian_digits(str(page)),
         "daily_page_count_label": persian_digits(str(page_count)),
-        "daily_parents": [{"id": row.id, "name": row.name} for row in parents],
+        "daily_parents": [
+            {"id": row.id, "name": row.name, "color": _color_for(row, i), "slug": row.slug or ""}
+            for i, row in enumerate(parents)
+        ],
         "daily_children": [
             {"id": row.id, "name": row.name, "parent_id": row.parent_id} for row in children
         ],
@@ -163,6 +216,23 @@ def daily_view(
         "daily_month_label": format_toman(month_total),
         "daily_month_title": f"{JALALI_MONTHS[month - 1]} {persian_digits(str(year))}",
         "daily_slices": slices,
+        "daily_top": sorted_slices[:4],
+        "daily_rest": sorted_slices[4:],
+        "daily_rest_label": persian_digits(str(len(sorted_slices) - 4)),
+        "daily_groups": groups,
+        "daily_total_count": len(rows),
+        "daily_count_label": f"{persian_digits(str(len(visible)))} از {persian_digits(str(len(rows)))} خرج در {month_name}",
+        "daily_more_label": f"نمایش {persian_digits(str(min(page_size, len(rows) - len(visible))))} خرج بیشتر",
+        "daily_has_more": len(visible) < len(rows),
+        "daily_month_name": month_name,
+        "daily_is_current_month": (year, month) == (today_j.year, today_j.month),
+        "daily_today_chip": f"امروز، {persian_digits(str(today_j.day))} {JALALI_MONTHS[today_j.month - 1]}",
+        "daily_today_parts": [today_j.year, today_j.month, today_j.day],
+        "daily_yesterday_parts": [yesterday_j.year, yesterday_j.month, yesterday_j.day],
+        "daily_has_any": has_any,
+        "spend_errors": spend_errors or {},
+        "spend_error_summary": summary_fa(len(spend_errors)) if spend_errors else "",
+        "spend_error_links": [(f, FIELD_SHORT[f]) for f in FIELD_ORDER if spend_errors and f in spend_errors],
         "daily_prev_year": prev_year,
         "daily_prev_month": prev_month,
         "daily_next_year": next_year,
@@ -171,7 +241,18 @@ def daily_view(
         "daily_month": month,
         "spend_form": spend_form,
         "editing_spend_id": editing["id"] if editing else editing_spend_id,
+        "spend_orig_amount": _orig_amount(db, user, editing["id"] if editing else editing_spend_id),
     }
+
+
+def _orig_amount(db: Session, user: User, spend_id: int | None) -> str:
+    """Stored amount (Latin, no grouping) of the row being edited; lets an unchanged legacy fraction save again."""
+    if not spend_id:
+        return ""
+    row = db.get(DailySpend, spend_id)
+    if row is None or row.user_id != user.id:
+        return ""
+    return format(Decimal(row.amount_toman).normalize(), "f")
 
 
 def _spend_form_dict(amount, year, month, day, category_id, note, parent_id: str = "") -> dict:
@@ -203,31 +284,35 @@ def _save_daily_spend(
 ) -> HTMLResponse | RedirectResponse:
     ensure_spend_categories(db, user)
     form = _spend_form_dict(amount_toman, year, month, day, category_id, note, parent_id)
-    try:
-        amount = parse_decimal(amount_toman, field="مبلغ")
-    except Exception as exc:
-        error = str(getattr(exc, "detail", None) or "مبلغ نامعتبر است")
-        amount = None
-    else:
-        error = "مبلغ باید بیشتر از صفر باشد" if amount <= 0 else None
-    spent, date_error = parse_jalali_parts(year, month, day)
-    error = error or date_error
+    # Every bad field at once ({field: message}); the old single `error` stays for old clients.
+    existing_amount = None
+    if spend_id is not None:
+        current = db.get(DailySpend, spend_id)
+        if current is not None and current.user_id == user.id:
+            existing_amount = Decimal(current.amount_toman)
+    errors, amount, spent = validate_spend(amount_toman, year, month, day, existing_amount)
     child = None
     if category_id.isdigit():
         child = db.get(SpendCategory, int(category_id))
     if child is None or child.user_id != user.id or child.parent_id is None:
-        error = error or "زیردسته را انتخاب کنید"
+        errors["category_id"] = CATEGORY_MSG
         child = None
-    if error or amount is None or spent is None or child is None:
+    wants_json = "application/json" in request.headers.get("accept", "")
+    if errors or amount is None or spent is None or child is None:
+        ordered = {f: errors[f] for f in FIELD_ORDER if f in errors}
+        first = next(iter(ordered.values()), "خرج ذخیره نشد")
+        if wants_json:
+            return JSONResponse({"ok": False, "error": first, "fields": ordered}, status_code=422)
         return _render_daily_error(
             request,
             db,
             user,
-            error or "خرج ذخیره نشد",
+            None,
             form,
             jy=jy,
             jm=jm,
             editing_spend_id=spend_id,
+            spend_errors=ordered,
         )
     if spend_id is None:
         db.add(
@@ -244,6 +329,8 @@ def _save_daily_spend(
         item = db.get(DailySpend, spend_id)
         if item is None or item.user_id != user.id:
             flash(request, "خرج پیدا نشد.", error=True)
+            if wants_json:
+                return JSONResponse({"ok": False, "error": "خرج پیدا نشد.", "redirect": "/dashboard?tab=daily"}, status_code=404)
             return RedirectResponse("/dashboard?tab=daily", status_code=303)
         item.category_id = child.id
         item.amount_toman = amount
@@ -251,22 +338,23 @@ def _save_daily_spend(
         item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
-    return RedirectResponse(
-        f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}",
-        status_code=303,
-    )
+    target = f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}"
+    if wants_json:
+        return JSONResponse({"ok": True, "redirect": target})
+    return RedirectResponse(target, status_code=303)
 
 
 def _render_daily_error(
     request: Request,
     db: Session,
     user: User,
-    error: str,
+    error: str | None,
     spend_form: dict,
     *,
     jy: str,
     jm: str,
     editing_spend_id: int | None,
+    spend_errors: dict | None = None,
 ):
     return render(
         request,
@@ -284,6 +372,7 @@ def _render_daily_error(
             jy=jy,
             jm=jm,
             editing_spend_id=editing_spend_id,
+            spend_errors=spend_errors,
         ),
     )
 

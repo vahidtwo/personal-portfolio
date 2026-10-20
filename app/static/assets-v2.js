@@ -202,7 +202,7 @@
     }).join("");
     var el = openDialog('<div class="v2-shead"><h2 id="v2-st">افزودن دارایی</h2>' + X + "</div>" +
       '<label class="lbl" for="v2-s">جست‌وجو</label><input class="v2-search" id="v2-s" type="search" placeholder="مثلاً سکه یا دلار" autocomplete="off">' +
-      '<div class="v2-pick">' + (list || '<p class="hint">همهٔ دارایی‌ها اضافه شده‌اند.</p>') + "</div>", { back: back });
+      '<div class="v2-pick">' + (list || '<p class="hint">همهٔ دارایی‌ها اضافه شده‌اند.</p>') + "</div>", { back: back, focus: "#v2-s" });
     $("#v2-s", el).addEventListener("input", function () {
       var q = this.value.trim();
       $$(".v2-pick li", el).forEach(function (li) { li.hidden = q !== "" && li.dataset.q.indexOf(q) === -1; });

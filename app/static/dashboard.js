@@ -463,9 +463,15 @@
     const times = payload.times || [];
     const nowMs = payload.now || (times.length ? times[times.length - 1] : Date.now());
     const series = payload.series || [];
+    // Arabi: one point per Tehran day for week/month/3-month, one per week for year/all (server-bucketed).
+    const weekly = payload.weekly && (payload.weekly.times || []).length >= 2 ? payload.weekly : null;
+    function src() {
+      if (weekly && (range === "365" || range === "all")) return weekly;
+      return { labels, times, series };
+    }
     const assetOptions = payload.assetOptions || [];
     // A single point is not a trend: show the empty state until there are 2+ points.
-    if (labels.length < 2 || !series.length) {
+    if ((labels.length < 2 && !weekly) || !series.length) {
       chartWrap?.classList.add("hidden");
       panel?.classList.add("is-empty");
       const empty = document.getElementById("chart-empty");
@@ -494,6 +500,7 @@
 
     /** First index inside the selected range (Tehran "now" comes from the server). */
     function rangeStart() {
+      const times = src().times;
       if (range === "all" || !times.length) return 0;
       const cutoff = nowMs - Number(range) * 86400000;
       let start = times.findIndex((t) => t >= cutoff);
@@ -503,6 +510,7 @@
 
     function currentView() {
       const start = rangeStart();
+      const { labels, times, series } = src();
       const full = buildDatasets(series, seriesKey);
       const xs = times.slice(start);
       const datasets = full.map((ds) => {

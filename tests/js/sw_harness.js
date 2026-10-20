@@ -46,6 +46,11 @@ const sandbox = {
   Date: { now: () => clock },
 };
 sandbox.self.caches = caches;
+// Fake cookieStore: the readable signed-in marker (scenario.marker / step.marker toggles it).
+let marker = scenario.marker === undefined ? true : scenario.marker;
+if (scenario.cookieStore !== false) {
+  sandbox.self.cookieStore = { async get(name) { return name === "inventory_signed_in" && marker ? { name, value: "1" } : null; } };
+}
 let src = fs.readFileSync(swPath, "utf8")
   .replace(/__STATIC_ASSET_VERSION__/g, "test")
   .replace("__SESSION_MAX_AGE_MS__", String(MAX_AGE_MS));
@@ -72,13 +77,14 @@ async function dispatch(path, { method = "GET", mode = "navigate" } = {}) {
   }
 }
 
-const PAGE = "inventory-vtest-pages";
+const PAGE = "inventory-vtest-pages-v2";
 async function pageKeys() { const s = caches._stores.get(PAGE); return s ? s._keys() : []; }
 
 (async () => {
   const out = [];
   for (const step of scenario.steps) {
     if (step.advance) clock += step.advance;
+    if (step.marker !== undefined) marker = step.marker;
     if (step.online === false) network = null;
     if (step.online === "ok") network = () => html(step.body || "<p>dashboard private</p>");
     if (step.online === "status") network = () => html("nope", step.status);

@@ -44,13 +44,9 @@ def _format_usd(value: Decimal) -> str:
     return format_usd(value, fixed=True)
 
 
-# Chart history tiers (age -> bucket). Each bucket keeps its last snapshot, values untouched.
-CHART_FULL_DETAIL = timedelta(hours=48)          # every (hourly) snapshot
-CHART_TIERS = (
-    (timedelta(days=7), "6h"),                    # 48h-7d: one per 6 hours (Tehran)
-    (timedelta(days=366), "day"),                 # 7d-1y: one per Tehran day
-    (None, "week"),                               # older: one per Tehran week
-)
+# Chart points: last snapshot per Tehran day for the week/month/3-month ranges (sent for the last
+# 92 days only), last snapshot per week for year/all. Stored values are never changed.
+CHART_DAILY_SPAN = timedelta(days=92)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -60,36 +56,30 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _chart_bucket(at_tehran: datetime, age: timedelta):
-    for limit, tier in CHART_TIERS:
-        if limit is None or age < limit:
-            break
-    if tier == "6h":
-        return (tier, at_tehran.date(), at_tehran.hour // 6)
-    if tier == "day":
-        return (tier, at_tehran.date())
-    year, week, _ = at_tehran.date().isocalendar()
-    return (tier, year, week)
+def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since: timedelta | None = None) -> list:
+    """Chart points, oldest first: the last snapshot per Tehran day (``"day"``) or per ISO week
+    of the Tehran date (``"week"``). No hourly points (Arabi, batch 1).
 
-
-def chart_snapshots(snaps: list, now: datetime) -> list:
-    """Snapshots for the chart, oldest first: every one of the last 48 hours, then the last one
-    per 6 hours (to 7 days), per Tehran day (to 1 year) and per week (older).
-
-    Three years of hourly snapshots would be ~26k points per series; this keeps ~570 and every
-    kept point is a real snapshot with its stored values. Works on anything with ``taken_at``.
+    The bucket that contains ``now`` is dropped, because the live portfolio value is appended as the
+    final point for that bucket. ``since`` limits how far back to go. Every kept point is a real
+    snapshot with its stored values. Works on anything with ``taken_at``.
     """
-    cutoff = now - CHART_FULL_DETAIL
+    def key(at_utc: datetime):
+        d = at_utc.astimezone(TEHRAN).date()
+        return d if granularity == "day" else d.isocalendar()[:2]
+
+    now_key = key(_as_utc(now))
+    cutoff = now - since if since is not None else None
     buckets: dict = {}
-    recent: list = []
     for snap in snaps:
         at = _as_utc(snap.taken_at)
-        if at >= cutoff:
-            recent.append(snap)
-        else:
-            buckets[_chart_bucket(at.astimezone(TEHRAN), now - at)] = snap  # ascending: last one wins
-    older = sorted(buckets.values(), key=lambda s: _as_utc(s.taken_at))
-    return older + recent
+        if cutoff is not None and at < cutoff:
+            continue
+        k = key(at)
+        if k == now_key:
+            continue
+        buckets[k] = snap  # ascending input: last one in the bucket wins
+    return sorted(buckets.values(), key=lambda s: _as_utc(s.taken_at))
 
 
 def _chart_number(value) -> int | float:
@@ -98,17 +88,8 @@ def _chart_number(value) -> int | float:
     return int(d) if d == d.to_integral_value() else float(d)
 
 
-def build_chart_data(db: Session, user_id: int, view, now: datetime | None = None) -> dict:
-    """Labels + per-asset series; chronological left→right, last point is live portfolio."""
-    now = _as_utc(now or utcnow())
-    # Pick the points from (id, taken_at) only, then load the breakdowns of the kept ones.
-    index = (
-        db.query(PortfolioSnapshot.id, PortfolioSnapshot.taken_at)
-        .filter(PortfolioSnapshot.user_id == user_id)
-        .order_by(PortfolioSnapshot.taken_at.asc(), PortfolioSnapshot.id.asc())
-        .all()
-    )
-    picked = chart_snapshots(index, now)
+def _chart_points(db: Session, picked: list, view, now: datetime) -> dict:
+    """Labels, times and per-asset series for the picked snapshots plus the live value at ``now``."""
     ids = [row.id for row in picked]
     loaded: dict[int, PortfolioSnapshot] = {}
     for i in range(0, len(ids), 500):
@@ -143,14 +124,28 @@ def build_chart_data(db: Session, user_id: int, view, now: datetime | None = Non
                 "data": [_chart_number(bd.get(key, 0)) for bd in breakdowns] + [_chart_number(current.get(key, 0))],
             }
         )
+    return {"labels": labels, "times": times, "series": series}
+
+
+def build_chart_data(db: Session, user_id: int, view, now: datetime | None = None) -> dict:
+    """Labels + per-asset series; chronological left→right, last point is live portfolio."""
+    now = _as_utc(now or utcnow())
+    # Pick the points from (id, taken_at) only, then load the breakdowns of the kept ones.
+    index = (
+        db.query(PortfolioSnapshot.id, PortfolioSnapshot.taken_at)
+        .filter(PortfolioSnapshot.user_id == user_id)
+        .order_by(PortfolioSnapshot.taken_at.asc(), PortfolioSnapshot.id.asc())
+        .all()
+    )
+    daily = _chart_points(db, chart_snapshots(index, now, "day", since=CHART_DAILY_SPAN), view, now)
+    weekly = _chart_points(db, chart_snapshots(index, now, "week"), view, now)
     asset_options = [{"key": "total", "label": "جمع کل"}] + [
         {"key": row.key, "label": row.name_fa} for row in view.rows
     ]
     return {
-        "labels": labels,
-        "times": times,
-        "now": times[-1],
-        "series": series,
+        **daily,
+        "now": daily["times"][-1],
+        "weekly": weekly,
         "assetOptions": asset_options,
     }
 

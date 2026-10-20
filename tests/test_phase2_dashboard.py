@@ -118,24 +118,24 @@ def test_asset_week_chip(client):
     assert asset_week_change(rows["cash"], None)[0]["label"] == "بدون تغییر"
 
 
-def test_chart_history_tiers_keep_real_snapshots(client):
-    from app.dashboard import chart_snapshots
+def test_chart_one_point_per_day_and_week(client):
+    """Arabi (batch 1): month/3-month = one point per Tehran day, year/all = one per week, no hourly ticks."""
+    from app.dashboard import CHART_DAILY_SPAN, chart_snapshots
 
     snaps = [_Snap(NOW - timedelta(hours=h)) for h in range(24 * 365 * 3, -1, -1)]  # hourly, 3 years
-    kept = chart_snapshots(snaps, NOW)
-    assert all(k in snaps for k in kept)  # real snapshots, stored values untouched
-    assert [k.taken_at for k in kept] == sorted(k.taken_at for k in kept)
-    age = lambda s: NOW - s.taken_at  # noqa: E731
-    last48 = [s for s in snaps if age(s) <= timedelta(hours=48)]
-    assert [k for k in kept if age(k) <= timedelta(hours=48)] == last48  # every hourly point
-    six = [k for k in kept if timedelta(hours=48) < age(k) < timedelta(days=7)]
-    buckets = {(k.taken_at.astimezone(TEHRAN).date(), k.taken_at.astimezone(TEHRAN).hour // 6) for k in six}
-    assert len(six) == len(buckets) and 18 <= len(six) <= 21  # one per 6 hours
-    days = [k for k in kept if timedelta(days=7) <= age(k) < timedelta(days=366)]
-    assert len(days) == len({k.taken_at.astimezone(TEHRAN).date() for k in days})  # one per Tehran day
-    weeks = [k for k in kept if age(k) >= timedelta(days=366)]
-    assert len(weeks) == len({k.taken_at.astimezone(TEHRAN).date().isocalendar()[:2] for k in weeks})
-    assert len(kept) < 600
+    day = lambda s: s.taken_at.astimezone(TEHRAN).date()  # noqa: E731
+    daily = chart_snapshots(snaps, NOW, "day", since=CHART_DAILY_SPAN)
+    assert all(k in snaps for k in daily)  # real snapshots, stored values untouched
+    assert [k.taken_at for k in daily] == sorted(k.taken_at for k in daily)
+    assert len(daily) == len({day(k) for k in daily})  # one per Tehran day
+    assert all(NOW - k.taken_at <= CHART_DAILY_SPAN for k in daily) and 90 <= len(daily) <= 93
+    for k in daily:  # the last snapshot of its day
+        same = [s for s in snaps if day(s) == day(k)]
+        assert k is same[-1]
+    weekly = chart_snapshots(snaps, NOW, "week")
+    wk = lambda s: day(s).isocalendar()[:2]  # noqa: E731
+    assert len(weekly) == len({wk(k) for k in weekly}) and 150 <= len(weekly) <= 158
+    assert all(k is [s for s in snaps if wk(s) == wk(k)][-1] for k in weekly)
 
 
 def test_chart_payload_small_for_three_years_hourly(client):
@@ -164,8 +164,13 @@ def test_chart_payload_small_for_three_years_hourly(client):
     size = len(json.dumps(data, ensure_ascii=False).encode())
     assert size < 200 * 1024, size
     assert len(data["series"]) == len(view.rows) + 1
-    # Values are the stored ones: the newest snapshot's total is passed through as is.
-    assert data["series"][0]["data"][-2] == 9_876_543_211
+    # Values are the stored ones: the point before «now» is the last snapshot of the previous
+    # Tehran day (today's bucket is the live value), passed through as is.
+    from app.formatting import TEHRAN
+    today = now.astimezone(TEHRAN).date()
+    h_last = min(h for h in range(1, 24 * 365 * 3) if (now - timedelta(hours=h)).astimezone(TEHRAN).date() < today)
+    assert data["series"][0]["data"][-2] == 9_876_543_210 + h_last
+    assert len(data["weekly"]["times"]) >= 150 and data["weekly"]["series"][0]["data"][-1] == data["series"][0]["data"][-1]
 
 
 def test_next_instalment_due_chip(client):
@@ -348,3 +353,12 @@ def test_four_assets_with_different_moves_show_four_different_7d_chips(client, n
                             r'<span class="chg [a-z]+">([^<]+)</span>', table, re.S))
     assert chips == {"بیت‌کوین": "▲ ۱۰٪", "اتریوم": "▼ ۵٪", "طلا ۱۸ عیار": "بدون تغییر", "دلار آمریکا": "▲ ۲٫۵٪"}
     assert len(set(chips.values())) == 4
+
+
+def test_hero_heading_title_and_muted_subline(client):
+    """Arabi (batch 1): «خالص دارایی» is the title at every width; «دارایی منهای بدهی» is a muted line under it."""
+    _register(client)
+    html = client.get("/dashboard").text
+    assert '<h1 id="total-heading" aria-describedby="total-sub">خالص دارایی</h1>' in html
+    assert '<p class="h-sub" id="total-sub">دارایی منهای بدهی</p>' in html
+    assert "(دارایی منهای بدهی)" not in html

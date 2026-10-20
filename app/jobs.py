@@ -4,6 +4,7 @@ import fcntl
 import logging
 from contextlib import contextmanager
 
+from app import price_fetch_state
 from app.chande import fetch_chande_prices
 from app.config import DATA_DIR
 from app.db import SessionLocal
@@ -53,6 +54,17 @@ def upsert_prices(prices) -> None:
         db.close()
 
 
+
+async def fetch_and_store_prices() -> None:
+    """Fetch chande.net prices and upsert them; the outcome is recorded for the home price banner."""
+    try:
+        fetched = await fetch_chande_prices()
+        upsert_prices(fetched)
+    except Exception:
+        price_fetch_state.record(False)
+        raise
+    price_fetch_state.record(True)
+
 async def run_hourly_job(take_snapshots: bool = True) -> None:
     with _job_lock() as acquired:
         if not acquired:
@@ -60,8 +72,7 @@ async def run_hourly_job(take_snapshots: bool = True) -> None:
             return
         logger.info("Hourly job started (snapshots=%s)", take_snapshots)
         try:
-            fetched = await fetch_chande_prices()
-            upsert_prices(fetched)
+            await fetch_and_store_prices()
             logger.info("Market prices updated from chande.net")
         except Exception:
             logger.exception("Failed to fetch prices from chande.net; continuing with stored prices")
@@ -113,8 +124,7 @@ async def refresh_all_sanjeh_cars() -> None:
 
 async def refresh_market_prices_for_user(user_id: int) -> None:
     """Fetch chande prices, refresh this user's Sanjeh car if configured, store a snapshot."""
-    fetched = await fetch_chande_prices()
-    upsert_prices(fetched)
+    await fetch_and_store_prices()
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
@@ -143,8 +153,7 @@ async def refresh_market_prices_for_user(user_id: int) -> None:
 async def refresh_prices_and_snapshot_user(user_id: int) -> None:
     """Refresh market prices when possible, then store one snapshot for this user."""
     try:
-        fetched = await fetch_chande_prices()
-        upsert_prices(fetched)
+        await fetch_and_store_prices()
     except Exception:
         logger.exception("Price fetch failed; snapshot will use stored prices")
     db = SessionLocal()

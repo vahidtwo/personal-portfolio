@@ -43,8 +43,9 @@ def test_signup_lands_on_assets_page(client, no_network):
 def test_dashboard_empty_state_for_new_user(client, no_network):
     _register(client, "emptyuser")
     html = client.get("/dashboard").text
-    assert "هنوز دارایی‌ای ثبت نکرده‌اید" in html
-    assert 'id="portfolio-table"' not in html
+    # home v2: no assets and no debts -> welcome card instead of an all-zero dashboard
+    assert 'id="home-welcome"' in html and "خوش آمدید! بیایید شروع کنیم" in html
+    assert 'id="portfolio-table"' not in html and 'id="chart-panel"' not in html
 
 
 def test_dashboard_hides_zero_rows_and_shows_them_after_value(client, no_network):
@@ -106,6 +107,7 @@ def test_spend_form_accepts_persian_and_latin_digits(client, no_network):
 
 def test_privacy_values_shown_by_default_with_labeled_toggle(client, no_network):
     _register(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     html = client.get("/dashboard").text
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html
     assert "privacy-label-hide" in html and "پنهان کردن" in html
@@ -193,6 +195,7 @@ def test_android_setup_prefills_public_server_url():
 def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):
     import re
     _register(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     for path in ("/dashboard", "/profile?tab=debts"):
         html = client.get(path).text
         assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html), path

@@ -43,6 +43,7 @@ def test_tehran_today_ignores_server_timezone(client, freeze):
 
 def test_spend_logged_0030_tehran_on_the_1st_counts_in_new_month(client, freeze, no_network):
     _register(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     freeze(_tehran(2026, 10, 23, 0, 30))  # 1405/08/01 00:30 Tehran = 2026-10-22 21:00 UTC
     assert client.post("/api/sms-spend", json={"amount_toman": "70000", "note": "sms"}).json()["ok"]
     from app.db import SessionLocal

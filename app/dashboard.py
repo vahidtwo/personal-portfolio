@@ -387,6 +387,41 @@ def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:
 USD_EQUIV_KEYS = frozenset({"btc", "eth", "ada", "sol", "doge", "matic"})
 
 
+
+PRICE_STALE_AFTER = timedelta(hours=2)  # the scheduler runs hourly; 2h = at least one missed run (Arabi, home v2)
+
+
+def age_label_fa(delta: timedelta) -> str:
+    """«۴ دقیقه» / «۳ ساعت» / «۲ روز»; under a minute: «لحظاتی»."""
+    sec = max(0, int(delta.total_seconds()))
+    if sec < 60:
+        return "لحظاتی"
+    if sec < 3600:
+        return f"{persian_digits(str(sec // 60))} دقیقه"
+    if sec < 86400:
+        return f"{persian_digits(str(sec // 3600))} ساعت"
+    return f"{persian_digits(str(sec // 86400))} روز"
+
+
+def price_status(fetched_at, now) -> dict:
+    """Home price line: state fresh | stale | error (last fetch failed after the newest stored price)."""
+    from app import price_fetch_state
+
+    if fetched_at is not None and fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+    age = (now - fetched_at) if fetched_at is not None else None
+    last = price_fetch_state.last()
+    failed = bool(last and not last[0] and (fetched_at is None or last[1] >= fetched_at))
+    if failed:
+        state = "error"
+    elif age is None or age >= PRICE_STALE_AFTER:
+        state = "stale"
+    else:
+        state = "fresh"
+    old = age is None or age >= PRICE_STALE_AFTER
+    return {"state": state, "old": old, "age": age_label_fa(age) if age is not None else None}
+
+
 def market_price_refresh_wait_seconds(db: Session) -> int:
     """Seconds until manual market refresh is allowed; 0 if allowed now."""
     prices = load_prices(db)
@@ -494,7 +529,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     refresh_wait_label = None
     if refresh_wait_sec > 0:
         minutes = max(1, (refresh_wait_sec + 59) // 60)
-        refresh_wait_label = f"حدود {persian_digits(str(minutes))} دقیقه دیگر"
+        refresh_wait_label = f"دوباره تا {persian_digits(str(minutes))} دقیقه"
     monthly = monthly_view(db, user)
     if usd_price is not None and usd_price > 0:
         usd_portfolio_label = _format_usd(view.total_toman / usd_price)
@@ -513,6 +548,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         total_label=format_toman(view.total_toman),
         total_big=big_toman(view.total_toman),
         debt_total_label=format_toman(debt_total),
+        has_debt=debt_total != 0,
         debt_big=big_toman(debt_total),
         next_debt_label=next_debt_label,
         next_instalment=next_instalment(debts, today_j),
@@ -526,6 +562,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         monthly_left_label=monthly["monthly_left_label"],
         total_week_chip=changes["7d"],
         fetched_label=format_when(view.prices_fetched_at),
+        price=price_status(view.prices_fetched_at, utcnow()),
         missing_fa=missing_fa,
         chart_json=chart_json,
         chart_asset_options=chart_asset_options,
@@ -568,7 +605,7 @@ async def dashboard_refresh_prices(
         await refresh_market_prices_for_user(user.id)
     except Exception:
         logger.exception("Manual price refresh failed for user %s", user.id)
-        flash(request, "دریافت قیمت از چنده ممکن نشد. بعداً دوباره تلاش کنید.", error=True)
+        # no flash: the home page shows the «قیمت تازه از چنده نرسید» banner from price_fetch_state
         return RedirectResponse("/dashboard", status_code=303)
     flash(request, "قیمت بازار و پرتفوی به‌روز شد")
     return RedirectResponse("/dashboard", status_code=303)

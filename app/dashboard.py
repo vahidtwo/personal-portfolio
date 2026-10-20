@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import jdatetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -15,12 +16,13 @@ from app.config import PRICE_MANUAL_REFRESH_MINUTES
 from app.db import get_db
 from app.debts import debt_rows
 from app.expenses import monthly_view
+from app.daily_spend import JALALI_MONTHS, month_chart
 from app.formatting import (
-    MONEY_DECIMALS, format_chart_jalali, format_number, format_qty, format_share_label, format_toman, format_usd,
-    format_when, persian_digits,
+    MILLION, MONEY_DECIMALS, TEHRAN, format_chart_jalali, format_millions, format_number, format_qty,
+    format_share_label, format_toman, format_usd, format_when, next_jalali_due, persian_digits, tehran_today,
 )
 from app.jobs import refresh_market_prices_for_user, refresh_user_sanjeh_car
-from app.models import Debt, PortfolioSnapshot, User, utcnow
+from app.models import DailySpend, Debt, PortfolioSnapshot, User, utcnow
 from app.portfolio import (
     ASSET_LABEL_FA,
     ASSET_META,
@@ -39,48 +41,113 @@ router = APIRouter()
 
 
 def _format_usd(value: Decimal) -> str:
-    return format_usd(value)
+    return format_usd(value, fixed=True)
 
 
-def build_chart_data(db: Session, user_id: int, view) -> dict:
-    """Labels + per-asset series; chronological left→right, last point is live portfolio."""
-    snaps = (
-        db.query(PortfolioSnapshot)
-        .filter(PortfolioSnapshot.user_id == user_id)
-        .order_by(PortfolioSnapshot.taken_at.desc())
-        .limit(720)
-        .all()
-    )
-    snaps.reverse()
-    labels = [format_chart_jalali(s.taken_at) for s in snaps] + [format_chart_jalali(utcnow())]
+# Chart points: last snapshot per Tehran day for the week/month/3-month ranges (sent for the last
+# 92 days only), last snapshot per week for year/all. Stored values are never changed.
+CHART_DAILY_SPAN = timedelta(days=92)
 
-    current: dict[str, float] = {row.key: float(row.value_toman) for row in view.rows}
-    current["total"] = float(view.total_toman)
+
+def _as_utc(value: datetime) -> datetime:
+    """SQLite hands back naive datetimes; they are stored as UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since: timedelta | None = None) -> list:
+    """Chart points, oldest first: the last snapshot per Tehran day (``"day"``) or per ISO week
+    of the Tehran date (``"week"``). No hourly points (Arabi, batch 1).
+
+    The bucket that contains ``now`` is dropped, because the live portfolio value is appended as the
+    final point for that bucket. ``since`` limits how far back to go. Every kept point is a real
+    snapshot with its stored values. Works on anything with ``taken_at``.
+    """
+    def key(at_utc: datetime):
+        d = at_utc.astimezone(TEHRAN).date()
+        return d if granularity == "day" else d.isocalendar()[:2]
+
+    now_key = key(_as_utc(now))
+    cutoff = now - since if since is not None else None
+    buckets: dict = {}
+    for snap in snaps:
+        at = _as_utc(snap.taken_at)
+        if cutoff is not None and at < cutoff:
+            continue
+        k = key(at)
+        if k == now_key:
+            continue
+        buckets[k] = snap  # ascending input: last one in the bucket wins
+    return sorted(buckets.values(), key=lambda s: _as_utc(s.taken_at))
+
+
+def _chart_number(value) -> int | float:
+    """Stored toman value as JSON number; integers without a trailing «.0» (same value)."""
+    d = Decimal(str(value))
+    return int(d) if d == d.to_integral_value() else float(d)
+
+
+def _chart_points(db: Session, picked: list, view, now: datetime) -> dict:
+    """Labels, times and per-asset series for the picked snapshots plus the live value at ``now``."""
+    ids = [row.id for row in picked]
+    loaded: dict[int, PortfolioSnapshot] = {}
+    for i in range(0, len(ids), 500):
+        for snap in db.query(PortfolioSnapshot).filter(PortfolioSnapshot.id.in_(ids[i:i + 500])):
+            loaded[snap.id] = snap
+    snaps = [loaded[i] for i in ids if i in loaded]
+    stamps = [_as_utc(s.taken_at) for s in snaps] + [now]
+    labels = [format_chart_jalali(at) for at in stamps]
+    times = [int(at.timestamp() * 1000) for at in stamps]
+    breakdowns = [json.loads(s.breakdown_json) for s in snaps]
+
+    current: dict[str, Decimal] = {row.key: row.value_toman for row in view.rows}
+    current["total"] = view.total_toman
 
     series: list[dict] = [
         {
             "key": "total",
             "label": "جمع کل",
-            "data": [float(json.loads(s.breakdown_json).get("total", s.total_toman)) for s in snaps]
-            + [current["total"]],
+            "data": [_chart_number(bd.get("total", s.total_toman)) for s, bd in zip(snaps, breakdowns)]
+            + [_chart_number(current["total"])],
         }
     ]
+    # Only assets the picker can show (the current rows); others were never sent to the UI.
+    shown = {row.key for row in view.rows}
     for key in ASSET_ORDER:
-        history_vals = []
-        for s in snaps:
-            bd = json.loads(s.breakdown_json)
-            history_vals.append(float(bd.get(key, 0)))
+        if key not in shown:
+            continue
         series.append(
             {
                 "key": key,
                 "label": ASSET_LABEL_FA.get(key, key),
-                "data": history_vals + [current.get(key, 0.0)],
+                "data": [_chart_number(bd.get(key, 0)) for bd in breakdowns] + [_chart_number(current.get(key, 0))],
             }
         )
+    return {"labels": labels, "times": times, "series": series}
+
+
+def build_chart_data(db: Session, user_id: int, view, now: datetime | None = None) -> dict:
+    """Labels + per-asset series; chronological left→right, last point is live portfolio."""
+    now = _as_utc(now or utcnow())
+    # Pick the points from (id, taken_at) only, then load the breakdowns of the kept ones.
+    index = (
+        db.query(PortfolioSnapshot.id, PortfolioSnapshot.taken_at)
+        .filter(PortfolioSnapshot.user_id == user_id)
+        .order_by(PortfolioSnapshot.taken_at.asc(), PortfolioSnapshot.id.asc())
+        .all()
+    )
+    daily = _chart_points(db, chart_snapshots(index, now, "day", since=CHART_DAILY_SPAN), view, now)
+    weekly = _chart_points(db, chart_snapshots(index, now, "week"), view, now)
     asset_options = [{"key": "total", "label": "جمع کل"}] + [
         {"key": row.key, "label": row.name_fa} for row in view.rows
     ]
-    return {"labels": labels, "series": series, "assetOptions": asset_options}
+    return {
+        **daily,
+        "now": daily["times"][-1],
+        "weekly": weekly,
+        "assetOptions": asset_options,
+    }
 
 
 def build_pie_data(view) -> dict:
@@ -126,140 +193,199 @@ ASSET_SPARKLINE_COLORS = {
 }
 
 
-def _snapshot_unit_price(bd: dict, key: str, quantity: Decimal) -> float | None:
-    """Unit price from the snapshot, or holding value ÷ today's quantity."""
-    stored = bd.get("unit_price")
-    if isinstance(stored, dict) and stored.get(key) not in (None, ""):
-        return float(stored[key])
-    if key == "cash" or quantity <= 0:
-        return None
-    try:
-        value = Decimal(str(bd.get(key, 0)))
-    except Exception:
-        return None
-    return float(value / quantity)
-
-
-def build_week_asset_trends(db: Session, user_id: int, view) -> dict[str, list[float]]:
-    """Unit price (toman) over 7 days, plus the live unit price."""
-    snaps = (
-        db.query(PortfolioSnapshot)
-        .filter(
-            PortfolioSnapshot.user_id == user_id,
-            PortfolioSnapshot.taken_at >= utcnow() - timedelta(days=7),
-        )
-        .order_by(PortfolioSnapshot.taken_at.asc())
-        .limit(720)
-        .all()
-    )
-    qty = {row.key: row.quantity for row in view.rows}
-    live = {row.key: row.unit_price for row in view.rows}
-    trends: dict[str, list[float]] = {}
-    for key in ASSET_ORDER:
-        points: list[float] = []
-        for snap in snaps:
-            price = _snapshot_unit_price(json.loads(snap.breakdown_json), key, qty.get(key, Decimal("0")))
-            if price is not None:
-                points.append(price)
-        current = live.get(key)
-        if current is not None:
-            points.append(float(current))
-        trends[key] = points
-    return trends
-
-
-def sparkline_path(values: list[float], width: int = 72, height: int = 26) -> str:
-    if not values:
-        return ""
-    series = list(values)
-    if len(series) == 1:
-        series = [series[0], series[0]]
-    vmin = min(series)
-    vmax = max(series)
-    span = vmax - vmin
-    if span <= 0:
-        mid = height / 2
-        return f"M 1,{mid:.1f} L {width - 1},{mid:.1f}"
-    n = len(series)
-    parts: list[str] = []
-    for i, v in enumerate(series):
-        x = 1 + (i / (n - 1)) * (width - 2)
-        y = height - 1 - ((v - vmin) / span) * (height - 2)
-        parts.append(f"{x:.1f},{y:.1f}")
-    return "M " + parts[0] + " L " + " L ".join(parts[1:])
-
-
-def build_week_total_values(db: Session, user_id: int, view) -> list[float]:
-    """Portfolio total (toman) for the last 7 days + current."""
-    window_end = utcnow()
-    window_start = window_end - timedelta(days=7)
-    snaps = (
-        db.query(PortfolioSnapshot)
-        .filter(
-            PortfolioSnapshot.user_id == user_id,
-            PortfolioSnapshot.taken_at >= window_start,
-        )
-        .order_by(PortfolioSnapshot.taken_at.asc())
-        .all()
-    )
-    values: list[float] = []
-    for snap in snaps:
-        bd = json.loads(snap.breakdown_json)
-        values.append(float(bd.get("total", snap.total_toman)))
-    values.append(float(view.total_toman))
-    return values
-
-
-def build_total_value_history(db: Session, user_id: int, view) -> list[float]:
-    snaps = (
-        db.query(PortfolioSnapshot)
-        .filter(PortfolioSnapshot.user_id == user_id)
-        .order_by(PortfolioSnapshot.taken_at.asc())
-        .limit(720)
-        .all()
-    )
-    values: list[float] = []
-    for snap in snaps:
-        bd = json.loads(snap.breakdown_json)
-        values.append(float(bd.get("total", snap.total_toman)))
-    values.append(float(view.total_toman))
-    return values
-
-
 def format_percent_label(pct: float) -> str:
     sign = "+" if pct > 0 else "−" if pct < 0 else ""
     return sign + format_number(abs(pct), MONEY_DECIMALS) + "٪"
 
 
-def week_trend_change_label(values: list[float]) -> str | None:
-    if len(values) < 2:
-        return None
-    first, last = values[0], values[-1]
-    if first == 0 and last == 0:
-        return persian_digits("0") + "٪"
-    if first == 0:
-        return None
-    return format_percent_label(((last - first) / abs(first)) * 100)
+# --- Net-worth change from price moves only (Phase 2) -------------------------------------
+# Today's holdings are valued at the unit prices stored in an older snapshot. Quantities,
+# added/removed assets and debts are the same on both sides, so only prices move the number.
+# Windows are Tehran wall-clock (24h / 7 days before now in Asia/Tehran). The reference is the
+# newest snapshot at or before that moment, but not older than the tolerance; no such
+# snapshot (or one without stored unit prices) means «—».
+CHANGE_WINDOWS: tuple[tuple[str, timedelta, timedelta, str], ...] = (
+    ("24h", timedelta(hours=24), timedelta(hours=3), "۲۴ ساعت"),
+    ("7d", timedelta(days=7), timedelta(hours=12), "۷ روز"),
+)
+CHANGE_LOOKBACK = timedelta(days=7, hours=12)
+NO_PRICE_MOVE_KEYS = frozenset({"cash"})  # manual toman: its price never moves
 
 
-def week_period_change_percent(values: list[float]) -> float | None:
-    """Percent change from first point in series to last (start of window → now)."""
-    if len(values) < 2:
-        return None
-    first, last = values[0], values[-1]
-    if first == 0 and last == 0:
-        return 0.0
-    if first == 0:
-        return None
-    return ((last - first) / abs(first)) * 100.0
+def change_reference_time(now: datetime, window: timedelta) -> datetime:
+    """`window` before `now` on the Tehran wall clock, as an aware UTC datetime."""
+    local = _as_utc(now).astimezone(TEHRAN)
+    return (local - window).astimezone(timezone.utc)
 
 
-def max_gain_labels(values: list[float]) -> tuple[str, str, bool]:
-    """Display label, sort key, and whether change is strictly positive."""
-    pct = week_period_change_percent(values)
+def reference_snapshot(snaps, now: datetime, window: timedelta, tolerance: timedelta):
+    target = change_reference_time(now, window)
+    best = None
+    best_at = None
+    for snap in snaps:
+        at = _as_utc(snap.taken_at)
+        if target - tolerance <= at <= target and (best_at is None or at >= best_at):
+            best, best_at = snap, at
+    return best
+
+
+def snapshot_unit_prices(snap) -> dict[str, Decimal] | None:
+    """Unit prices stored with a snapshot, or None when it has none (older snapshot format)."""
+    if snap is None:
+        return None
+    try:
+        stored = json.loads(snap.breakdown_json or "{}").get("unit_price")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(stored, dict) or not stored:
+        return None
+    prices: dict[str, Decimal] = {}
+    for key, raw in stored.items():
+        if raw in (None, ""):
+            continue
+        try:
+            prices[key] = Decimal(str(raw))
+        except Exception:
+            continue
+    return prices or None
+
+
+def value_at_prices(view, then_prices: dict[str, Decimal]) -> Decimal:
+    """Today's holdings valued at older unit prices (assets with no older price: unchanged)."""
+    total = Decimal("0")
+    for row in view.rows:
+        then = then_prices.get(row.key)
+        if row.key in NO_PRICE_MOVE_KEYS or row.unit_price is None or then is None:
+            total += row.value_toman
+            continue
+        total += (row.value_toman - row.quantity * (row.unit_price - then)).quantize(Decimal("1"))
+    return total
+
+
+def _chip(pct: Decimal | None, flat_label: str = "۰٪") -> dict:
     if pct is None:
-        return "—", "", False
-    return format_percent_label(pct), str(pct), pct > 0
+        return {"kind": "none", "label": "—"}
+    rounded = pct.quantize(Decimal("0.01"))
+    if rounded > 0:
+        return {"kind": "up", "label": "▲ " + format_number(rounded, MONEY_DECIMALS) + "٪"}
+    if rounded < 0:
+        return {"kind": "down", "label": "▼ " + format_number(-rounded, MONEY_DECIMALS) + "٪"}
+    return {"kind": "flat", "label": flat_label}
+
+
+def net_worth_changes(snaps, view, debt_total: Decimal, now: datetime) -> dict:
+    """24h / 7d change chips for the hero. snaps: this user's snapshots (any order)."""
+    out: dict = {"windows": [], "has_history": False}
+    for key, window, tolerance, period in CHANGE_WINDOWS:
+        then_prices = snapshot_unit_prices(reference_snapshot(snaps, now, window, tolerance))
+        item = {"key": key, "period": period, "delta": None, "pct": None}
+        if then_prices is not None:
+            out["has_history"] = True
+            past_assets = value_at_prices(view, then_prices)
+            delta = view.total_toman - past_assets
+            past_net = past_assets - debt_total
+            item["delta"] = delta
+            item["pct"] = (delta / abs(past_net) * Decimal("100")) if past_net != 0 else None
+        item.update(_chip(item["pct"]))
+        if item["delta"] is not None and item["pct"] is None:
+            item.update(_chip(Decimal("0") if item["delta"] == 0 else None))
+        out["windows"].append(item)
+        out[key] = item
+    day = out["24h"]
+    if day["delta"] is not None:
+        amount = format_toman(abs(day["delta"]))
+        if day["delta"] > 0:
+            out["note"] = (amount, "تومان بیشتر از دیروز")
+        elif day["delta"] < 0:
+            out["note"] = (amount, "تومان کمتر از دیروز")
+        else:
+            out["note"] = (None, "بدون تغییر نسبت به دیروز")
+    elif out["has_history"]:
+        out["note"] = (None, "برای ۲۴ ساعت پیش قیمتی ثبت نشده")
+    else:
+        out["note"] = None
+    return out
+
+
+def asset_week_change(row, then_prices: dict[str, Decimal] | None) -> tuple[dict, str]:
+    """Unit-price change of one asset vs the 7-day reference snapshot: chip + sort key."""
+    if row.key in NO_PRICE_MOVE_KEYS:
+        return {"kind": "flat", "label": "بدون تغییر"}, "0"
+    then = (then_prices or {}).get(row.key)
+    if row.unit_price is None or then is None or then == 0:
+        return {"kind": "none", "label": "—"}, ""
+    pct = (Decimal(row.unit_price) - then) / then * Decimal("100")
+    return _chip(pct, "بدون تغییر"), str(pct)
+
+
+def big_toman(value: Decimal) -> dict:
+    """Big amounts in «میلیون تومان» (≈ when rounded); under a million stays in تومان."""
+    value = Decimal(value)
+    if abs(value) < MILLION:
+        return {"label": format_toman(value), "unit": "تومان", "approx": False}
+    decimals = 0 if abs(value) >= MILLION * 1000 else 1
+    label, approx = format_millions(value, decimals)
+    return {"label": label, "unit": "میلیون تومان", "approx": approx}
+
+
+def next_instalment(debts: list[Debt], today: jdatetime.date) -> dict | None:
+    """Soonest instalment over all debts (same due-date rule as the debts page)."""
+    soonest = None
+    due_debts: list[Debt] = []
+    for debt in debts:
+        nxt = next_jalali_due(debt.due_day, today)
+        if nxt is None:
+            continue
+        if soonest is None or nxt < soonest:
+            soonest, due_debts = nxt, [debt]
+        elif nxt == soonest:
+            due_debts.append(debt)
+    if soonest is None:
+        return None
+    days = (soonest.togregorian() - today.togregorian()).days
+    if days == 0:
+        chip = "امروز"
+    elif days == 1:
+        chip = "فردا"
+    else:
+        chip = f"{persian_digits(str(days))} روز دیگر"
+    amount = sum((Decimal(d.monthly_toman) for d in due_debts), Decimal("0"))
+    titles = [(d.title or "").strip() for d in due_debts]
+    if len(due_debts) > 1:
+        title = f"{persian_digits(str(len(due_debts)))} قسط"
+    else:
+        title = titles[0] or "قسط"
+    return {
+        "amount_label": format_toman(amount),
+        "title": title,
+        "date_label": persian_digits(f"{soonest.day} {JALALI_MONTHS[soonest.month - 1]}"),
+        "chip": chip,
+        "days": days,
+    }
+
+
+def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:
+    """This Jalali month's daily spends and today's, same sums as the spending page."""
+    _slices, month_total = month_chart(db, user, today.year, today.month)
+    today_g = today.togregorian()
+    today_total = sum(
+        (
+            Decimal(row.amount_toman)
+            for row in db.query(DailySpend)
+            .filter(DailySpend.user_id == user.id, DailySpend.spent_on == today_g)
+            .all()
+        ),
+        Decimal("0"),
+    )
+    return {
+        "month_label": format_toman(month_total),
+        "today_label": format_toman(today_total),
+        "month_title": f"{JALALI_MONTHS[today.month - 1]} {persian_digits(str(today.year))}",
+    }
+
+
+USD_EQUIV_KEYS = frozenset({"btc", "eth", "ada", "sol", "doge", "matic"})
+
 
 def market_price_refresh_wait_seconds(db: Session) -> int:
     """Seconds until manual market refresh is allowed; 0 if allowed now."""
@@ -299,49 +425,69 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 logger.exception("Sanjeh refresh failed for user %s", user.id)
     prices = load_prices(db)
     view = build_portfolio(user, prices)
+    now = utcnow()
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
-    week_trends = build_week_asset_trends(db, user.id, view)
+    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    _debt_list, debt_total, next_debt_label = debt_rows(debts)
+    recent_snaps = (
+        db.query(PortfolioSnapshot)
+        .filter(
+            PortfolioSnapshot.user_id == user.id,
+            PortfolioSnapshot.taken_at >= now - CHANGE_LOOKBACK - timedelta(days=1),
+        )
+        .all()
+    )
+    changes = net_worth_changes(recent_snaps, view, debt_total, now)
+    week_prices = snapshot_unit_prices(
+        reference_snapshot(recent_snaps, now, CHANGE_WINDOWS[1][1], CHANGE_WINDOWS[1][2])
+    )
+    usd_row = next((row for row in view.rows if row.key == "usd"), None)
+    usd_price = usd_row.unit_price if usd_row is not None else None
     rows = []
     for row in view.rows:
         places = ASSET_META[row.key]["qty_places"]
         share = (row.value_toman / total * Decimal("100")).quantize(Decimal("0.1"))
-        trend_vals = week_trends.get(row.key, [float(row.value_toman)])
-        trend_change = week_trend_change_label(trend_vals)
-        max_gain_label, sort_max_gain, max_gain_positive = max_gain_labels(trend_vals)
+        week_chip, sort_week = asset_week_change(row, week_prices)
+        if row.key == "usd":
+            quantity_label = format_usd(row.quantity, fixed=True)
+        else:
+            quantity_label = format_qty(row.quantity, places if row.key not in ("car", "cash") else 0)
+        usd_equiv_label = None
+        if row.key in USD_EQUIV_KEYS and usd_price and row.value_toman > 0:
+            usd_equiv_label = format_usd(row.value_toman / usd_price, fixed=True)
         rows.append(
             {
                 "key": row.key,
                 "name_fa": row.name_fa,
-                "sparkline_path": sparkline_path(trend_vals),
-                "sparkline_color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
-                "trend_change_label": trend_change,
-                "max_gain_label": max_gain_label,
-                "max_gain_positive": max_gain_positive,
-                "quantity_label": format_qty(
-                    row.quantity,
-                    places if row.key not in ("car", "cash") else 0,
-                ),
-                "unit_fa": row.unit_fa,
+                "color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
+                "week_chip": week_chip,
+                "quantity_label": quantity_label,
+                "unit_fa": "دلار" if row.key == "usd" else row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
                 "value_label": format_toman(row.value_toman),
+                "usd_equiv_label": usd_equiv_label,
                 "share_label": format_share_label(share),
+                "share_width": str(min(max(share, Decimal("0")), Decimal("100"))),
                 "manual": row.manual,
                 "sanjeh": row.sanjeh,
                 "sort_qty": str(row.quantity),
                 "sort_unit_price": str(row.unit_price) if row.unit_price is not None else "",
                 "sort_value": str(row.value_toman),
+                "value_num": float(row.value_toman),
                 "sort_share": str(share),
-                "sort_max_gain": sort_max_gain,
+                "sort_max_gain": sort_week,
             }
         )
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
-    chart_data = build_chart_data(db, user.id, view)
+    chart_data = build_chart_data(db, user.id, view, now)
     chart_json = json.dumps(chart_data, ensure_ascii=False)
     chart_asset_options = [{"key": "total", "name_fa": "جمع کل"}] + [
         {"key": row.key, "name_fa": row.name_fa} for row in view.rows
     ]
     default_chart_asset_key = "total"
     pie_data = build_pie_data(view)
+    for slice_ in pie_data["slices"]:
+        slice_["color"] = ASSET_SPARKLINE_COLORS.get(slice_["key"], "#9aa3b2")
     pie_json = json.dumps(pie_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)
     refresh_wait_sec = market_price_refresh_wait_seconds(db)
@@ -349,19 +495,12 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     if refresh_wait_sec > 0:
         minutes = max(1, (refresh_wait_sec + 59) // 60)
         refresh_wait_label = f"حدود {persian_digits(str(minutes))} دقیقه دیگر"
-    total_max_gain_label, total_max_gain_sort, total_max_gain_positive = max_gain_labels(
-        build_week_total_values(db, user.id, view)
-    )
-    _debt_list, debt_total, next_debt_label = debt_rows(
-        db.query(Debt).filter(Debt.user_id == user.id).all()
-    )
     monthly = monthly_view(db, user)
-    usd_row = next((row for row in view.rows if row.key == "usd"), None)
-    usd_price = usd_row.unit_price if usd_row is not None else None
     if usd_price is not None and usd_price > 0:
         usd_portfolio_label = _format_usd(view.total_toman / usd_price)
     else:
         usd_portfolio_label = "—"
+    today_j = tehran_today()  # same "today" as the debts and spending pages
     tab = request.query_params.get("tab", "portfolio")
     if tab not in ("portfolio", "daily"):
         tab = "portfolio"
@@ -372,22 +511,27 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         view=view,
         rows=rows,
         total_label=format_toman(view.total_toman),
+        total_big=big_toman(view.total_toman),
         debt_total_label=format_toman(debt_total),
+        debt_big=big_toman(debt_total),
         next_debt_label=next_debt_label,
+        next_instalment=next_instalment(debts, today_j),
+        month_spend=month_spend_tile(db, user, today_j) if tab != "daily" else None,
         net_label=format_toman(view.total_toman - debt_total),
         usd_portfolio_label=usd_portfolio_label,
+        changes=changes,
         income_month_label=monthly["income_month_label"],
         installment_month_label=monthly["installment_month_label"],
         expense_month_label=monthly["expense_month_label"],
         monthly_left_label=monthly["monthly_left_label"],
-        total_max_gain_label=total_max_gain_label,
-        total_max_gain_positive=total_max_gain_positive,
+        total_week_chip=changes["7d"],
         fetched_label=format_when(view.prices_fetched_at),
         missing_fa=missing_fa,
         chart_json=chart_json,
         chart_asset_options=chart_asset_options,
         default_chart_asset_key=default_chart_asset_key,
         pie_json=pie_json,
+        pie_slices=pie_data["slices"],
         pie_has_data=bool(pie_data["slices"]),
         flash=flash_message,
         flash_error=flash_error,

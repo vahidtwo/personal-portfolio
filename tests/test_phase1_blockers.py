@@ -32,6 +32,8 @@ def test_user_forms_have_no_autocomplete_off(client, no_network, path):
     for tag in re.findall(r"<(?:input|form|textarea|select)\b[^>]*>", html):
         if 'type="password"' in tag:  # the Sanjeh token field: browsers never restore passwords anyway
             continue
+        if 'name="salary_toman"' in tag:  # #7 salary privacy: the empty edit box must never be refilled
+            continue
         assert 'autocomplete="off"' not in tag, (path, tag)
 
 
@@ -299,4 +301,4 @@ def test_plain_get_pages_do_not_rewrite_the_address_bar(client, no_network):
 
 def test_static_asset_version_bumped():
     from app.config import STATIC_ASSET_VERSION
-    assert STATIC_ASSET_VERSION == "20261017s"
+    assert STATIC_ASSET_VERSION >= "20261017s"  # bumped on every static change

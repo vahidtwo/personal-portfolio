@@ -1,10 +1,23 @@
 const VERSION = "inventory-v__STATIC_ASSET_VERSION__";
 const STATIC_CACHE = VERSION + "-static";
-const PAGE_CACHE = VERSION + "-pages";
+const PAGE_CACHE = VERSION + "-pages-v2"; // v2: offline copy needs the signed-in marker (batch 1)
 // The offline copy of the dashboard is private data: it must not outlive the session cookie.
 // Each stored copy carries the time it was stored (CACHED_AT_HEADER); older than this = deleted, not served.
 const SESSION_MAX_AGE_MS = Number("__SESSION_MAX_AGE_MS__") || 30 * 24 * 60 * 60 * 1000;
 const CACHED_AT_HEADER = "x-inventory-cached-at";
+// Readable marker the server keeps next to the HttpOnly session cookie (app/session_marker.py): same
+// lifetime, removed on logout/expiry. No marker (or no way to read it) = no valid session = no offline copy.
+const SESSION_MARKER_COOKIE = "inventory_signed_in";
+
+async function hasSessionMarker() {
+  try {
+    if (!self.cookieStore || typeof self.cookieStore.get !== "function") return false;
+    const c = await self.cookieStore.get(SESSION_MARKER_COOKIE);
+    return Boolean(c && c.value === "1");
+  } catch (e) {
+    return false;
+  }
+}
 
 const PRECACHE = [
   "/offline.html",
@@ -170,6 +183,13 @@ async function networkFirstDashboard(request) {
   try {
     response = await fetch(request);
   } catch (err) {
+    if (!(await hasSessionMarker())) {
+      // Offline and no valid session: the private copy is deleted, never shown.
+      await clearPrivatePages();
+      const offline = await caches.match("/offline.html");
+      if (offline) return offline;
+      throw err;
+    }
     const now = Date.now();
     const page =
       (await freshCachedPage(cache, request, now)) ||
@@ -187,7 +207,7 @@ async function networkFirstDashboard(request) {
     return response;
   }
   const type = response.headers.get("content-type") || "";
-  if (response.ok && type.includes("text/html")) {
+  if (response.ok && type.includes("text/html") && (await hasSessionMarker())) {
     await cache.put(request, await withCachedAt(response, Date.now()));
   }
   return response;

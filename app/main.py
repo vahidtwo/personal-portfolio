@@ -11,6 +11,9 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.session_marker import SessionMarkerMiddleware
+from app.static_gzip import StaticGZipMiddleware
+
 from app.admin_users import router as admin_users_router
 from app.assets_page import router as assets_router
 from app.auth_routes import router as auth_router
@@ -68,6 +71,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="My Inventory", lifespan=lifespan)
+# Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
+app.add_middleware(SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY)
 app.add_middleware(
     SessionMiddleware,
     secret_key=_secret_key(),
@@ -76,6 +81,7 @@ app.add_middleware(
     https_only=HTTPS_ONLY,
     max_age=SESSION_MAX_AGE_SECONDS,
 )
+app.add_middleware(StaticGZipMiddleware, minimum_size=1000)  # /static/*.css|*.js only
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 

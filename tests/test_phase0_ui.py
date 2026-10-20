@@ -79,7 +79,8 @@ def test_daily_form_on_top_with_today_in_persian_digits(client, no_network):
     _register(client)
     html = client.get("/dashboard?tab=daily").text
     assert html.index('id="daily-spend-form"') < html.index('id="daily-report-heading"')
-    today = jdatetime.date.today()
+    from app.formatting import tehran_today
+    today = tehran_today()
     assert f'name="year" value="{persian_digits(str(today.year))}"' in html
     assert f'name="day" value="{persian_digits(str(today.day))}"' in html
 
@@ -90,7 +91,8 @@ def test_spend_form_accepts_persian_and_latin_digits(client, no_network):
     _register(client)
     page = client.get("/dashboard?tab=daily").text
     cat = re.search(r'name="category_id" id="spend-child" required>\s*<option value="(\d+)"', page).group(1)
-    today = jdatetime.date.today()
+    from app.formatting import tehran_today
+    today = tehran_today()
     fa = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
     for amount, y in (("۱۵۰۰۰۰", str(today.year).translate(fa)), ("150000", str(today.year))):
         client.post("/profile/spends", data={"csrf": _csrf(client, "/dashboard?tab=daily"), "amount_toman": amount,
@@ -247,7 +249,7 @@ def test_debt_year_placeholder_is_current_jalali_year(client, no_network):
     from app.formatting import persian_digits
     _register(client)
     html = client.get("/profile?tab=debts").text
-    assert f'name="due_year" value="" inputmode="numeric" placeholder="{persian_digits(str(jdatetime.date.today().year))}"' in html
+    assert f'name="due_year" value="" inputmode="numeric" placeholder="{persian_digits(str(__import__('app.formatting', fromlist=['x']).tehran_today().year))}"' in html
 
 
 def test_mcp_box_in_collapsed_advanced_section_and_actions_work(client, no_network):

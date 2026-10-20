@@ -25,7 +25,7 @@ templates.env.filters["num"] = format_number  # THE display number formatter
 # Signup rules shown as hints come from the real validator constants.
 from app.security import PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH  # noqa: E402
 
-import jdatetime  # noqa: E402
+from app.formatting import tehran_today  # noqa: E402
 
 
 
@@ -37,7 +37,7 @@ def android_apk_info() -> dict | None:
 
 
 templates.env.globals["android_apk_info"] = android_apk_info
-templates.env.globals["current_jalali_year"] = lambda: jdatetime.date.today().year
+templates.env.globals["current_jalali_year"] = lambda: tehran_today().year
 templates.env.globals["auth_rules"] = {
     "username_min": USERNAME_MIN_LENGTH,
     "username_max": USERNAME_MAX_LENGTH,

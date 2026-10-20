@@ -1,174 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{% if tab == "debts" %}بدهی‌ها و هزینهٔ ماهانه{% else %}تنظیمات{% endif %} · موجودی من{% endblock %}
+{% block title %}{% if tab == "debts" %}بدهی‌ها، موجودی من{% else %}تنظیمات، موجودی من{% endif %}{% endblock %}
 {% block content %}
-<section class="card auth-card wide">
+<section class="card auth-card wide{% if tab == 'debts' %} dv-wrap{% endif %}">
   {% if tab == 'debts' %}
   <h1>بدهی‌ها و هزینهٔ ماهانه</h1>
-  <div class="tabs" role="tablist">
-    <a class="tab" href="/assets" role="tab"><img class="section-logo" src="/static/logos/section-assets.svg" alt="" width="18" height="18">دارایی‌ها</a>
-    <a class="tab is-active" href="/profile?tab=debts" role="tab"><img class="section-logo" src="/static/logos/section-debts.svg" alt="" width="18" height="18">بدهی‌ها</a>
-  </div>
+  {% include "partials/debts_v2.html" %}
   {% else %}
   <h1>تنظیمات</h1>
-  {% endif %}
   {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
   {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
-  {% if tab == 'debts' %}
-  <p class="card-desc">برای هر وام یا قسط: مبلغ ماهانه، تعداد ماه‌های مانده و تاریخ قسط بعدی (جلالی). روزِ همین تاریخ، روز قسط در هر ماه است. جمع بدهی = مبلغ ماهانه × ماه مانده.</p>
-  <p class="debt-total">جمع بدهی: <span class="num">{{ debt_total_label }}</span> تومان · قسط بعدی: {{ next_debt_label }}</p>
-  {% if debts %}
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th scope="col">عنوان</th>
-          <th scope="col">مبلغ ماهانه</th>
-          <th scope="col">ماه مانده</th>
-          <th scope="col">جمع</th>
-          <th scope="col">قسط بعدی</th>
-          <th scope="col">ویرایش</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for debt in debts %}
-        <tr>
-          <td>{{ debt.title or "بدهی" }}</td>
-          <td class="num">{{ debt.monthly_label }}</td>
-          <td class="num">{{ debt.months_label }}</td>
-          <td class="num">{{ debt.total_label }}</td>
-          <td>{{ debt.next_label }}</td>
-          <td class="row-actions">
-            <a class="btn btn-ghost btn-sm" href="/profile?tab=debts&edit={{ debt.id }}">ویرایش</a>
-            <form method="post" action="/profile/debts/{{ debt.id }}/delete" class="inline-form" onsubmit="return confirm('این بدهی حذف شود؟');">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <p class="empty-state-title">هنوز بدهی یا قسطی ثبت نکرده‌اید</p>
-    <p class="empty-state-hint">اگر وام یا قسط دارید، با فرم زیر اضافه کنید تا جمع بدهی و قسط بعدی در داشبورد نمایش داده شود.</p>
-    <a class="btn btn-ghost btn-sm" href="#debt-form">رفتن به فرم بدهی</a>
-  </div>
-  {% endif %}
-  <form method="post" action="{% if editing_id %}/profile/debts/{{ editing_id }}{% else %}/profile/debts{% endif %}" class="grid-form" id="debt-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="span-2">
-      <span class="label-text">عنوان</span>
-      <input name="title" value="{{ debt_form.title }}" maxlength="64" placeholder="مثلاً وام مسکن">
-    </label>
-    <label>
-      <span class="label-text">مبلغ ماهانه (تومان)</span>
-      <input name="monthly_toman" value="{{ debt_form.monthly_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest>
-    </label>
-    <label>
-      <span class="label-text">ماه مانده</span>
-      <input name="months_left" value="{{ debt_form.months_left | fa }}" inputmode="numeric" dir="ltr">
-    </label>
-    <div class="span-2">
-      <span class="label-text">تاریخ جلالی قسط</span>
-      <div class="jalali-row">
-        <label>
-          <span class="label-text">سال</span>
-          <input name="due_year" value="{{ debt_form.due_year | fa }}" inputmode="numeric" placeholder="{{ current_jalali_year() | string | fa }}" dir="ltr">
-        </label>
-        <label>
-          <span class="label-text">ماه</span>
-          <input name="due_month" value="{{ debt_form.due_month | fa }}" inputmode="numeric" placeholder="۷" dir="ltr">
-        </label>
-        <label>
-          <span class="label-text">روز</span>
-          <input name="due_day" value="{{ debt_form.due_day | fa }}" inputmode="numeric" placeholder="۱۵" dir="ltr">
-        </label>
-      </div>
-    </div>
-    <div class="form-actions span-2">
-      <a class="btn btn-ghost" href="{% if editing_id %}/profile?tab=debts{% else %}/dashboard{% endif %}">انصراف</a>
-      <button type="submit" class="btn btn-primary">{% if editing_id %}ذخیره تغییرات{% else %}افزودن بدهی{% endif %}</button>
-    </div>
-  </form>
-
-  <section class="monthly-block" aria-labelledby="monthly-heading">
-    <h2 id="monthly-heading"><img class="section-logo" src="/static/logos/section-expense.svg" alt="" width="20" height="20">هزینهٔ ماهانه</h2>
-    <p class="card-desc">اجاره، قبوض و پرداخت‌های تکرارشونده. در ارزش پرتفوی و جمع بدهی حساب نمی‌شود، اما در گزارش ماهانه از مانده کم می‌شود. جمع پرداخت ماهانه = اقساط این ماه + هزینهٔ ماهانه.</p>
-    <dl class="net-line">
-      <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr">{{ installment_month_label }}</bdi> تومان</dd></div>
-      <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr">{{ expense_month_label }}</bdi> تومان</dd></div>
-      <div><dt>جمع پرداخت ماهانه</dt><dd class="num"><bdi dir="ltr">{{ monthly_pay_label }}</bdi> تومان</dd></div>
-    </dl>
-    {% if expenses %}
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th scope="col">عنوان</th>
-            <th scope="col">مبلغ</th>
-            <th scope="col">روز ماه</th>
-            <th scope="col">نوبت بعدی</th>
-            <th scope="col">ویرایش</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for expense in expenses %}
-          <tr>
-            <td>{{ expense.title or "خرج" }}</td>
-            <td class="num">{{ expense.amount_label }}</td>
-            <td class="num">{{ expense.day_label }}</td>
-            <td>{{ expense.next_label }}</td>
-            <td class="row-actions">
-              <a class="btn btn-ghost btn-sm" href="/profile?tab=debts&spend={{ expense.id }}">ویرایش</a>
-              <form method="post" action="/profile/expenses/{{ expense.id }}/delete" class="inline-form" onsubmit="return confirm('این خرج حذف شود؟');">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty-state">
-      <p class="empty-state-title">هنوز هزینهٔ ماهانه‌ای ثبت نکرده‌اید</p>
-      <p class="empty-state-hint">اجاره، قبض یا هر پرداخت تکراری را اضافه کنید تا مانده ماهانه درست حساب شود.</p>
-      <a class="btn btn-ghost btn-sm" href="#expense-form">رفتن به فرم هزینهٔ ماهانه</a>
-    </div>
-    {% endif %}
-    <form method="post" action="{% if editing_expense_id %}/profile/expenses/{{ editing_expense_id }}{% else %}/profile/expenses{% endif %}" class="grid-form" id="expense-form">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label class="span-2">
-        <span class="label-text">عنوان</span>
-        <input name="title" value="{{ expense_form.title }}" maxlength="64" placeholder="مثلاً اجاره خانه">
-      </label>
-      <label>
-        <span class="label-text">مبلغ ماهانه (تومان)</span>
-        <input name="amount_toman" value="{{ expense_form.amount_toman }}" inputmode="decimal" dir="ltr" data-thousands data-amount-suggest>
-      </label>
-      <label>
-        <span class="label-text">روز ماه</span>
-        <input name="due_day" value="{{ expense_form.due_day | fa }}" inputmode="numeric" dir="ltr" placeholder="&#x2067;۱ تا ۳۱&#x2069;">
-      </label>
-      <div class="form-actions span-2">
-        <a class="btn btn-ghost" href="/profile?tab=debts">انصراف</a>
-        <button type="submit" class="btn btn-primary">{% if editing_expense_id %}ذخیرهٔ هزینه{% else %}افزودن هزینهٔ ماهانه{% endif %}</button>
-      </div>
-    </form>
-
-    <h2 id="report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-salary-reveal aria-pressed="true" aria-label="نمایش مبلغ"><svg class="privacy-icon privacy-icon-hide" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9.5 4.5 10.5 7-.4 1-1.2 2.3-2.3 3.5M6.1 6.1C4.2 7.5 2.8 9.4 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="privacy-icon privacy-icon-show" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg><span class="privacy-label privacy-label-show">نمایش</span><span class="privacy-label privacy-label-hide">پنهان کردن</span></button></h2>
-    <p class="card-desc">مانده = حقوق − اقساط این ماه − هزینهٔ ماهانه. این گزارش ارزش پرتفوی را عوض نمی‌کند.</p>
-    <dl class="net-line">
-      <div><dt>حقوق</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="salary">••••••</bdi> تومان</dd></div>
-      <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr">{{ installment_month_label }}</bdi> تومان</dd></div>
-      <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr">{{ expense_month_label }}</bdi> تومان</dd></div>
-      <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
-    </dl>
-  </section>
-  {% else %}
   <h2 id="account-settings">حساب و رمز عبور</h2>
   <form method="post" action="/profile/account" class="grid-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -281,6 +121,7 @@
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
+{% if tab == "debts" %}<script src="/static/debts-page.js?v={{ static_v }}" defer></script>{% endif %}
 <script>
   const copyConfig = document.getElementById("mcp-copy-config");
   const configBox = document.getElementById("mcp-cursor-config");

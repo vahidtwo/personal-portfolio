@@ -160,5 +160,6 @@ async def profile_delete_expense(
         return RedirectResponse("/profile?tab=debts", status_code=303)
     db.delete(item)
     db.commit()
-    flash(request, "هزینهٔ ماهانه حذف شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
+    from app.debts import saved_response
+
+    return saved_response(request, "هزینهٔ ماهانه حذف شد")

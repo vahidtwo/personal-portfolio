@@ -386,13 +386,15 @@ async def profile_debt_unpaid(
     debt = _owned_debt(db, user, debt_id)
     undo = request.session.get("debt_undo") or {}
     if debt is None or undo.get("id") != debt_id or _state(debt) != list(undo.get("after") or []):
-        flash(request, "چیزی برای برگرداندن نیست.", error=True)
+        message = "چیزی برای برگرداندن نیست."
+        if wants_json(request):
+            return JSONResponse({"ok": False, "error": message, "fields": {}}, status_code=409)
+        flash(request, message, error=True)
         return RedirectResponse(DEBTS_URL, status_code=303)
     debt.months_left, debt.due_year, debt.due_month, debt.due_day = undo["before"]
     db.commit()
     request.session.pop("debt_undo", None)
-    flash(request, f"پرداخت «{undo.get('title') or 'قسط'}» برگردانده شد.")
-    return RedirectResponse(DEBTS_URL, status_code=303)
+    return saved_response(request, f"پرداخت «{undo.get('title') or 'قسط'}» برگردانده شد.")
 
 
 @router.post("/profile/debts/{debt_id}/delete")
@@ -414,5 +416,4 @@ async def profile_delete_debt(
     undo = request.session.get("debt_undo") or {}
     if undo.get("id") == debt_id:
         request.session.pop("debt_undo", None)
-    flash(request, "قسط حذف شد")
-    return RedirectResponse(DEBTS_URL, status_code=303)
+    return saved_response(request, "قسط حذف شد")

@@ -67,8 +67,10 @@ def test_dashboard_hides_zero_rows_and_shows_them_after_value(client, no_network
 def test_debts_expenses_spends_empty_states(client, no_network):
     _register(client)
     html = client.get("/profile?tab=debts").text
-    assert "هنوز بدهی یا قسطی ثبت نکرده‌اید" in html and 'href="#debt-form"' in html
-    assert "هنوز هزینهٔ ماهانه‌ای ثبت نکرده‌اید" in html and 'href="#expense-form"' in html
+    # Debts v2: each list has its own empty state with a primary button that opens the sheet.
+    assert "از کجا شروع کنم؟" in html
+    assert "وام یا قسطی ثبت نشده است" in html and 'data-dv-add="debt"><svg' in html and "افزودن وام یا قسط</span>" in html
+    assert "هزینهٔ ماهانه‌ای ثبت نشده است" in html and 'data-dv-add="expense"><svg' in html and "افزودن هزینهٔ ماهانه</span>" in html
     daily = client.get("/dashboard?tab=daily").text
     assert "اولین خرجتان را ثبت کنید" in daily  # spending v2 first-time empty state
 
@@ -197,10 +199,12 @@ def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):
     import re
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
-    for path in ("/dashboard", "/profile?tab=debts"):
-        html = client.get(path).text
-        assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html), path
-        assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr">[^<]+</bdi> تومان</dd>', html), path
+    html = client.get("/dashboard").text
+    assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html)
+    assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr">[^<]+</bdi> تومان</dd>', html)
+    # Debts v2: «مانده از حقوق» is a tile; the number is an LTR bdi with «تومان» after it, never an LTR block.
+    debts = client.get("/profile?tab=debts").text
+    assert re.search(r'<b class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi></b>\s*<small>تومان', debts)
 
 
 def test_glossary_terms(client, no_network):

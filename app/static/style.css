@@ -2713,4 +2713,4 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .v2-menu button:hover,.v2-menu button:focus-visible{background:color-mix(in srgb,var(--text) 8%,transparent)}
 .v2-menu button.danger{color:var(--danger-text)}
 .arow{position:relative}
-.v2-qty input,.v2-qty input:focus{border:0;box-shadow:none;outline:none;height:auto;padding:0;background:transparent;min-height:0}
+.v2-qty input,.v2-qty input:focus{border:0;box-shadow:none;outline:none;height:100%;align-self:stretch;padding:0;background:transparent;min-height:0}

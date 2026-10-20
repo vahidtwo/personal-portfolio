@@ -2338,3 +2338,11 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .dash-chart.is-empty .range,
 .dash-chart.is-empty .fs-btn,
 .dash-chart.is-empty .chart-stage { display: none; }
+
+/* Phase 2: keep amount + «تومان» on one line (360px) */
+.dash-hero .total { white-space: nowrap; }
+.net-line dd.num, .stat dd, .tile .v, .badge-acc { white-space: nowrap; }
+@media (max-width: 380px) {
+  .dash-hero .total-num { font-size: clamp(26px, 8vw, 40px); }
+  .net-line dd.num { font-size: 14px; }
+}

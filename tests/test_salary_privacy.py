@@ -39,6 +39,7 @@ def _setup(client):
 
 def test_no_salary_page_html_contains_the_amount(client, no_network):
     _setup(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     for path in PAGES:
         html = client.get(path).text
         for needle in (SALARY_RAW, SALARY_FA, LEFT_FA, "73,519,846", "71019846", "۷۳۵۱۹۸۴۶"):

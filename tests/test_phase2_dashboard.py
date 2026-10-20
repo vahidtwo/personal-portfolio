@@ -231,7 +231,7 @@ def test_layout_css_contract():
     css = (ROOT / "app/static/style.css").read_text(encoding="utf-8")
     block = css[css.index("Dashboard (Phase 2"):]
     assert "@media (min-width: 900px)" in block and "@media (max-width: 899px)" in block
-    assert '"hero" "assets" "chart" "tiles" "report"' in block  # phones: tiles below the chart
+    assert '"hero" "tiles" "assets" "chart" "report"' in block  # home v2 phones: actionable tiles right after the hero
     assert '"hero tiles"' in block  # desktop: tiles beside the hero
     assert "#chart-asset-select:focus-visible" in block and ".range button:focus-visible" in block
     assert "#chart-fullscreen { display: none; }" not in css  # full screen reachable on phones
@@ -358,6 +358,7 @@ def test_four_assets_with_different_moves_show_four_different_7d_chips(client, n
 def test_hero_heading_title_and_muted_subline(client):
     """Arabi (batch 1): «خالص دارایی» is the title at every width; «دارایی منهای بدهی» is a muted line under it."""
     _register(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     html = client.get("/dashboard").text
     assert '<h1 id="total-heading" aria-describedby="total-sub">خالص دارایی</h1>' in html
     assert '<p class="h-sub" id="total-sub">دارایی منهای بدهی</p>' in html

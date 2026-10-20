@@ -686,13 +686,64 @@
     return true;
   }
 
+  // Home v2: skeleton if the chart isn't drawn within 1s; a retry message if Chart.js never loads.
+  let chartSkelTimer = null;
+  function chartHolder() {
+    const canvas = document.getElementById("timeline-chart");
+    return canvas ? canvas.parentElement : null;
+  }
+  function clearChartPlaceholders() {
+    if (chartSkelTimer) { window.clearTimeout(chartSkelTimer); chartSkelTimer = null; }
+    document.querySelectorAll("#chart-panel .v2-chart-skel, #chart-panel .v2-chart-msg").forEach((n) => n.remove());
+    const holder = chartHolder();
+    if (holder) holder.classList.remove("v2-hide");
+  }
+  function showChartSkeleton() {
+    const holder = chartHolder();
+    if (!holder || document.querySelector("#chart-panel .v2-chart-skel")) return;
+    holder.classList.add("v2-hide");
+    const sk = document.createElement("div");
+    sk.className = "v2-skel v2-chart-skel";
+    sk.setAttribute("aria-hidden", "true");
+    holder.after(sk);
+  }
+  function showChartFailed() {
+    const holder = chartHolder();
+    if (!holder) return;
+    clearChartPlaceholders();
+    holder.classList.add("v2-hide");
+    const foot = document.getElementById("chart-foot");
+    if (foot) foot.hidden = true;
+    const msg = document.createElement("div");
+    msg.className = "v2-chart-msg";
+    msg.setAttribute("role", "status");
+    msg.innerHTML = '<span>نمودار باز نشد. اینترنت را بررسی کنید و دوباره امتحان کنید.</span><button class="btn btn-ghost" type="button">تلاش دوباره</button>';
+    msg.querySelector("button").addEventListener("click", () => {
+      msg.remove();
+      showChartSkeleton();
+      const s = document.createElement("script");
+      s.src = "/static/vendor/chart.umd.min.js?retry=" + Date.now();
+      s.onload = () => boot(25);
+      s.onerror = () => showChartFailed();
+      document.head.appendChild(s);
+    });
+    holder.after(msg);
+  }
+
   function boot(retries) {
     useAppFont();
+    if (chartSkelTimer === null && chartHolder() && document.getElementById("chart-data")) {
+      chartSkelTimer = window.setTimeout(showChartSkeleton, 1000);
+    }
     const timelineOk = init();
     initPieChart();
-    if (timelineOk) return;
+    if (timelineOk) { clearChartPlaceholders(); return; }
     if (retries > 0) {
       window.setTimeout(() => boot(retries - 1), 80);
+    } else if (typeof Chart === "undefined") {
+      showChartFailed();
+    } else {
+      clearChartPlaceholders();
     }
   }
 

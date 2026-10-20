@@ -205,6 +205,7 @@
   </form>
   {% endif %}
 </section>
+{% if tab != "debts" %}{# push, Android app, MCP, APK download + logout: settings tab only, never under «بدهی‌ها» #}
 {% if push_enabled %}
 <section class="card auth-card wide" id="push-settings">
   <h2>اعلان‌ها</h2>
@@ -275,6 +276,7 @@
     <button type="submit" class="settings-row settings-row-danger">{{ nav_icon('logout') }}<span class="settings-row-label">خروج از حساب</span></button>
   </form>
 </section>
+{% endif %}{# settings-only sections #}
 {% endblock %}
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>

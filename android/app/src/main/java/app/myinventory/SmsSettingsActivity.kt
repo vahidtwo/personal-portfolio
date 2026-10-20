@@ -177,7 +177,7 @@ class SmsSettingsActivity : Activity() {
 
     private fun upgradeCard(): View = section(accent).apply {
         contentDescription = null
-        addView(tv("از این نسخه فقط پیامک‌هایی ثبت می‌شوند که یکی از کلمه‌های شما را دارند. کلمهٔ «برداشت» را برایتان اضافه کردیم؛ در تنظیمات می‌توانید عوضش کنید.", 14f, cText))
+        addView(tv("از این نسخه فقط پیامک‌هایی ثبت می‌شوند که یکی از کلمه‌های شما و یک مبلغ را دارند. «برداشت» را برایتان اضافه کردیم؛ همین پایین می‌توانید عوضش کنید.", 14f, cText))
         addView(button("باشه") { SmsPrefs.dismissUpgradeNote(this@SmsSettingsActivity); render() })
     }
 

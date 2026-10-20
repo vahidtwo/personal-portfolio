@@ -57,7 +57,10 @@
     var amt = form.elements.amount_toman;
     // amount words/suggestions were inserted inside the unit wrapper; move them under it.
     var wrap = amt.closest(".sp-amt");
-    $$(".amount-words, .amount-suggest", wrap).reverse().forEach(function (el) { wrap.insertAdjacentElement("afterend", el); });
+    // Order under the field: error, words, suggestions. The error and the words line swap places
+    // (one shows when the other hides), so blur validation doesn't shift the chips below mid-click.
+    var amtErr = $("#err-amount_toman");
+    $$(".amount-words, .amount-suggest", wrap).reverse().forEach(function (el) { amtErr.insertAdjacentElement("afterend", el); });
 
     /* ---------- chips ---------- */
     var pChips = $("[data-sp-pchips]"), cChips = $("[data-sp-cchips]");

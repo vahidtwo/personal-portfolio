@@ -2686,7 +2686,9 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .sp-invalid input,.sp-invalid select{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
 .sp-summary a{color:var(--danger-text);font-weight:600;min-height:24px;display:inline-block}
 .sp-summary:focus{outline:2px solid var(--danger-text);outline-offset:2px}
-.sp-form .amount-words{color:var(--accent-text)}
+.sp-form .amount-words{color:var(--accent-text);min-height:20px;line-height:20px;margin:6px 0 0}
+.sp-form #err-amount_toman{min-height:20px;line-height:20px}
+.sp-form #err-amount_toman:not(:empty)+.amount-words{display:none}
 .sp-form .amount-suggest-btn{min-height:44px}
 /* JS on: chips replace the selects; date fields only for «تاریخ دیگر» */
 [data-sp-js] .sp-sel{display:none}

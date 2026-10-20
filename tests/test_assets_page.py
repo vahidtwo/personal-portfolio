@@ -49,7 +49,7 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
     from app.profile import profile_save
     _register(client)
     form = _assets_form(client.get("/assets").text)
-    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "db", "csrf", "clear_sanjeh", "next_url"}
+    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "background_tasks", "db", "csrf", "clear_sanjeh", "next_url"}
     assert handler_fields == set(QTY_FIELDS) | {"sanjeh_token"}
     for name in handler_fields:
         assert form.count(f'name="{name}"') == 1, name

@@ -7,7 +7,7 @@ import logging
 import secrets
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -277,6 +277,7 @@ async def profile_account(
 @router.post("/profile")
 async def profile_save(
     request: Request,
+    background_tasks: BackgroundTasks,
     gold_grams: str = Form("0"),
     coin_emami: str = Form("0"),
     coin_bahar: str = Form("0"),
@@ -358,7 +359,9 @@ async def profile_save(
             logger.exception("Sanjeh fetch failed on profile save")
             sanjeh_warning = "دارایی‌ها ذخیره شد، ولی قیمت خودرو از سنجه گرفته نشد. بعداً دوباره تلاش کنید."
     db.commit()
-    await refresh_prices_and_snapshot_user(user.id)
+    # Don't hold the redirect on chande.net (up to 20s): the next page renders with stored prices
+    # (home v2 shows the stale/waiting line) and the fetch + snapshot run after the response is sent.
+    background_tasks.add_task(refresh_prices_and_snapshot_user, user.id)
     # Only where we go next differs: the Assets page asks to come back to itself (exact internal path only).
     if next_url == "/assets":
         flash(request, sanjeh_warning or "ذخیره شد")

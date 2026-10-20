@@ -236,7 +236,7 @@ def test_layout_css_contract():
     assert ".dash-main, .dash-side { display: contents; }" in block  # phones: wrappers vanish, order unchanged
     assert "#chart-asset-select:focus-visible" in block and ".range button:focus-visible" in block
     assert "#chart-fullscreen { display: none; }" not in css  # full screen reachable on phones
-    assert ".dash-tiles { align-self: start; }" in block and "grid-auto-rows: 1fr" not in block  # tiles size to content
+    assert "grid-auto-rows: 1fr" not in block  # tiles size to content
 
 
 def test_cash_card_subtitle_says_cash_not_the_amount_again(client, no_network):

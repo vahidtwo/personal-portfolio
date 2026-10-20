@@ -2148,8 +2148,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
   .dash-main { grid-area: main; gap: 20px; }
   .dash-side { grid-area: side; }
   .dash-main > *, .dash-side > * { align-self: stretch; }  /* full column width (no shrink-to-content in the flex column) */
-  /* Tiles sit at the top and keep their own height (not stretched to the hero). */
-  .dash-tiles { align-self: start; }
+  /* Tiles keep their own height: they're in the side column now, never stretched to the hero. */
   .dash .dash-tiles { grid-template-columns: 1fr; grid-auto-rows: auto; align-content: start; gap: 12px; }
   .dash-pie { display: block; }
   .dash-assets {

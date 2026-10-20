@@ -299,4 +299,4 @@ def test_plain_get_pages_do_not_rewrite_the_address_bar(client, no_network):
 
 def test_static_asset_version_bumped():
     from app.config import STATIC_ASSET_VERSION
-    assert STATIC_ASSET_VERSION == "20261017q"
+    assert STATIC_ASSET_VERSION == "20261017s"

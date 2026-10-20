@@ -175,7 +175,7 @@ a:hover { color: var(--accent-hover); }
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.6); /* Arabi spec: dim the page at 60%; tap closes the menu */
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -196,7 +196,7 @@ a:hover { color: var(--accent-hover); }
   inset-inline-start: 0;
   width: min(320px, 88vw);
   padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
-  background: var(--surface);
+  background: var(--bg); /* opaque page colour per theme; --surface is translucent and let the page show through */
   border-inline-start: 1px solid var(--border-subtle);
   box-shadow: var(--card-shadow);
   overflow: auto;

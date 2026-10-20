@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}موجودی من — پرتفوی شخصی{% endblock %}
 {% block content %}
-{% from "partials/landing_img.html" import shot %}
 <div class="landing shell-wide">
   <section class="landing-hero page-split" aria-labelledby="landing-heading">
     <div class="landing-hero-copy">
@@ -55,16 +54,6 @@
     {% if apk_sha256 %}
     <p class="card-desc apk-hash" dir="ltr">SHA-256: {{ apk_sha256 }}</p>
     {% endif %}
-  </section>
-
-  <section class="landing-onboarding card" aria-labelledby="onboard-heading">
-    <div class="card-head">
-      <h2 id="onboard-heading">داخل اپ چه می‌بینید؟</h2>
-    </div>
-    <div class="intro-previews intro-previews-lg">
-      {{ shot("chart", "shot-wide", "نمونهٔ نمودار روند ارزش دارایی‌ها در یک سال، با اعداد ساختگی", "(min-width: 900px) 560px, 100vw") }}
-      {{ shot("spend-phone", "shot-phone", "نمونهٔ ثبت خرج روزانه در گوشی: مبلغ، دسته و یادداشت، با اعداد ساختگی", "(min-width: 900px) 300px, 80vw") }}
-    </div>
   </section>
 </div>
 {% endblock %}

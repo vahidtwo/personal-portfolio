@@ -35,13 +35,27 @@ class SmsSettingsActivity : Activity() {
     private var errorOnInput = false
     private var draft = ""
 
-    private val bg = Color.parseColor("#0f1118")
-    private val card = Color.parseColor("#181b25")
-    private val cText = Color.parseColor("#e8eaf0")
-    private val muted = Color.parseColor("#8b93a8")
-    private val accent = Color.parseColor("#2fd3a6")
-    private val danger = Color.parseColor("#ff8a7a")
-    private val amber = Color.parseColor("#f5b94a")
+    // Arabi's tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
+    private val light by lazy {
+        (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_NO
+    }
+    private fun c(dark: String, lightHex: String) = Color.parseColor(if (light) lightHex else dark)
+    private val bg by lazy { c("#0f1118", "#f8f9fc") }
+    private val card by lazy { c("#181b25", "#ffffff") }
+    private val cText by lazy { c("#e8eaf0", "#11141c") }
+    private val muted by lazy { c("#8b93a8", "#5e6678") }
+    private val accent by lazy { c("#2fd3a6", "#08785c") }
+    private val danger by lazy { c("#ff8a7a", "#b42318") }
+    private val amber by lazy { c("#f5b94a", "#8a5300") }
+    private val chipBg by lazy { c("#232838", "#eef0f5") }
+    private val line by lazy { c("#2a3042", "#d9dde7") }
+    private val font: android.graphics.Typeface? by lazy { runCatching { resources.getFont(R.font.vazirmatn) }.getOrNull() }
+    private fun face(bold: Boolean): android.graphics.Typeface? {
+        val f = font ?: return null
+        return if (android.os.Build.VERSION.SDK_INT >= 28) android.graphics.Typeface.create(f, if (bold) 700 else 400, false)
+        else android.graphics.Typeface.create(f, if (bold) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +74,7 @@ class SmsSettingsActivity : Activity() {
 
     private fun render() {
         root.removeAllViews()
+        root.addView(header())
         if (SmsPrefs.upgradeNotePending(this)) root.addView(upgradeCard())
         root.addView(tv("خرج‌ها", 20f, cText, bold = true).apply { contentDescription = "خرج‌ها"; accessibilityHeading() })
         val granted = SmsPrefs.permissionGranted(this)
@@ -88,6 +103,17 @@ class SmsSettingsActivity : Activity() {
         if (on) root.addView(keywordSection())
     }
 
+    private fun header(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(-1, dp(56))
+        addView(ImageButton(this@SmsSettingsActivity).apply {
+            setImageResource(R.drawable.ic_back_rtl); setColorFilter(cText); setBackgroundColor(Color.TRANSPARENT)
+            contentDescription = "بازگشت"; layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setOnClickListener { finish() }
+        })
+        addView(tv("تنظیمات پیامک", 18f, cText, bold = true).apply { accessibilityHeading(); setPadding(dp(8), 0, 0, 0) })
+    }
+
     private fun firstKeyword() = SmsPrefs.keywords(this).first()
 
     private fun onToggle(wantOn: Boolean) {
@@ -112,16 +138,22 @@ class SmsSettingsActivity : Activity() {
         v.addView(bullet("یک کد برای اینکه یک خرج دو بار ثبت نشود"))
         v.addView(bullet("شمارهٔ فرستندهٔ پیامک فرستاده نمی‌شود. اپ هم نمی‌تواند پیامک بفرستد."))
         v.addView(tv("بعد از این، اندروید هم اجازه را می‌پرسد. هر وقت بخواهید، از تنظیمات خاموش می‌شود.", 13f, muted))
-        val dlg = AlertDialog.Builder(this)
-            .setTitle("خرج‌ها را خودکار ثبت کنیم؟")
-            .setView(ScrollView(this).apply { addView(v) })
-            .setPositiveButton("اجازه می‌دهم") { _, _ ->
-                SmsPrefs.markAsked(this)
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECEIVE_SMS), REQ_SMS)
-            }
-            .setNegativeButton("فعلاً نه") { _, _ -> render() }
-            .setOnCancelListener { render() }
-            .create()
+        v.addView(tv("خرج‌ها را خودکار ثبت کنیم؟", 18f, cText, bold = true).apply { accessibilityHeading() }, 0)
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val btns = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(12), 0, dp(12)) }
+        btns.addView(button("اجازه می‌دهم") {
+            dlg.dismiss(); SmsPrefs.markAsked(this)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECEIVE_SMS), REQ_SMS)
+        }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
+        btns.addView(button("فعلاً نه", primary = false) { dlg.dismiss(); render() }
+            .apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(12) } })
+        v.addView(btns)
+        dlg.setContentView(ScrollView(this).apply { addView(v); background = round(card, dp(20)) })
+        dlg.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        dlg.window?.setLayout((resources.displayMetrics.widthPixels * 0.94).toInt(), -2)
+        dlg.window?.setGravity(Gravity.BOTTOM)
+        dlg.setOnCancelListener { render() }
         dlg.show()
     }
 
@@ -160,12 +192,18 @@ class SmsSettingsActivity : Activity() {
         val addRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val input = EditText(this).apply {
             hint = "کلمهٔ تازه، مثلاً پرداخت"; setText(draft); setSingleLine(); ellipsize = TextUtils.TruncateAt.END
-            contentDescription = "کلمهٔ تازه"; setTextColor(if (errorOnInput) danger else cText); setHintTextColor(muted)
+            contentDescription = "کلمهٔ تازه"
+            setTextColor(cText); setHintTextColor(muted); typeface = face(false)
+            background = round(card, dp(12), line).apply { if (errorOnInput) setStroke(dp(2), danger) }
+            setPadding(dp(12), 0, dp(12), 0)
+            if (errorOnInput) contentDescription = "کلمهٔ تازه، خطا: این کلمه را قبلاً اضافه کرده‌اید"
             imeOptions = EditorInfo.IME_ACTION_DONE
             layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
             tag = "sms-keyword-input"
         }
-        val add = button("افزودن") { addKeyword(input) }
+        val add = button("افزودن") { addKeyword(input) }.apply {
+            layoutParams = LinearLayout.LayoutParams(-2, dp(48)).apply { marginStart = dp(12) }
+        }
         input.setOnEditorActionListener { _, id, ev ->
             if (id == EditorInfo.IME_ACTION_DONE || ev?.keyCode == KeyEvent.KEYCODE_ENTER) { addKeyword(input); true } else false
         }
@@ -195,12 +233,14 @@ class SmsSettingsActivity : Activity() {
     private fun chip(word: String, last: Boolean): View {
         val c = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            background = round(Color.parseColor("#232838"), dp(22)); setPadding(dp(14), 0, dp(2), 0)
+            background = round(chipBg, dp(22)); setPadding(dp(14), 0, dp(2), 0)
         }
         c.addView(tv(word, 15f, cText).apply { maxWidth = dp(220); setSingleLine(); ellipsize = TextUtils.TruncateAt.END; setPadding(0, 0, 0, 0) })
         val x = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel); setBackgroundColor(Color.TRANSPARENT)
-            contentDescription = "حذف کلمهٔ $word"; layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            setColorFilter(cText)
+            contentDescription = if (last) "حذف کلمهٔ $word، غیرفعال: دست‌کم یک کلمه لازم است" else "حذف کلمهٔ $word"
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
             alpha = if (last) 0.4f else 1f
             setOnClickListener {
                 when (val r = SmsKeywords.remove(SmsPrefs.keywords(this@SmsSettingsActivity), word)) {
@@ -226,13 +266,26 @@ class SmsSettingsActivity : Activity() {
     }
     private fun tv(s: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
         text = s; textSize = size; setTextColor(color); setPadding(0, dp(6), 0, dp(6))
-        if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+        face(bold)?.let { typeface = it }
+        if (bold && font == null) setTypeface(typeface, android.graphics.Typeface.BOLD)
         textDirection = View.TEXT_DIRECTION_RTL
     }
     private fun TextView.accessibilityHeading() { if (android.os.Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true }
     private fun bullet(s: String) = tv("• $s", 14f, cText)
     private fun alert(s: String) = tv(s, 14f, danger).apply { accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE }
-    private fun button(s: String, on: () -> Unit) = Button(this).apply { text = s; minHeight = dp(44); setOnClickListener { on() } }
+    /** App-styled buttons: primary = teal gradient with #04120e text; ghost = outlined. */
+    private fun button(s: String, primary: Boolean = true, on: () -> Unit) = Button(this).apply {
+        text = s; isAllCaps = false; minHeight = dp(44); minimumHeight = dp(44); textSize = 15f
+        face(true)?.let { typeface = it }; stateListAnimator = null; setPadding(dp(18), 0, dp(18), 0)
+        if (primary) {
+            background = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(Color.parseColor("#2fd3a6"), Color.parseColor("#1fb38c"))).apply { cornerRadius = dp(12).toFloat() }
+            setTextColor(Color.parseColor("#04120e"))
+        } else {
+            background = round(Color.TRANSPARENT, dp(12), line); setTextColor(cText)
+        }
+        setOnClickListener { on() }
+    }
     private fun section(border: Int? = null) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(12))
         background = round(card, dp(16), border)

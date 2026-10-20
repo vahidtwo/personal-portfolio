@@ -2569,7 +2569,6 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 }
 .sms-offer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .sms-offer-actions .btn { min-height: 44px; }
-||||||| d4c70fd
 /* «از پیامک»: spends saved automatically from a bank SMS (category sms_bank + idempotency key in the note) */
 .tag-sms {
   display: inline-block; padding: 0 8px; line-height: 22px; border-radius: 999px; font-size: 11.5px; font-weight: 600;

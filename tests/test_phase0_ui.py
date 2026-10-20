@@ -162,9 +162,13 @@ def test_chart_default_falls_back_to_total_when_default_asset_hidden(client, no_
     assert selected() == ["btc"]  # a visible default is kept
 
 
-def test_landing_android_url_in_own_ltr_block(client):
+def test_landing_v2_has_no_jargon_or_raw_url(client):
+    """Landing v2 (spec §9.8): plain copy; the server address is prefilled in the app, not shown raw."""
     html = client.get("/").text
-    assert '<span class="url-block" dir="ltr">https://portfolio.vahidtwo.ir</span>' in html
+    main = html[html.index("<main"):html.index("</main>")]
+    for word in ("پرتفوی", "اسنپ‌شات", "bcrypt", "HTTPS", "پیامک بانکی", "https://portfolio.vahidtwo.ir", "داخل اپ چه می‌بینید"):
+        assert word not in main, word
+    assert main.count('class="btn btn-primary"') == 2 and "ورود یا ساخت حساب" in main
 
 
 def test_profile_mcp_url_uses_request_or_public_base_url(client, no_network, monkeypatch):
@@ -217,8 +221,9 @@ def test_privacy_btn_is_pill_not_fixed_circle():
 def test_privacy_note_mentions_backups_and_hashed_passwords(client):
     from app.security import hash_password
     assert hash_password("x" * 8).startswith("$2")  # bcrypt, as the note says
-    html = client.get("/").text
-    assert "نسخه‌های پشتیبان" in html and "هش‌شده" in html
+    html = client.get("/").text  # landing v2: same facts, plain words
+    assert "مدیر سایت به آن دسترسی دارد" in html and "یک‌طرفه" in html
+    assert "داده‌ها روی سرور رمزگذاری نمی‌شوند" in html
 
 
 def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_network):

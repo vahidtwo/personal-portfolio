@@ -34,11 +34,9 @@ def test_landing_shows_version_and_real_size_with_persian_comma(client):
     label = apk_size_label_fa(apk.stat().st_size)
     from app.pwa import load_android_release, to_fa_digits
     version = to_fa_digits(load_android_release()["versionCode"])
-    assert f"<strong>نسخهٔ {version}</strong>، {label}" in html
-    row = html[html.index('class="card-desc apk-version"'):]
-    row = row[: row.index("</p>")]
-    assert "·" not in row
-    assert "نسخهٔ ۳ یا قدیمی‌تر" in html
+    assert f'<p class="apk-meta dl">نسخهٔ {version}، {label}</p>' in html  # landing v2
+    row = html[html.index('class="apk-meta dl"'):]
+    assert "·" not in row[: row.index("</p>")]
 
 
 def test_size_label_rounds_to_whole_megabytes():

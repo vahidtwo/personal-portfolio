@@ -1,6 +1,6 @@
 {
- "git_sha": "WIP",
- "generated_at": "2026-10-20T10:17:31Z",
+ "git_sha": "landing-v2",
+ "generated_at": "2026-10-20T12:44:44Z",
  "frozen_clock": "2026-10-20T08:30:00Z",
  "dataset_sha256": "21e5f364d00e5045c65c8a913d599bb28c1ddec1ed4685c52194892bdf3c20b9",
  "net_worth_toman": 504900000,
@@ -11,7 +11,7 @@
    "theme": null,
    "width": 1680,
    "height": 1120,
-   "bytes": 52000,
+   "bytes": 50326,
    "quality": 78
   },
   {
@@ -20,7 +20,7 @@
    "theme": null,
    "width": 1120,
    "height": 747,
-   "bytes": 30748,
+   "bytes": 29684,
    "quality": 78
   },
   {
@@ -42,12 +42,21 @@
    "quality": 78
   },
   {
+   "file": "spend-phone-dark-780.webp",
+   "slot": "spend-phone",
+   "theme": "dark",
+   "width": 780,
+   "height": 1644,
+   "bytes": 24572,
+   "quality": 78
+  },
+  {
    "file": "hero-light-1680.webp",
    "slot": null,
    "theme": null,
    "width": 1680,
    "height": 1120,
-   "bytes": 54408,
+   "bytes": 53260,
    "quality": 78
   },
   {
@@ -56,7 +65,7 @@
    "theme": null,
    "width": 1120,
    "height": 747,
-   "bytes": 31852,
+   "bytes": 30618,
    "quality": 78
   },
   {
@@ -75,6 +84,15 @@
    "width": 360,
    "height": 779,
    "bytes": 17958,
+   "quality": 78
+  },
+  {
+   "file": "spend-phone-light-780.webp",
+   "slot": "spend-phone",
+   "theme": "light",
+   "width": 780,
+   "height": 1644,
+   "bytes": 25596,
    "quality": 78
   }
  ],

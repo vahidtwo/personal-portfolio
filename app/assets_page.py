@@ -43,7 +43,10 @@ def _plain(value: Decimal | None) -> str:
     return text
 
 
-def assets_context(user, db: Session, form: dict[str, str]) -> dict:
+def assets_context(user, db: Session, form: dict[str, str], saved: dict[str, str] | None = None,
+                   field_errors: dict[str, str] | None = None) -> dict:
+    saved = form if saved is None else saved
+    field_errors = field_errors or {}
     view = build_portfolio(user, load_prices(db))
     by_key = {row.key: row for row in view.rows}
     groups = []
@@ -67,7 +70,9 @@ def assets_context(user, db: Session, form: dict[str, str]) -> dict:
                     "unit": _UNIT_OVERRIDE.get(key, meta["unit_fa"]),
                     "unit_latin": key in _LATIN_UNIT,
                     "value": value_text,
-                    "held": value_text.strip() != "",
+                    # visible = saved before, or typed/invalid in this post (keeps the original row visibility)
+                    "held": bool(saved.get(field, "").strip()) or value_text.strip() != "" or field in field_errors,
+                    "error": field_errors.get(field),
                     "manual": manual,
                     "thousands": manual,
                     "price_plain": _plain(price),
@@ -92,6 +97,9 @@ def assets_context(user, db: Session, form: dict[str, str]) -> dict:
         "car_value_plain": _plain(car.value_toman),
         "car_group_label": format_toman(car.value_toman) if car.value_toman > 0 else None,
         "missing_prices": bool(view.missing_prices),
+        # only assets the user actually holds (a zero row without a price isn't news)
+        "missing_names": [r["name"] for g in groups for r in g["rows"]
+                          if r["key"] in view.missing_prices and (saved.get(r["field"]) or "").strip()],
         # unchanged Sanjeh (car) fields, exactly as the old profile assets tab showed them
         "has_sanjeh_token": bool(user.sanjeh_token),
         "car_fetched_label": format_when(user.car_fetched_at),
@@ -100,11 +108,16 @@ def assets_context(user, db: Session, form: dict[str, str]) -> dict:
 
 
 def render_assets(request: Request, db: Session, user, *, form: dict[str, str] | None = None, error: str | None = None,
-                  flash_message: str | None = None, flash_error: bool = False):
+                  flash_message: str | None = None, flash_error: bool = False, field_errors: dict[str, str] | None = None,
+                  field_short: dict[str, str] | None = None):
     from app.profile import holdings_form
 
+    saved = holdings_form(user)
     if form is None:
-        form = holdings_form(user)
+        form = saved
+    else:
+        # error re-render: an untouched hidden row posts nothing (FastAPI default "0"); show it empty, not Latin «0»
+        form = {k: ("" if (v or "").strip() in ("", "0") and not saved.get(k) else v) for k, v in form.items()}
     return render(
         request,
         "assets.html",
@@ -113,7 +126,9 @@ def render_assets(request: Request, db: Session, user, *, form: dict[str, str] |
         flash=flash_message,
         flash_error=flash_error,
         form=form,
-        **assets_context(user, db, form),
+        field_errors=field_errors or {},
+        field_short=field_short or {},
+        **assets_context(user, db, form, saved=saved, field_errors=field_errors or {}),
     )
 
 

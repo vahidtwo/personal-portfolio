@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}دارایی‌ها · موجودی من{% endblock %}
+{% block title %}دارایی‌ها، موجودی من{% endblock %}
 {% block content %}
 {#- Phase 1 piece 2: dedicated Assets page (layout from /mockups/phase1/assets.html).
     Posts to the unchanged POST /profile handler; every quantity field of the old profile assets tab is here. -#}
@@ -9,39 +9,67 @@
   <div class="assets-head">
     <div class="assets-head-text">
       <h1>دارایی‌ها</h1>
-      <p>مقدار هر دارایی را وارد کنید؛ ارزش با قیمت روز حساب می‌شود. دارایی‌های خالی در خانه نمایش داده نمی‌شوند.</p>
+      <p>مقدار هر دارایی را وارد کنید؛ ارزش با قیمت روز حساب می‌شود.</p>
     </div>
-    <div class="assets-total" aria-live="polite">
+    {%- set held_count = namespace(n=0) %}{% for g in asset_groups %}{% for r in g.rows %}{% if r.held %}{% set held_count.n = held_count.n + 1 %}{% endif %}{% endfor %}{% endfor %}
+    {%- set is_empty = held_count.n == 0 %}
+    <div class="assets-total{% if is_empty %} v2-hide{% endif %}" aria-live="polite" id="assets-total">
       <span class="assets-total-label">جمع دارایی</span>
       <span class="assets-total-value"><b class="num" data-assets-total data-base="{{ assets_total_plain }}">{{ assets_total_label }}</b> <span class="assets-unit">تومان</span></span>
     </div>
   </div>
+  <div class="v2-add{% if is_empty %} v2-hide{% endif %}"><button type="button" class="btn btn-primary" data-v2-add-open><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>افزودن دارایی</span></button></div>
+  <div data-v2-banners>
+  {%- if field_errors %}
+  <div class="v2-banner err" role="alert" tabindex="-1" id="v2-summary" data-v2-summary>
+    <div><strong>{{ field_errors | length | string | fa }} مقدار نیاز به اصلاح دارد</strong>
+      <ul>{% for g in asset_groups %}{% for r in g.rows %}{% if r.error %}<li><a href="#asset-{{ r.field }}">{{ r.name }}: {{ field_short.get(r.field, r.error) }}</a></li>{% endif %}{% endfor %}{% endfor %}</ul></div>
+  </div>
+  {%- endif %}
+  </div>
   {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
-  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
-  {% if missing_prices %}<p class="assets-note">قیمت روز برخی دارایی‌ها در دسترس نیست؛ ارزش آن‌ها فعلاً صفر حساب می‌شود.</p>{% endif %}
+  {% if error and not field_errors %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  {% if missing_names and not is_empty %}<div class="v2-banner" role="status"><div><strong>قیمت روز {{ missing_names | join('، ') }} در دسترس نیست</strong>ارزش {{ 'آن' if missing_names | length == 1 else 'آن‌ها' }} فعلاً صفر حساب می‌شود؛ مقدارش محفوظ است.</div></div>{% endif %}
+  {% if is_empty %}
+  <section class="asset-group v2-welcome" aria-labelledby="v2-wt" data-v2-welcome>
+    <h2 id="v2-wt">اولین دارایی‌تان را اضافه کنید</h2>
+    <p>هرچه دارید، از طلا و سکه تا دلار و رمزارز، با قیمت روز به تومان حساب می‌شود و در خانه جمع آن را می‌بینید.</p>
+    <div class="v2-quick">
+      {%- for k, n, u in [('gold', 'طلا ۱۸ عیار', 'به گرم'), ('coin_emami', 'سکه امامی', 'به عدد'), ('usd', 'دلار آمریکا', 'به دلار'), ('cash', 'نقد', 'به تومان')] %}
+      <button type="button" data-v2-quick="{{ k }}"><img src="/static/logos/{{ k }}.svg" alt="" width="28" height="28"><span>{{ n }}<small>{{ u }}</small></span></button>
+      {%- endfor %}
+    </div>
+    <button type="button" class="btn btn-primary" data-v2-add-open><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>همهٔ دارایی‌ها</span></button>
+  </section>
+  {% endif %}
 
   {% macro asset_group(g) -%}
-  <section class="asset-group" data-asset-group="{{ g.key }}" aria-labelledby="group-{{ g.key }}">
+  {%- set gheld = g.rows | selectattr('held') | list %}
+  <section class="asset-group{% if is_empty %} v2-hide{% endif %}" data-asset-group="{{ g.key }}" data-group-title="{{ g.title }}" aria-labelledby="group-{{ g.key }}">
     <div class="asset-group-head">
-      <h2 id="group-{{ g.key }}">{{ g.title }}</h2>
+      <div class="v2-ghead"><h2 id="group-{{ g.key }}">{{ g.title }}</h2><span class="v2-count" data-v2-count{% if not gheld %} hidden{% endif %}>{{ gheld | length | string | fa }} دارایی</span></div>
       <span class="asset-group-total"><bdi class="num" data-group-total data-base="{{ g.subtotal_plain }}">{{ g.subtotal_label }}</bdi> تومان</span>
     </div>
     {%- for r in g.rows %}
-    <div class="arow" data-asset-row="{{ r.key }}" data-price="{{ r.price_plain }}" data-base="{{ r.value_plain }}"{% if not r.held %} hidden{% endif %}>
+    <div class="arow{% if r.error %} v2-invalid{% endif %}" data-asset-row="{{ r.key }}" data-name="{{ r.name }}" data-unit="{{ r.unit }}" data-field="{{ r.field }}" data-price="{{ r.price_plain }}" data-base="{{ r.value_plain }}"{% if not r.held %} hidden{% endif %}>
       <span class="arow-logo"><img src="/static/logos/{{ r.key }}.svg" alt="" width="24" height="24"></span>
       <div class="arow-info">
         <label class="arow-name" for="asset-{{ r.field }}">{{ r.name }}{% if r.symbol %} <span class="arow-symbol" dir="ltr">{{ r.symbol }}</span>{% endif %}</label>
         <span class="arow-worth" id="worth-{{ r.field }}">{% if r.manual %}بدون تبدیل{% elif r.value_label is none %}قیمت در دسترس نیست{% else %}<bdi class="num" data-row-value>{{ r.value_label }}</bdi> تومان{% endif %}</span>
       </div>
+      <div class="v2-field">
       <div class="arow-input">
-        <input name="{{ r.field }}" value="{{ r.value }}" placeholder="۰" inputmode="decimal" dir="ltr" id="asset-{{ r.field }}" aria-describedby="worth-{{ r.field }}" data-asset-input{% if r.thousands %} data-thousands{% endif %}>
+        <input name="{{ r.field }}" value="{{ r.value }}" placeholder="۰" inputmode="decimal" dir="ltr" id="asset-{{ r.field }}" aria-describedby="{% if r.error %}err-asset-{{ r.field }} {% endif %}worth-{{ r.field }}" data-asset-input{% if r.thousands %} data-thousands data-max-decimals="2"{% endif %}{% if r.error %} aria-invalid="true"{% endif %}>
         <span class="arow-unit"{% if r.unit_latin %} dir="ltr"{% endif %}>{{ r.unit }}</span>
       </div>
+      {%- if r.error %}<span class="v2-err" id="err-asset-{{ r.field }}">{{ r.error }}</span>{% endif %}
+      </div>
+      <button type="button" class="v2-more" aria-label="گزینه‌های {{ r.name }}" aria-haspopup="menu" aria-expanded="false" data-v2-more><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
     </div>
     {%- endfor %}
     {%- set unheld = g.rows | rejectattr('held') | list %}
     <div class="asset-more" data-asset-more{% if not unheld %} hidden{% endif %}>
-      <p class="asset-more-title">افزودن دارایی در این گروه</p>
+      <p class="asset-more-title">افزودن به این گروه</p>
       <div class="asset-chips">
         {%- for r in unheld %}
         <button type="button" class="asset-chip" data-add-asset="{{ r.key }}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>{{ r.name }}</span></button>
@@ -74,7 +102,7 @@
           </div>
           <p class="field-hint">در سنجه پروفایل و خودروهای خود را تکمیل کنید، سپس توکن API را اینجا بگذارید.</p>
           {% if has_sanjeh_token %}
-          <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
+          <p class="field-status">توکن ذخیره شده است{% if car_value_label %}، ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %}، آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
           {% endif %}
           <input type="password" name="sanjeh_token" id="sanjeh-token" value="" autocomplete="off" dir="ltr" data-assets-extra placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
           {% if has_sanjeh_token %}
@@ -95,7 +123,7 @@
   <div class="assets-save-bar" id="assets-save-bar" data-save-bar hidden>
     <span class="assets-dirty" role="status"><span class="assets-dirty-dot" aria-hidden="true"></span><span data-dirty-count></span></span>
     <button type="button" class="btn btn-ghost btn-sm" data-assets-cancel>انصراف</button>
-    <button type="submit" class="btn btn-primary btn-sm">ذخیرهٔ تغییرات</button>
+    <button type="submit" class="btn btn-primary btn-sm" data-assets-submit>ذخیرهٔ تغییرات</button>
   </div>
 </form>
 {% endblock %}
@@ -103,4 +131,5 @@
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
 <script src="/static/assets-page.js?v={{ static_v }}" defer></script>
+<script src="/static/assets-v2.js?v={{ static_v }}" defer></script>
 {% endblock %}

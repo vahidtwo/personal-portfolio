@@ -62,3 +62,43 @@ def parse_int_required(raw: str | None) -> int:
     if value is None:
         raise ValueError("empty")
     return value
+
+
+# Assets v2: per-field validation reasons (same rules as above; mirrored in static/assets-page.js).
+FIELD_ERROR_FA = {
+    "decimal_point": "فقط یک ممیز (٫) بگذارید؛ مثلاً ۱٫۲۵",
+    "not_number": "فقط عدد وارد کنید",
+    "negative": "مقدار نمی‌تواند منفی باشد",
+    "too_many_decimals": "حداکثر {n} رقم اعشار",
+}
+FIELD_ERROR_SHORT_FA = {"decimal_point": "عدد نامعتبر", "not_number": "عدد نامعتبر", "negative": "منفی است",
+                       "too_many_decimals": "رقم اعشار زیاد"}
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def quantity_error(raw: str | None, max_decimals: int = 8) -> str | None:
+    """Reason key for an invalid quantity ('' / None -> valid, counts as 0), else None."""
+    try:
+        text = normalize_number_text(raw)
+    except ValueError as exc:
+        msg = str(exc)
+        if "decimal point" in msg:
+            return "decimal_point"
+        if text_has_minus(raw):
+            return "negative"
+        return "not_number"
+    if text == "":
+        return None
+    if text.startswith("-") and text.strip("-0.") != "":
+        return "negative"
+    if "." in text and len(text.split(".", 1)[1]) > max_decimals:
+        return "too_many_decimals"
+    return None
+
+
+def text_has_minus(raw: str | None) -> bool:
+    return str(raw or "").strip().replace("−", "-").startswith("-")
+
+
+def field_error_message(reason: str, max_decimals: int = 8) -> str:
+    return FIELD_ERROR_FA[reason].replace("{n}", str(max_decimals).translate(_FA_DIGITS))

@@ -1,0 +1,16 @@
+{#- «دریافت اپ اندروید»: logged-in users only; hidden inside the Android app (html.in-android-app,
+    set by android-bridge.js). Version and size are read from the APK on the server. Links to the
+    unchanged /download/my-inventory.apk route. -#}
+{% from "partials/nav_icons.html" import nav_icon %}
+{%- set _apk = android_apk_info() -%}
+{%- if _apk %}
+<a class="{{ cls }} apk-download" href="/download/my-inventory.apk" data-apk-download>
+  {{ nav_icon('download') }}
+  <span class="apk-download-text">
+    <span class="settings-row-label">دریافت اپ اندروید</span>
+    <span class="apk-meta">{% if _apk.version %}<span class="apk-version">نسخهٔ <bdi>{{ _apk.version }}</bdi></span> <span class="apk-sep" aria-hidden="true">·</span> {% endif %}<span class="apk-size"><bdi>{{ _apk.size }}</bdi></span></span>
+    <span class="apk-note">اگر کروم پرسید، نصب از این منبع را برای کروم مجاز کنید.</span>
+    <span class="apk-hint" data-apk-hint hidden>روی گوشی اندروید باز کنید</span>
+  </span>
+</a>
+{%- endif %}

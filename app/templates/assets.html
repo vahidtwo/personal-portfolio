@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}دارایی‌ها · موجودی من{% endblock %}
+{% block content %}
+{#- Phase 1 piece 2: dedicated Assets page (layout from /mockups/phase1/assets.html).
+    Posts to the unchanged POST /profile handler; every quantity field of the old profile assets tab is here. -#}
+<form method="post" action="/profile" class="assets-page" id="assets-form" data-assets-form>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next" value="/assets">
+  <div class="assets-head">
+    <div class="assets-head-text">
+      <h1>دارایی‌ها</h1>
+      <p>مقدار هر دارایی را وارد کنید؛ ارزش با قیمت روز حساب می‌شود. دارایی‌های خالی در خانه نمایش داده نمی‌شوند.</p>
+    </div>
+    <div class="assets-total" aria-live="polite">
+      <span class="assets-total-label">جمع دارایی</span>
+      <span class="assets-total-value"><b class="num" data-assets-total data-base="{{ assets_total_plain }}">{{ assets_total_label }}</b> <span class="assets-unit">تومان</span></span>
+    </div>
+  </div>
+  {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
+  {% if missing_prices %}<p class="assets-note">قیمت روز برخی دارایی‌ها در دسترس نیست؛ ارزش آن‌ها فعلاً صفر حساب می‌شود.</p>{% endif %}
+
+  {% macro asset_group(g) -%}
+  <section class="asset-group" data-asset-group="{{ g.key }}" aria-labelledby="group-{{ g.key }}">
+    <div class="asset-group-head">
+      <h2 id="group-{{ g.key }}">{{ g.title }}</h2>
+      <span class="asset-group-total"><bdi class="num" data-group-total data-base="{{ g.subtotal_plain }}">{{ g.subtotal_label }}</bdi> تومان</span>
+    </div>
+    {%- for r in g.rows %}
+    <div class="arow" data-asset-row="{{ r.key }}" data-price="{{ r.price_plain }}" data-base="{{ r.value_plain }}"{% if not r.held %} hidden{% endif %}>
+      <span class="arow-logo"><img src="/static/logos/{{ r.key }}.svg" alt="" width="24" height="24"></span>
+      <div class="arow-info">
+        <label class="arow-name" for="asset-{{ r.field }}">{{ r.name }}{% if r.symbol %} <span class="arow-symbol" dir="ltr">{{ r.symbol }}</span>{% endif %}</label>
+        <span class="arow-worth" id="worth-{{ r.field }}">{% if r.manual %}بدون تبدیل{% elif r.value_label is none %}قیمت در دسترس نیست{% else %}<bdi class="num" data-row-value>{{ r.value_label }}</bdi> تومان{% endif %}</span>
+      </div>
+      <div class="arow-input">
+        <input name="{{ r.field }}" value="{{ r.value }}" placeholder="۰" inputmode="decimal" dir="ltr" id="asset-{{ r.field }}" aria-describedby="worth-{{ r.field }}" data-asset-input{% if r.thousands %} data-thousands{% endif %}>
+        <span class="arow-unit"{% if r.unit_latin %} dir="ltr"{% endif %}>{{ r.unit }}</span>
+      </div>
+    </div>
+    {%- endfor %}
+    {%- set unheld = g.rows | rejectattr('held') | list %}
+    <div class="asset-more" data-asset-more{% if not unheld %} hidden{% endif %}>
+      <p class="asset-more-title">افزودن دارایی در این گروه</p>
+      <div class="asset-chips">
+        {%- for r in unheld %}
+        <button type="button" class="asset-chip" data-add-asset="{{ r.key }}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>{{ r.name }}</span></button>
+        {%- endfor %}
+      </div>
+    </div>
+  </section>
+  {%- endmacro %}
+
+  <div class="assets-grid">
+    <div class="assets-col">
+      {{ asset_group(asset_groups[0]) }}
+      {{ asset_group(asset_groups[1]) }}
+    </div>
+    <div class="assets-col">
+      {{ asset_group(asset_groups[2]) }}
+      {#- Car: the existing Sanjeh token fields, unchanged (the new connection-status UI is Phase 3). -#}
+      <section class="asset-group" data-asset-group="car" aria-labelledby="group-car">
+        <div class="asset-group-head">
+          <h2 id="group-car">خودرو</h2>
+          {% if car_group_label %}<span class="asset-group-total"><bdi class="num">{{ car_group_label }}</bdi> تومان</span>{% endif %}
+        </div>
+        <div class="sanjeh-block">
+          <div class="label-row">
+            <label class="label-text" for="sanjeh-token"><img class="asset-logo" src="/static/logos/car.svg" alt="" width="22" height="22">خودرو (سنجه)</label>
+            <a class="help-link" href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer" title="رفتن به سنجه برای تکمیل پروفایل و دریافت توکن">
+              <span class="help-icon" aria-hidden="true">?</span>
+              <span>راهنما: sanjeh.app</span>
+            </a>
+          </div>
+          <p class="field-hint">در سنجه پروفایل و خودروهای خود را تکمیل کنید، سپس توکن API را اینجا بگذارید.</p>
+          {% if has_sanjeh_token %}
+          <p class="field-status">توکن ذخیره شده است{% if car_value_label %} · ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %} · آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
+          {% endif %}
+          <input type="password" name="sanjeh_token" id="sanjeh-token" value="" autocomplete="off" dir="ltr" data-assets-extra placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
+          {% if has_sanjeh_token %}
+          <label class="checkbox-row">
+            <input type="checkbox" name="clear_sanjeh" value="1" data-assets-extra>
+            <span>حذف توکن سنجه</span>
+          </label>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <noscript>
+    <style>.arow[hidden] { display: grid !important; } .asset-more { display: none !important; }</style>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">ذخیرهٔ تغییرات</button></div>
+  </noscript>
+  <div class="assets-save-bar" id="assets-save-bar" data-save-bar hidden>
+    <span class="assets-dirty" role="status"><span class="assets-dirty-dot" aria-hidden="true"></span><span data-dirty-count></span></span>
+    <button type="button" class="btn btn-ghost btn-sm" data-assets-cancel>انصراف</button>
+    <button type="submit" class="btn btn-primary btn-sm">ذخیرهٔ تغییرات</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="/static/number-format.js?v={{ static_v }}" defer></script>
+<script src="/static/amount-input.js?v={{ static_v }}" defer></script>
+<script src="/static/assets-page.js?v={{ static_v }}" defer></script>
+{% endblock %}

@@ -99,8 +99,8 @@ async def register(
     db.commit()
     rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session["user_id"] = user.id
-    flash(request, "حساب شما ساخته شد. موجودی را در پروفایل وارد کنید.")
-    return RedirectResponse("/profile", status_code=303)
+    flash(request, "حساب شما ساخته شد. دارایی‌هایتان را در صفحهٔ دارایی‌ها وارد کنید.")
+    return RedirectResponse("/assets", status_code=303)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -157,4 +157,7 @@ async def logout(request: Request, csrf: str = Form("")):
     require_csrf(request, csrf)
     invalidate_session(request)
     response = RedirectResponse("/login", status_code=303)
+    # Drop the browser's HTTP cache (and back/forward cache) for this site: no private page after logout.
+    # The service worker deletes its own offline copy of the dashboard on this same response.
+    response.headers["Clear-Site-Data"] = '"cache"'
     return attach_session_cookie_deletion(response)

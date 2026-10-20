@@ -123,7 +123,10 @@
     var old = $("[data-v2-save-error]", form); if (old) old.remove();
     if (!window.fetch || !window.FormData) { form.dispatchEvent(new Event("assets:saved")); form.submit(); return; }
     setBusy(true);
-    fetch(form.action, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" }, credentials: "same-origin" })
+    var body = new FormData(form); // amount-input stripped [data-thousands] to Latin for the server
+    // fetch keeps us on the page, so paint the grouped Persian display back (e.g. «۲۵٬۰۰۰٬۰۰۰»).
+    form.querySelectorAll("[data-thousands]").forEach(function (f) { f.dispatchEvent(new Event("blur")); });
+    fetch(form.action, { method: "POST", body: body, headers: { Accept: "application/json" }, credentials: "same-origin" })
       .then(function (res) {
         return res.json().catch(function () { return null; }).then(function (data) { return { res: res, data: data }; });
       })

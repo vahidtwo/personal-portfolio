@@ -26,7 +26,8 @@
     var ip = (parts[0] || "0").replace(/^0+(?=\d)/, "") || "0";
     var fp = (parts[1] || "").replace(/0+$/, "");
     var out = fp ? ip + "." + fp : ip;
-    return neg && out !== "0" ? "-" + out : out;
+    if (neg && out !== "0") return null; // negative: invalid, worth shows «—», totals untouched
+    return out;
   }
 
   function isChanged(input) {

@@ -140,3 +140,43 @@ def test_js_rules_match_server(tmp_path):
     out = subprocess.run([node, str(script)], capture_output=True, text=True, timeout=20)
     assert out.returncode == 0, out.stderr
     assert __import__("json").loads(out.stdout) == [quantity_error(c) for c in cases]
+
+
+def test_negative_quantity_keeps_saved_worth_in_totals(tmp_path):
+    """«-۵» is invalid on the client: canon() gives null, the row keeps its saved worth (totals unchanged)."""
+    import re as _re
+    import shutil as _sh
+    import subprocess as _sp
+    from pathlib import Path as _P
+
+    node = _sh.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    static = _P(__file__).resolve().parents[1] / "app" / "static"
+    src = (static / "assets-page.js").read_text(encoding="utf-8")
+    funcs = "".join(
+        _re.search(r"\n  function " + name + r"\(.*?\n  }\n", src, _re.S).group(0)
+        for name in ("canon", "isChanged", "rowValue")
+    )
+    script = tmp_path / "neg.js"
+    script.write_text(
+        f"var NF = require({str(static / 'number-format.js')!r});\n" + funcs + """
+var row = { dataset: { base: "37250000", price: "7450000" } };
+function inp(v) { return { value: v, defaultValue: "5" }; }
+var out = {
+  canonNeg: canon("-۵"), canonNegLatin: canon("-5"), canonOk: canon("۵"),
+  neg: rowValue(row, inp("-۵")), ok: rowValue(row, inp("۶")),
+};
+console.log(JSON.stringify(out));
+""",
+        encoding="utf-8",
+    )
+    res = _sp.run([node, str(script)], capture_output=True, text=True, timeout=20)
+    assert res.returncode == 0, res.stderr
+    import json as _json
+
+    out = _json.loads(res.stdout)
+    assert out["canonNeg"] is None and out["canonNegLatin"] is None
+    assert out["canonOk"] == "5"
+    assert out["neg"] == {"value": 37250000, "ok": False}  # saved worth kept, row marked invalid («—»)
+    assert out["ok"] == {"value": 44700000, "ok": True}

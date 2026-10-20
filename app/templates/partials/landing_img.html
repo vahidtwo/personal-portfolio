@@ -1,0 +1,14 @@
+{#- One lazy screenshot figure (fake demo data) from app/static/landing/manifest.json (written by scripts/landing_shots.py). -#}
+{% macro shot(slot, cls, alt, sizes) -%}
+{%- set m = landing_manifest().get(slot) -%}
+{%- if m -%}
+<figure class="shot {{ cls }}" dir="rtl">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="{% for f in m.light %}/static/landing/{{ f.file }}?v={{ static_v }} {{ f.w }}w{% if not loop.last %}, {% endif %}{% endfor %}" sizes="{{ sizes }}" width="{{ m.dark[0].w }}" height="{{ m.dark[0].h }}">
+    <img src="/static/landing/{{ m.dark[0].file }}?v={{ static_v }}" srcset="{% for f in m.dark %}/static/landing/{{ f.file }}?v={{ static_v }} {{ f.w }}w{% if not loop.last %}, {% endif %}{% endfor %}" sizes="{{ sizes }}"
+         width="{{ m.dark[0].w }}" height="{{ m.dark[0].h }}" loading="lazy" decoding="async" alt="{{ alt }}">
+  </picture>
+  <figcaption>نمونه، اعداد ساختگی</figcaption>
+</figure>
+{%- endif -%}
+{%- endmacro %}

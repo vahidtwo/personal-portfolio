@@ -1,11 +1,23 @@
 {% extends "base.html" %}
 {% block title %}موجودی من — پرتفوی شخصی{% endblock %}
 {% block content %}
+{% from "partials/landing_img.html" import shot %}
 <div class="landing shell-wide">
   <section class="landing-hero page-split" aria-labelledby="landing-heading">
     <div class="landing-hero-copy">
       {% set show_previews = false %}
       {% include "partials/intro_panel.html" %}
+    <figure class="shot hero-shot" dir="rtl">
+    <picture>
+      <source media="(max-width: 899px) and (prefers-color-scheme: light)" srcset="/static/landing/hero-phone-light-360.webp?v={{ static_v }} 360w, /static/landing/hero-phone-light-720.webp?v={{ static_v }} 720w" sizes="80vw" width="360" height="779">
+      <source media="(max-width: 899px)" srcset="/static/landing/hero-phone-dark-360.webp?v={{ static_v }} 360w, /static/landing/hero-phone-dark-720.webp?v={{ static_v }} 720w" sizes="80vw" width="360" height="779">
+      <source media="(prefers-color-scheme: light)" srcset="/static/landing/hero-light-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-light-1680.webp?v={{ static_v }} 1680w" sizes="560px" width="1120" height="747">
+      <img src="/static/landing/hero-dark-1120.webp?v={{ static_v }}" srcset="/static/landing/hero-dark-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-dark-1680.webp?v={{ static_v }} 1680w" sizes="560px"
+           width="1120" height="747" loading="eager" fetchpriority="high" decoding="async"
+           alt="نمونهٔ داشبورد موجودی من در کامپیوتر و گوشی با اعداد ساختگی: خالص دارایی ۵۰۴٬۹۰۰٬۰۰۰ تومان، تغییر ۲۴ ساعت و ۷ روز، و کارت‌های طلا، سکه و بیت‌کوین">
+    </picture>
+    <figcaption>نمونه، اعداد ساختگی</figcaption>
+  </figure>
     </div>
     <div class="landing-cta card">
       <h2 id="landing-heading">شروع در چند دقیقه</h2>
@@ -50,28 +62,8 @@
       <h2 id="onboard-heading">داخل اپ چه می‌بینید؟</h2>
     </div>
     <div class="intro-previews intro-previews-lg">
-      <figure class="preview-card">
-        <img
-          src="/static/onboarding/dashboard.svg"
-          width="480"
-          height="300"
-          alt="نمونه داشبورد"
-          loading="lazy"
-          class="preview-img"
-        >
-        <figcaption>ارزش کل، به‌روزرسانی قیمت و جدول پرتفوی</figcaption>
-      </figure>
-      <figure class="preview-card">
-        <img
-          src="/static/onboarding/chart.svg"
-          width="480"
-          height="300"
-          alt="نمونه نمودار"
-          loading="lazy"
-          class="preview-img"
-        >
-        <figcaption>روند ارزش در زمان با نمودار تعاملی</figcaption>
-      </figure>
+      {{ shot("chart", "shot-wide", "نمونهٔ نمودار روند ارزش دارایی‌ها در یک سال، با اعداد ساختگی", "(min-width: 900px) 560px, 100vw") }}
+      {{ shot("spend-phone", "shot-phone", "نمونهٔ ثبت خرج روزانه در گوشی: مبلغ، دسته و یادداشت، با اعداد ساختگی", "(min-width: 900px) 300px, 80vw") }}
     </div>
   </section>
 </div>

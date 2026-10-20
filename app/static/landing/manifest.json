@@ -1,0 +1,331 @@
+{
+ "git_sha": "WIP",
+ "generated_at": "2026-10-20T10:17:31Z",
+ "frozen_clock": "2026-10-20T08:30:00Z",
+ "dataset_sha256": "21e5f364d00e5045c65c8a913d599bb28c1ddec1ed4685c52194892bdf3c20b9",
+ "net_worth_toman": 504900000,
+ "files": [
+  {
+   "file": "hero-dark-1680.webp",
+   "slot": null,
+   "theme": null,
+   "width": 1680,
+   "height": 1120,
+   "bytes": 52000,
+   "quality": 78
+  },
+  {
+   "file": "hero-dark-1120.webp",
+   "slot": null,
+   "theme": null,
+   "width": 1120,
+   "height": 747,
+   "bytes": 30748,
+   "quality": 78
+  },
+  {
+   "file": "hero-phone-dark-720.webp",
+   "slot": null,
+   "theme": null,
+   "width": 720,
+   "height": 1558,
+   "bytes": 39002,
+   "quality": 78
+  },
+  {
+   "file": "hero-phone-dark-360.webp",
+   "slot": null,
+   "theme": null,
+   "width": 360,
+   "height": 779,
+   "bytes": 17132,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-desktop-dark-1280.webp",
+   "slot": "desktop",
+   "theme": "dark",
+   "width": 1280,
+   "height": 800,
+   "bytes": 27350,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-desktop-dark-640.webp",
+   "slot": "desktop",
+   "theme": "dark",
+   "width": 640,
+   "height": 400,
+   "bytes": 10764,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-phone-dark-780.webp",
+   "slot": "phone",
+   "theme": "dark",
+   "width": 780,
+   "height": 1644,
+   "bytes": 42338,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-phone-dark-390.webp",
+   "slot": "phone",
+   "theme": "dark",
+   "width": 390,
+   "height": 822,
+   "bytes": 18730,
+   "quality": 78
+  },
+  {
+   "file": "chart-dark-1180.webp",
+   "slot": "chart",
+   "theme": "dark",
+   "width": 1180,
+   "height": 413,
+   "bytes": 10028,
+   "quality": 78
+  },
+  {
+   "file": "chart-dark-590.webp",
+   "slot": "chart",
+   "theme": "dark",
+   "width": 590,
+   "height": 206,
+   "bytes": 3806,
+   "quality": 78
+  },
+  {
+   "file": "spend-phone-dark-780.webp",
+   "slot": "spend-phone",
+   "theme": "dark",
+   "width": 780,
+   "height": 1644,
+   "bytes": 24572,
+   "quality": 78
+  },
+  {
+   "file": "spend-phone-dark-390.webp",
+   "slot": "spend-phone",
+   "theme": "dark",
+   "width": 390,
+   "height": 822,
+   "bytes": 10796,
+   "quality": 78
+  },
+  {
+   "file": "hero-light-1680.webp",
+   "slot": null,
+   "theme": null,
+   "width": 1680,
+   "height": 1120,
+   "bytes": 54408,
+   "quality": 78
+  },
+  {
+   "file": "hero-light-1120.webp",
+   "slot": null,
+   "theme": null,
+   "width": 1120,
+   "height": 747,
+   "bytes": 31852,
+   "quality": 78
+  },
+  {
+   "file": "hero-phone-light-720.webp",
+   "slot": null,
+   "theme": null,
+   "width": 720,
+   "height": 1558,
+   "bytes": 40760,
+   "quality": 78
+  },
+  {
+   "file": "hero-phone-light-360.webp",
+   "slot": null,
+   "theme": null,
+   "width": 360,
+   "height": 779,
+   "bytes": 17958,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-desktop-light-1280.webp",
+   "slot": "desktop",
+   "theme": "light",
+   "width": 1280,
+   "height": 800,
+   "bytes": 27794,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-desktop-light-640.webp",
+   "slot": "desktop",
+   "theme": "light",
+   "width": 640,
+   "height": 400,
+   "bytes": 10440,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-phone-light-780.webp",
+   "slot": "phone",
+   "theme": "light",
+   "width": 780,
+   "height": 1644,
+   "bytes": 44144,
+   "quality": 78
+  },
+  {
+   "file": "dashboard-phone-light-390.webp",
+   "slot": "phone",
+   "theme": "light",
+   "width": 390,
+   "height": 822,
+   "bytes": 19678,
+   "quality": 78
+  },
+  {
+   "file": "chart-light-1180.webp",
+   "slot": "chart",
+   "theme": "light",
+   "width": 1180,
+   "height": 413,
+   "bytes": 10022,
+   "quality": 78
+  },
+  {
+   "file": "chart-light-590.webp",
+   "slot": "chart",
+   "theme": "light",
+   "width": 590,
+   "height": 206,
+   "bytes": 3730,
+   "quality": 78
+  },
+  {
+   "file": "spend-phone-light-780.webp",
+   "slot": "spend-phone",
+   "theme": "light",
+   "width": 780,
+   "height": 1644,
+   "bytes": 25596,
+   "quality": 78
+  },
+  {
+   "file": "spend-phone-light-390.webp",
+   "slot": "spend-phone",
+   "theme": "light",
+   "width": 390,
+   "height": 822,
+   "bytes": 11224,
+   "quality": 78
+  }
+ ],
+ "slots": {
+  "desktop": {
+   "dark": [
+    {
+     "file": "dashboard-desktop-dark-1280.webp",
+     "w": 1280,
+     "h": 800
+    },
+    {
+     "file": "dashboard-desktop-dark-640.webp",
+     "w": 640,
+     "h": 400
+    }
+   ],
+   "light": [
+    {
+     "file": "dashboard-desktop-light-1280.webp",
+     "w": 1280,
+     "h": 800
+    },
+    {
+     "file": "dashboard-desktop-light-640.webp",
+     "w": 640,
+     "h": 400
+    }
+   ]
+  },
+  "phone": {
+   "dark": [
+    {
+     "file": "dashboard-phone-dark-780.webp",
+     "w": 780,
+     "h": 1644
+    },
+    {
+     "file": "dashboard-phone-dark-390.webp",
+     "w": 390,
+     "h": 822
+    }
+   ],
+   "light": [
+    {
+     "file": "dashboard-phone-light-780.webp",
+     "w": 780,
+     "h": 1644
+    },
+    {
+     "file": "dashboard-phone-light-390.webp",
+     "w": 390,
+     "h": 822
+    }
+   ]
+  },
+  "chart": {
+   "dark": [
+    {
+     "file": "chart-dark-1180.webp",
+     "w": 1180,
+     "h": 413
+    },
+    {
+     "file": "chart-dark-590.webp",
+     "w": 590,
+     "h": 206
+    }
+   ],
+   "light": [
+    {
+     "file": "chart-light-1180.webp",
+     "w": 1180,
+     "h": 413
+    },
+    {
+     "file": "chart-light-590.webp",
+     "w": 590,
+     "h": 206
+    }
+   ]
+  },
+  "spend-phone": {
+   "dark": [
+    {
+     "file": "spend-phone-dark-780.webp",
+     "w": 780,
+     "h": 1644
+    },
+    {
+     "file": "spend-phone-dark-390.webp",
+     "w": 390,
+     "h": 822
+    }
+   ],
+   "light": [
+    {
+     "file": "spend-phone-light-780.webp",
+     "w": 780,
+     "h": 1644
+    },
+    {
+     "file": "spend-phone-light-390.webp",
+     "w": 390,
+     "h": 822
+    }
+   ]
+  }
+ }
+}

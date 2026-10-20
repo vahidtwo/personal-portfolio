@@ -127,6 +127,9 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 url ?: return
+                // Persist the session cookie right after each page (e.g. the /auth -> /dashboard login), not only
+                // in onPause: a process kill without onPause (force-stop, OOM) otherwise logs the user out.
+                CookieManager.getInstance().flush()
                 if (url.startsWith("file:")) {
                     errorPending = false
                     showLoading(false)

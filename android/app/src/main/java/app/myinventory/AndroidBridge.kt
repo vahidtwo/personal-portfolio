@@ -46,6 +46,14 @@ class AndroidBridge(
         )
     }
 
+    /**
+     * v7: whether automatic spends from SMS are on ("on") or off ("off"), so the spending page can show
+     * its one-time offer card only to people who haven't turned it on. No keywords or SMS content.
+     */
+    @JavascriptInterface
+    fun getSmsAutoState(): String =
+        if (SmsPrefs.isEnabledPref(context) && SmsPrefs.permissionGranted(context)) "on" else "off"
+
     @JavascriptInterface
     fun isAndroidApp(): Boolean = true
 

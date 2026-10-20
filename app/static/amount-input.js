@@ -145,6 +145,14 @@
     return out;
   }
 
+  // Chips for what the user TYPED: none when the text has a decimal separator (. ٫ /), because
+  // toman are whole and scaling "1500.5" gave nonsense like «≈ ۱۵٫۰۱ هزار تومان». "٬" and "," are grouping.
+  var DECIMAL_SEP = /[.\u066B\/]/;
+  function suggestionsFor(raw) {
+    if (DECIMAL_SEP.test(String(raw || ""))) return [];
+    return chipOptions(plainNumber(raw));
+  }
+
   function bindSuggest(input) {
     var words = document.createElement("p");
     words.className = "amount-words";
@@ -163,7 +171,7 @@
       words.textContent = line;
       words.hidden = !line;
       box.innerHTML = "";
-      var options = chipOptions(plain);
+      var options = suggestionsFor(input.value);
       options.forEach(function (option) {
         var button = document.createElement("button");
         button.type = "button";
@@ -184,7 +192,7 @@
   }
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { amountInWords: amountInWords, amountWordsLine: amountWordsLine, SMALL_AMOUNT: SMALL_AMOUNT, chipOptions: chipOptions, chipLabel: chipLabel, plainNumber: plainNumber,
+    module.exports = { amountInWords: amountInWords, amountWordsLine: amountWordsLine, SMALL_AMOUNT: SMALL_AMOUNT, chipOptions: chipOptions, suggestionsFor: suggestionsFor, chipLabel: chipLabel, plainNumber: plainNumber,
                        formatAmount: formatAmount, displayAmount: displayAmount, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
   }
   if (typeof document === "undefined") return;

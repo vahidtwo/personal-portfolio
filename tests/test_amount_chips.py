@@ -67,3 +67,15 @@ def test_rounded_chip_labels_carry_approx_sign():
     assert labels == ["≈ ۱۲٫۳۵ میلیون تومان", "≈ ۱۲۳٫۴۶ میلیون تومان"]
     assert [o["label"] for o in _run('m.chipOptions("150000")')] == ["۱٫۵ میلیون تومان", "۱۵ میلیون تومان"]
     assert _run('m.chipOptions(m.plainNumber("۱٫۵"))') == [{"plain": "1500", "label": "۱٫۵ هزار تومان"}]  # ٫ is a decimal point
+
+
+def test_no_chips_when_a_decimal_separator_is_typed():
+    for typed in ("1500.5", "۱۵۰۰٫۵", "1500/5", "۱٬۵۰۰٫۵"):
+        assert _run(f"m.suggestionsFor({json.dumps(typed)})") == [], typed
+
+
+def test_integer_inputs_still_get_correct_chips():
+    want = ["۱۵ هزار تومان", "۱۵۰ هزار تومان"]
+    for typed in ("1,500", "۱۵۰۰", "۱٬۵۰۰", "1500"):
+        opts = _run(f"m.suggestionsFor({json.dumps(typed)})")
+        assert [o["label"] for o in opts] == want and [o["plain"] for o in opts] == ["15000", "150000"], typed

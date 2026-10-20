@@ -26,3 +26,4 @@ keystore.properties
 
 # Firebase client config (never commit)
 android/app/google-services.json
+.testmondata*

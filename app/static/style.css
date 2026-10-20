@@ -2714,7 +2714,7 @@ body.sp-locked{overflow:hidden}
 @media (max-width:899px){
   .sp-page{padding-bottom:84px}
   [data-sp-js] .sp-form:not(.open){display:none}
-  .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 96px;background:var(--surface-solid,#11131a)}
+  .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;scroll-padding-bottom:96px;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 96px;background:var(--surface-solid,#11131a)}
   [data-theme=light] .sp-form.open{background:#fff}
   .sp-form.open .sp-x{display:grid;place-items:center}
   .sp-form.open .form-actions{position:fixed;inset-inline:0;bottom:0;z-index:93;display:flex;gap:12px;margin:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:inherit;border-top:1px solid var(--border)}

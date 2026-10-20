@@ -61,11 +61,12 @@ async def home_head():
     return Response(status_code=200, media_type="text/html")
 
 
-@router.get("/register", response_class=HTMLResponse)
+@router.get("/register")
 async def register_form(request: Request, db: Session = Depends(get_db)):
+    """Phase 3: one sign-in page. Old links and bookmarks land on /auth."""
     if redirect := redirect_to_dashboard_if_authenticated(request, db):
         return redirect
-    return render(request, "register.html", db, error=None, form={"username": ""})
+    return RedirectResponse("/auth", status_code=303)
 
 
 @router.post("/register")
@@ -113,11 +114,12 @@ async def register(
     return RedirectResponse("/assets", status_code=303)
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get("/login")
 async def login_form(request: Request, db: Session = Depends(get_db)):
+    """Phase 3: one sign-in page. Old links and bookmarks land on /auth."""
     if redirect := redirect_to_dashboard_if_authenticated(request, db):
         return redirect
-    return render(request, "login.html", db, error=None, form={"username": ""})
+    return RedirectResponse("/auth", status_code=303)
 
 
 @router.post("/login")
@@ -166,7 +168,7 @@ async def login(
 async def logout(request: Request, csrf: str = Form("")):
     require_csrf(request, csrf)
     invalidate_session(request)
-    response = RedirectResponse("/login", status_code=303)
+    response = RedirectResponse("/auth", status_code=303)
     # Drop the browser's HTTP cache (and back/forward cache) for this site: no private page after logout.
     # The service worker deletes its own offline copy of the dashboard on this same response.
     response.headers["Clear-Site-Data"] = '"cache"'

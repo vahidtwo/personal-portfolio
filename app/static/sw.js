@@ -145,14 +145,14 @@ function isSessionEnd(response) {
   if (response.status === 401 || response.status === 403) return true;
   if (response.redirected) {
     try {
-      if (new URL(response.url).pathname === "/login") return true;
+      if (["/login", "/auth"].includes(new URL(response.url).pathname)) return true;
     } catch (e) {}
   }
   return false;
 }
 
 function isLoginUrl(url) {
-  return url.origin === self.location.origin && url.pathname === "/login";
+  return url.origin === self.location.origin && (url.pathname === "/login" || url.pathname === "/auth");
 }
 
 async function withCachedAt(response, now) {

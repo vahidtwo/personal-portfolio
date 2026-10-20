@@ -33,7 +33,7 @@ def test_no_cookie_home_200_dashboard_redirects_login(client: TestClient):
 
     dash = client.get("/dashboard", follow_redirects=False)
     assert dash.status_code == 303
-    assert dash.headers["location"] == "/login"
+    assert dash.headers["location"] == "/auth"
 
 
 def test_valid_session_home_to_dashboard_and_dashboard_200(client: TestClient):
@@ -64,12 +64,12 @@ def test_stale_session_cleared_and_no_redirect_loop(client: TestClient):
 
     dash = client.get("/dashboard", follow_redirects=False)
     assert dash.status_code == 303
-    assert dash.headers["location"] == "/login"
+    assert dash.headers["location"] == "/auth"
     set_cookie = dash.headers.get("set-cookie", "").lower()
     assert SESSION_COOKIE_NAME in set_cookie
     assert "max-age=0" in set_cookie or 'max-age="0"' in set_cookie
 
-    login = client.get("/login", follow_redirects=False)
+    login = client.get("/auth", follow_redirects=False)  # Phase 3 sign-in page
     assert login.status_code == 200
 
     home = client.get("/", follow_redirects=False)
@@ -77,4 +77,4 @@ def test_stale_session_cleared_and_no_redirect_loop(client: TestClient):
 
     chain = client.get("/dashboard", follow_redirects=True)
     assert chain.status_code == 200
-    assert chain.url.path == "/login"
+    assert chain.url.path == "/auth"

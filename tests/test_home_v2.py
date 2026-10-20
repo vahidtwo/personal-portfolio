@@ -172,3 +172,13 @@ def test_dashboard_copy_uses_persian_comma(client, no_network):
     hero = html[html.index('class="summary dash-hero"'):html.index('id="chart-panel"')]
     assert "·" not in hero
     assert 'aria-label="نمایش یا پنهان کردن خالص دارایی"' in html
+
+
+def test_recent_failure_keeps_relative_line_but_shows_alert(client, no_network):
+    from app import price_fetch_state
+
+    _with_asset(client)
+    _price_at(_now() - timedelta(minutes=20))
+    price_fetch_state.record(False)
+    html = client.get("/dashboard").text
+    assert "قیمت‌ها <b>۲۰ دقیقه پیش</b> به‌روز شد" in html and "قیمت تازه از چنده نرسید" in html

@@ -62,7 +62,7 @@
     <span class="market-bar-status v2-fresh{% if ps != 'fresh' %} v2-stale{% endif %}" id="price-line" tabindex="-1" title="{{ fetched_label }} وقت تهران">
       <span class="v2-dot" aria-hidden="true"></span>
       {%- if not price.age %}<span>هنوز قیمتی دریافت نشده</span>
-      {%- elif ps == 'fresh' %}<span>قیمت‌ها <b>{{ price.age }} پیش</b> به‌روز شد<span class="sr-only">، {{ fetched_label }} وقت تهران</span></span>
+      {%- elif not price.old %}<span>قیمت‌ها <b>{{ price.age }} پیش</b> به‌روز شد<span class="sr-only">، {{ fetched_label }} وقت تهران</span></span>
       {%- else %}<span>قیمت‌ها <b>{{ price.age }}</b> است به‌روز نشده‌اند<span class="sr-only">، آخرین بار {{ fetched_label }} وقت تهران</span></span>{% endif %}
     </span>
     <form method="post" action="/dashboard/refresh-prices" class="market-bar-form" id="refresh-prices-form">

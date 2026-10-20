@@ -418,7 +418,8 @@ def price_status(fetched_at, now) -> dict:
         state = "stale"
     else:
         state = "fresh"
-    return {"state": state, "age": age_label_fa(age) if age is not None else None}
+    old = age is None or age >= PRICE_STALE_AFTER
+    return {"state": state, "old": old, "age": age_label_fa(age) if age is not None else None}
 
 
 def market_price_refresh_wait_seconds(db: Session) -> int:

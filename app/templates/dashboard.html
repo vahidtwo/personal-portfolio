@@ -33,6 +33,9 @@
 </section>
 {% else %}
 <div class="dash">
+{#- Two independent columns from 900px (side cards keep their natural height); display:contents on phones keeps the
+    single-column order hero, tiles, assets, chart, report from the grid areas. -#}
+<div class="dash-main">
 <section class="summary dash-hero" dir="rtl" aria-labelledby="total-heading">
   <div class="hero-label">
     <div class="hero-title"><h1 id="total-heading" aria-describedby="total-sub">خالص دارایی</h1><p class="h-sub" id="total-sub">دارایی منهای بدهی</p></div>
@@ -82,26 +85,6 @@
   </div>
   {% endif %}
 </section>
-
-<div class="tiles dash-tiles">
-  <a class="tile" href="/profile?tab=debts" id="tile-next-debt">
-    <div class="t">{{ ui_icon('cal') }}قسط بعدی</div>
-    {% if next_instalment %}
-    <div class="v"><bdi dir="ltr">{{ next_instalment.amount_label }}</bdi> <span class="s">تومان</span></div>
-    <div class="s">{{ next_instalment.title }}، {{ next_instalment.date_label }}</div>
-    <div class="row"><span class="badge badge-due{% if next_instalment.days <= 3 %} is-soon{% endif %}">{{ next_instalment.chip }}</span></div>
-    {% else %}
-    <div class="v v-empty">قسطی ثبت نشده</div>
-    <div class="row"><span class="btn-text">{{ ui_icon('plus') }}افزودن بدهی</span></div>
-    {% endif %}
-  </a>
-  <a class="tile" href="/dashboard?tab=daily" id="tile-month-spend">
-    <div class="t">{{ ui_icon('spend') }}خرج این ماه</div>
-    <div class="v"><bdi dir="ltr">{{ month_spend.month_label }}</bdi> <span class="s">تومان</span></div>
-    <div class="s">{{ month_spend.month_title }}</div>
-    <div class="row"><span class="badge badge-acc">امروز: <bdi dir="ltr">{{ month_spend.today_label }}</bdi> تومان</span></div>
-  </a>
-</div>
 
 <section class="card chart-card dash-chart" id="chart-panel" aria-labelledby="chart-heading">
   <div class="chart-top">
@@ -230,6 +213,27 @@
   {% endif %}
 </section>
 
+</div>
+<div class="dash-side">
+<div class="tiles dash-tiles">
+  <a class="tile" href="/profile?tab=debts" id="tile-next-debt">
+    <div class="t">{{ ui_icon('cal') }}قسط بعدی</div>
+    {% if next_instalment %}
+    <div class="v"><bdi dir="ltr">{{ next_instalment.amount_label }}</bdi> <span class="s">تومان</span></div>
+    <div class="s">{{ next_instalment.title }}، {{ next_instalment.date_label }}</div>
+    <div class="row"><span class="badge badge-due{% if next_instalment.days <= 3 %} is-soon{% endif %}">{{ next_instalment.chip }}</span></div>
+    {% else %}
+    <div class="v v-empty">قسطی ثبت نشده</div>
+    <div class="row"><span class="btn-text">{{ ui_icon('plus') }}افزودن بدهی</span></div>
+    {% endif %}
+  </a>
+  <a class="tile" href="/dashboard?tab=daily" id="tile-month-spend">
+    <div class="t">{{ ui_icon('spend') }}خرج این ماه</div>
+    <div class="v"><bdi dir="ltr">{{ month_spend.month_label }}</bdi> <span class="s">تومان</span></div>
+    <div class="s">{{ month_spend.month_title }}</div>
+    <div class="row"><span class="badge badge-acc">امروز: <bdi dir="ltr">{{ month_spend.today_label }}</bdi> تومان</span></div>
+  </a>
+</div>
 <aside class="card dash-pie" id="pie-panel" aria-labelledby="pie-heading">
   <div class="card-head"><h2 id="pie-heading">توزیع دارایی‌ها</h2></div>
   {% if pie_has_data %}
@@ -262,6 +266,7 @@
     <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
   </dl>
 </section>
+</div>
 </div>
 {% endif %}
 {% else %}

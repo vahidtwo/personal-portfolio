@@ -232,7 +232,8 @@ def test_layout_css_contract():
     block = css[css.index("Dashboard (Phase 2"):]
     assert "@media (min-width: 900px)" in block and "@media (max-width: 899px)" in block
     assert '"hero" "tiles" "assets" "chart" "report"' in block  # home v2 phones: actionable tiles right after the hero
-    assert '"hero tiles"' in block  # desktop: tiles beside the hero
+    assert 'grid-template-areas: "main side"' in block  # desktop: two independent columns (side cards beside the hero)
+    assert ".dash-main, .dash-side { display: contents; }" in block  # phones: wrappers vanish, order unchanged
     assert "#chart-asset-select:focus-visible" in block and ".range button:focus-visible" in block
     assert "#chart-fullscreen { display: none; }" not in css  # full screen reachable on phones
     assert ".dash-tiles { align-self: start; }" in block and "grid-auto-rows: 1fr" not in block  # tiles size to content
@@ -363,3 +364,16 @@ def test_hero_heading_title_and_muted_subline(client):
     assert '<h1 id="total-heading" aria-describedby="total-sub">خالص دارایی</h1>' in html
     assert '<p class="h-sub" id="total-sub">دارایی منهای بدهی</p>' in html
     assert "(دارایی منهای بدهی)" not in html
+
+
+def test_side_cards_live_in_their_own_column(client, no_network):
+    """Fix (live 1280px gaps): tiles, pie and report are stacked in .dash-side; hero, chart and assets in .dash-main."""
+    _register(client)
+    client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})
+    html = client.get("/dashboard").text
+    main = html[html.index('<div class="dash-main">'):html.index('<div class="dash-side">')]
+    side = html[html.index('<div class="dash-side">'):]
+    for cls in ("dash-hero", "dash-chart", "dash-assets"):
+        assert cls in main and cls not in side.split("</main>")[0], cls
+    for cls in ("dash-tiles", "dash-pie", "dash-report"):
+        assert cls in side and cls not in main, cls

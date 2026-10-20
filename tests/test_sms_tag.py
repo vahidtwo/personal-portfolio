@@ -18,8 +18,8 @@ def test_sms_spend_shows_tag_and_hides_internal_key(client, no_network):
     _register(client)
     _sms_spend(client, "برداشت از کارت **** خرید فروشگاه نمونه")
     html = client.get("/dashboard?tab=daily").text
-    assert '<span class="tag tag-sms" title="ثبت خودکار از پیامک">از پیامک</span>' in html
-    assert "[" + "a" * 64 + "]" not in html.split("<tbody>")[1].split("</tbody>")[0]
+    assert '<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>' in html
+    assert "[" + "a" * 64 + "]" not in html.split("data-sp-days")[1].split("</ul>")[0]
     assert "برداشت از کارت **** خرید فروشگاه نمونه" in html
 
 

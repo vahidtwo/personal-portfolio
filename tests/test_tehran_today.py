@@ -27,9 +27,11 @@ def _tehran(*args):
 
 def _month_line(client, query=""):
     html = client.get("/dashboard?tab=daily" + query).text
-    m = re.search(r'امروز: <span class="num">([^<]+)</span> تومان · این ماه: <span class="num">([^<]+)</span>', html)
-    title = re.search(r"<strong>([^<]+ [۰-۹]{4})</strong>", html).group(1)
-    return title, m.group(1), m.group(2)
+    # Spending v2 tiles: «امروز» + «این ماه», or a single «جمع {ماه}» for a past month (no «امروز» there).
+    today = re.search(r'<span>امروز</span><b class="num">([^<]+)</b>', html)
+    month = re.search(r'<span>(?:این ماه|جمع [^<]+)</span><b class="num">([^<]+)</b>', html)
+    title = re.search(r"data-sp-title>([^<]+ [۰-۹]{4})</strong>", html).group(1)
+    return title, today.group(1) if today else None, month.group(1)
 
 
 def test_tehran_today_ignores_server_timezone(client, freeze):

@@ -74,7 +74,7 @@ def test_settings_anchor_exists_and_profile_features_unchanged(client, no_networ
     assert 'name="new_password"' in html  # account form is shown under settings
     assert 'name="gold_grams"' not in html  # Phase 1 piece 2: assets moved to /assets
     # privacy toggle and the collapsed «پیشرفته» MCP section are untouched
-    assert 'data-privacy-toggle="salary"' in client.get("/profile?tab=debts").text
+    assert 'data-salary-reveal' in client.get("/profile?tab=debts").text
     assert 'id="advanced"' in html and 'id="mcp-heading"' in html
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html
 

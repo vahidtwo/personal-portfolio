@@ -8,7 +8,7 @@ import secrets
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.config import PUBLIC_BASE_URL
@@ -171,13 +171,12 @@ async def revoke_mcp_token(
     flash(request, "توکن MCP حذف شد.")
     return RedirectResponse("/profile", status_code=303)
 def _account_form(user: User, **overrides: str) -> dict[str, str]:
-    salary = Decimal(getattr(user, "salary_toman", 0) or 0)
-    text = format_amount_input(salary)
+    # Privacy mode: the stored salary is never put in the form; the input starts empty.
     data = {
         "full_name": user.full_name or "",
         "username": user.username,
         "mobile": user.mobile or "",
-        "salary_toman": text,
+        "salary_toman": "",
     }
     data.update(overrides)
     return data
@@ -216,7 +215,7 @@ async def profile_account(
     full_name: str = Form(""),
     username: str = Form(""),
     mobile: str = Form(""),
-    salary_toman: str = Form("0"),
+    salary_toman: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
     csrf: str = Form(""),
@@ -230,7 +229,7 @@ async def profile_account(
         "full_name": full_name.strip()[:80],
         "username": username,
         "mobile": mobile,
-        "salary_toman": salary_toman,
+        "salary_toman": "",  # never echoed back into the page
     }
     name = normalize_username(username)
     name_error = validate_username(name) or admin_name_change_error(user.username, name)
@@ -243,7 +242,11 @@ async def profile_account(
     if phone_error:
         return _render_account_error(request, db, user, phone_error, account)
     try:
-        salary = parse_decimal(salary_toman, field="حقوق ماهانه")
+        # Empty input = keep the stored salary (the form never shows it).
+        if to_latin_digits(salary_toman or "").strip() == "":
+            salary = Decimal(user.salary_toman or 0)
+        else:
+            salary = parse_decimal(salary_toman, field="حقوق ماهانه")
     except Exception as exc:
         return _render_account_error(
             request,
@@ -382,3 +385,19 @@ def holdings_form(user: User) -> dict[str, str]:
         "usd": format_qty_input(Decimal(user.usd or 0), 2),
         "cash_toman": format_amount_input(Decimal(user.cash_toman or 0)),
     }
+
+
+@router.get("/api/salary")
+def salary_reveal(request: Request, db: Session = Depends(get_db)):
+    """Salary and مانده for the signed-in user only, fetched when the eye button is tapped."""
+    no_store = {"Cache-Control": "no-store, private", "Pragma": "no-cache", "Vary": "Cookie"}
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"error": "login"}, status_code=401, headers=no_store)
+    from app.expenses import monthly_view
+
+    monthly = monthly_view(db, user)
+    return JSONResponse(
+        {"salary": monthly["income_month_label"], "left": monthly["monthly_left_label"]},
+        headers=no_store,
+    )

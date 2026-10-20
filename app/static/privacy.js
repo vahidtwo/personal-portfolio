@@ -1,6 +1,6 @@
 (function () {
-  var keys = { portfolio: "privacy-portfolio", salary: "privacy-salary" };
-  var showAttr = { portfolio: "showPortfolio", salary: "showSalary" };
+  var keys = { portfolio: "privacy-portfolio" };
+  var showAttr = { portfolio: "showPortfolio" };
 
   function isHidden(kind) {
     try {
@@ -29,4 +29,59 @@
       paint(kind);
     });
   });
+})();
+
+// Monthly salary (and the مانده derived from it) is never in the page HTML.
+// The eye button fetches it from /api/salary and keeps it only in the DOM; nothing is stored,
+// so every reload or navigation shows the mask again.
+(function () {
+  var MASK = "••••••";
+  var buttons = document.querySelectorAll("[data-salary-reveal]");
+  if (!buttons.length) return;
+  var shown = false;
+
+  function fields() {
+    return document.querySelectorAll("[data-salary-field]");
+  }
+
+  function setButtons(hidden, busy) {
+    buttons.forEach(function (b) {
+      b.setAttribute("aria-pressed", hidden ? "true" : "false");
+      b.setAttribute("aria-label", hidden ? "نمایش مبلغ" : "پنهان کردن");
+      if (busy) b.setAttribute("aria-busy", "true");
+      else b.removeAttribute("aria-busy");
+    });
+  }
+
+  function hide() {
+    fields().forEach(function (el) { el.textContent = MASK; });
+    shown = false;
+    setButtons(true, false);
+  }
+
+  function show() {
+    setButtons(true, true);
+    fetch("/api/salary", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("salary " + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        fields().forEach(function (el) {
+          var v = data[el.getAttribute("data-salary-field")];
+          el.textContent = typeof v === "string" ? v : MASK;
+        });
+        shown = true;
+        setButtons(false, false);
+      })
+      .catch(function () { hide(); });
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () { if (shown) hide(); else show(); });
+  });
+  // Back/forward cache restores the old DOM: mask again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) hide(); });
+  window.addEventListener("pagehide", hide);
+  hide();
 })();

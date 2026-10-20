@@ -68,6 +68,8 @@ const PRECACHE = [
 function bypassServiceWorker(url) {
   if (url.pathname === "/download/my-inventory.apk") return true;
   if (url.pathname.endsWith(".apk")) return true;
+  // Private salary figure: never cached, never served offline.
+  if (url.pathname === "/api/salary") return true;
   return false;
 }
 

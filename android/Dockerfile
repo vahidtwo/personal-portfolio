@@ -49,6 +49,6 @@ RUN --mount=type=secret,id=keystore_properties,target=/run/secrets/signing/keyst
     && printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
     && chmod +x android/gradlew \
     && if [ -s /run/secrets/signing/keystore.properties ]; then export MY_INVENTORY_KEYSTORE_PROPERTIES=/run/secrets/signing/keystore.properties; fi \
-    && cd android && ./gradlew assembleRelease --no-daemon \
+    && cd android && ./gradlew testReleaseUnitTest assembleRelease --no-daemon \
     && mkdir -p /src/out \
     && cp app/build/outputs/apk/release/app-release.apk /src/out/my-inventory.apk

@@ -18,7 +18,8 @@
     try {
       // Values are shown by default; only an explicit "hide" choice ("1") masks them.
       if (localStorage.getItem("privacy-portfolio") !== "1") document.documentElement.dataset.showPortfolio = "1";
-      if (localStorage.getItem("privacy-salary") !== "1") document.documentElement.dataset.showSalary = "1";
+      // Salary is never shown from storage: it is fetched on demand (privacy.js). Drop the old saved choice.
+      localStorage.removeItem("privacy-salary");
     } catch (e) {}
   </script>
   {% if page_url %}<script>try { history.replaceState(history.state, "", {{ page_url | tojson }}); } catch (e) {}</script>{% endif %}

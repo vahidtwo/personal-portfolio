@@ -67,7 +67,7 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
 def test_new_user_sees_add_chips_and_held_rows_hide_their_chip(client, no_network):
     _register(client)
     html = client.get("/assets").text
-    assert html.count("افزودن دارایی در این گروه") == 3
+    assert html.count("افزودن به این گروه") == 3  # assets v2 copy
     assert 'data-add-asset="btc"' in html and re.search(r'data-asset-row="btc"[^>]*hidden', html)
     client.post("/profile", data={"btc": "0.5", "csrf": _csrf(client, "/assets")})
     html = client.get("/assets").text
@@ -102,7 +102,7 @@ def test_invalid_value_shows_assets_page_again_and_saves_nothing(client, no_netw
     client.post("/profile", data={"btc": "2", "csrf": _csrf(client, "/assets")})
     r = client.post("/profile", data={"btc": "1.2.3", "eth": "5", "csrf": _csrf(client, "/assets")})
     assert r.status_code == 200
-    assert "یکی از مقادیر وارد شده نامعتبر است" in r.text and 'class="assets-page"' in r.text
+    assert "۱ مقدار نیاز به اصلاح دارد" in r.text and 'class="assets-page"' in r.text  # assets v2: summary
     assert 'name="btc" value="1.2.3"' in r.text  # what was typed is kept for fixing
     db, u = _user()
     assert u.btc == Decimal("2") and u.eth == 0
@@ -126,8 +126,8 @@ def test_header_total_and_row_values_match_the_dashboard_math(client, no_network
     db.close()
     assert view.total_toman == Decimal("2501000")
     assert re.search(rf'data-assets-total data-base="2501000">{format_toman(view.total_toman)}<', html)
-    assert 'data-asset-row="btc" data-price="10000000" data-base="2500000"' in html
-    assert "قیمت در دسترس نیست" not in html.split('data-asset-row="btc"')[1].split("</div>\n    </div>")[0]
+    assert re.search(r'data-asset-row="btc"[^>]* data-price="10000000" data-base="2500000"', html)
+    assert "قیمت در دسترس نیست" not in html.split('data-asset-row="btc"')[1].split("data-asset-row=")[0]
 
 
 def test_profile_no_longer_has_assets_section(client, no_network):

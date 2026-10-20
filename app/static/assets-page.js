@@ -86,8 +86,10 @@
   function refresh() {
     refreshValues();
     var n = dirtyCount();
+    var removed = form.querySelectorAll(".arow.v2-removed").length;
     bar.hidden = n === 0;
-    countEl.textContent = NF.format(n, 0) + " تغییر ذخیره نشده";
+    // assets v2: name the kind of change when every pending change is a delete
+    countEl.textContent = removed && removed === n ? NF.format(n, 0) + " حذف ذخیره نشده" : NF.format(n, 0) + " تغییر ذخیره نشده";
     setExtraBottom();
   }
 
@@ -114,6 +116,7 @@
 
   form.querySelector("[data-assets-cancel]").addEventListener("click", function () {
     form.reset(); // back to the values that were loaded
+    form.dispatchEvent(new Event("assets:reset"));
     inputs.forEach(function (input) { input.dispatchEvent(new Event("blur")); });
     revealed.forEach(function (item) {
       item.row.hidden = true;
@@ -127,6 +130,8 @@
   form.addEventListener("input", refresh);
   form.addEventListener("change", refresh);
   form.addEventListener("submit", function () { submitting = true; });
+  form.addEventListener("assets:refresh", refresh);
+  form.addEventListener("assets:saved", function () { submitting = true; });
   window.addEventListener("beforeunload", function (event) {
     if (submitting || dirtyCount() === 0) return;
     event.preventDefault();

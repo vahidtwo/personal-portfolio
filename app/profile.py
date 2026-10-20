@@ -21,7 +21,7 @@ from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
 from app.models import Debt, User, utcnow
 from app.sanjeh import SanjehAuthError
-from app.number_input import to_latin_digits
+from app.number_input import FIELD_ERROR_SHORT_FA, field_error_message, quantity_error, to_latin_digits
 from app.security import (
     get_authenticated_user,
     redirect_to_login,
@@ -320,27 +320,26 @@ async def profile_save(
         "cash_toman": cash_toman,
         "sanjeh_token": "",
     }
-    try:
-        user.gold_grams = parse_decimal(gold_grams, field="gold")
-        user.coin_emami = parse_decimal(coin_emami, field="coin_emami")
-        user.coin_bahar = parse_decimal(coin_bahar, field="coin_bahar")
-        user.coin_half = parse_decimal(coin_half, field="coin_half")
-        user.coin_quarter = parse_decimal(coin_quarter, field="coin_quarter")
-        user.coin_gram = parse_decimal(coin_gram, field="coin_gram")
-        user.silver_grams = parse_decimal(silver_grams, field="silver")
-        user.btc = parse_decimal(btc, field="btc")
-        user.ada = parse_decimal(ada, field="ada")
-        user.eth = parse_decimal(eth, field="eth")
-        user.sol = parse_decimal(sol, field="sol")
-        user.doge = parse_decimal(doge, field="doge")
-        user.matic = parse_decimal(matic, field="matic")
-        user.usd = parse_decimal(usd, field="usd")
-        user.cash_toman = parse_decimal(cash_toman, field="cash")
-    except Exception:
+    # Assets v2: validate every field first and collect {field: message}; nothing is assigned or committed
+    # unless all of them are valid. A form post still gets the HTML page (now with inline errors);
+    # a fetch() with Accept: application/json gets 422 {"ok": false, "error", "fields", "reasons"}.
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    reasons: dict[str, str] = {}
+    for name in HOLDING_FORM_FIELDS:
+        reason = quantity_error(form[name], 2 if name == "cash_toman" else 8)
+        if reason:
+            reasons[name] = reason
+    if reasons:
         from app.assets_page import render_assets
 
-        # Nothing is committed on this path; the typed values are shown again on the Assets page.
-        return render_assets(request, db, user, form=form, error="یکی از مقادیر وارد شده نامعتبر است")
+        summary = "یکی از مقادیر وارد شده نامعتبر است"
+        fields = {k: field_error_message(r, 2 if k == "cash_toman" else 8) for k, r in reasons.items()}
+        if wants_json:
+            return JSONResponse({"ok": False, "error": summary, "fields": fields, "reasons": reasons}, status_code=422)
+        return render_assets(request, db, user, form=form, error=summary, field_errors=fields,
+                             field_short={k: FIELD_ERROR_SHORT_FA[r] for k, r in reasons.items()})
+    for name in HOLDING_FORM_FIELDS:
+        setattr(user, name, parse_decimal(form[name], field=name))
     if clear_sanjeh == "1":
         user.sanjeh_token = None
         user.car_toman = Decimal("0")
@@ -362,9 +361,17 @@ async def profile_save(
     # Only where we go next differs: the Assets page asks to come back to itself (exact internal path only).
     if next_url == "/assets":
         flash(request, sanjeh_warning or "ذخیره شد")
+        if wants_json:
+            return JSONResponse({"ok": True, "redirect": "/assets"})
         return RedirectResponse("/assets", status_code=303)
     flash(request, sanjeh_warning or "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
+
+
+HOLDING_FORM_FIELDS = (
+    "gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram", "silver_grams",
+    "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman",
+)
 
 
 def holdings_form(user: User) -> dict[str, str]:

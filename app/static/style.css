@@ -2684,7 +2684,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .sp-cats .sp-chips+.sp-flabel{margin-top:14px}
 .sp-err{display:block;color:var(--danger-text);font-size:12.5px;line-height:1.6;margin-top:6px}.sp-err:empty{display:none}
 .sp-invalid input,.sp-invalid select{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
-.sp-summary a{color:var(--danger-text);font-weight:600;min-height:24px;display:inline-block}
+.sp-summary a{color:var(--danger-text);font-weight:600;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:underline}
 .sp-summary:focus{outline:2px solid var(--danger-text);outline-offset:2px}
 .sp-form .amount-words{color:var(--accent-text);margin:6px 0 0;line-height:20px}
 .sp-amt-msg{min-height:26px}

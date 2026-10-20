@@ -2545,3 +2545,13 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .apk-hint[hidden] { display: none; }
 .nav-link.apk-download { display: flex; gap: 10px; }
 .nav-link.apk-download .main-nav-icon { width: 20px; height: 20px; flex: none; }
+
+/* Batch 1 (Arabi review): every tap target at least 44×44 (box size, not font size). */
+.brand { min-height: 44px; display: inline-flex; align-items: center; }
+.menu-toggle { min-height: 44px; min-width: 44px; }
+#chart-range [data-range] { min-height: 44px; min-width: 44px; }
+.privacy-btn { min-height: 44px; min-width: 44px; }
+.dash a.btn-sm, .dash a.btn-text { min-height: 44px; display: inline-flex; align-items: center; }
+.main-nav-item { min-height: 44px; min-width: 44px; }
+.nav-link { min-height: 44px; }
+[data-theme="light"] .apk-hint { color: #9a4708; }

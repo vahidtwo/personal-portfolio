@@ -7,7 +7,6 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.debts import debt_rows
 from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, next_jalali_due, persian_digits
 from app.models import Debt, MonthlyExpense, User
 from app.number_input import parse_int_required
@@ -30,8 +29,10 @@ def monthly_view(
     editing_expense_id: int | None = None,
 ) -> dict:
     """Monthly cash report. Salary comes only from the profile account field."""
-    loans = db.query(Debt).filter(Debt.user_id == user.id).all()
-    installment = sum((Decimal(row.monthly_toman) for row in loans), Decimal("0"))
+    from app.debt_schedule import active_installment
+
+    # Debts with 0 instalments left are paid off: out of «اقساط این ماه» (and so of مانده / /api/salary).
+    installment = active_installment(db.query(Debt).filter(Debt.user_id == user.id).all())
     income_total = Decimal(user.salary_toman or 0)
     items = (
         db.query(MonthlyExpense)
@@ -81,50 +82,8 @@ def expense_form_for_request(db: Session, user: User, request: Request) -> dict:
             "due_day": editing["due_day"],
         }
     return view
-def _parse_due_day(raw: str) -> tuple[int | None, str | None]:
-    try:
-        day = parse_int_required(raw)
-    except ValueError:
-        return None, "روز ماه باید عدد باشد"
-    if day < 1 or day > 31:
-        return None, "روز ماه باید بین ۱ و ۳۱ باشد"
-    return day, None
-
-
-def _read_expense_fields(title: str, amount_toman: str, due_day: str):
-    form = {"title": title.strip()[:64], "amount_toman": amount_toman, "due_day": due_day}
-    try:
-        amount = parse_decimal(amount_toman, field="مبلغ ماهانه")
-    except Exception as exc:
-        return form, None, None, str(getattr(exc, "detail", None) or "مبلغ ماهانه نامعتبر است")
-    if amount <= 0:
-        return form, None, None, "مبلغ ماهانه باید بیشتر از صفر باشد"
-    day, day_error = _parse_due_day(due_day)
-    return form, amount, day, day_error
-
-
-def _render_expense_error(request, db, user, error, form, editing_expense_id):
-    debts, debt_total, next_debt_label = debt_rows(
-        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
-    )
-    return render(
-        request,
-        "profile.html",
-        db,
-        error=error,
-        flash=None,
-        form=_holdings_form(user),
-        has_sanjeh_token=bool(user.sanjeh_token),
-        car_fetched_label=format_when(user.car_fetched_at),
-        car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        tab="debts",
-        debts=debts,
-        debt_total_label=format_toman(debt_total),
-        next_debt_label=next_debt_label,
-        editing_id=None,
-        debt_form={"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""},
-        **monthly_view(db, user, expense_form=form, editing_expense_id=editing_expense_id),
-    )
+def _expense_form(title: str, amount_toman: str, due_day: str) -> dict:
+    return {"title": title.strip()[:64], "amount_toman": amount_toman, "due_day": due_day}
 
 
 @router.post("/profile/expenses")
@@ -136,17 +95,20 @@ async def profile_add_expense(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    from app.debts import invalid_response, saved_response
+    from app.debt_validation import validate_expense
+
     require_csrf(request, csrf)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
-    form, amount, day, error = _read_expense_fields(title, amount_toman, due_day)
-    if error or amount is None or day is None:
-        return _render_expense_error(request, db, user, error or "مقادیر نامعتبر است", form, None)
-    db.add(MonthlyExpense(user_id=user.id, title=form["title"], amount_toman=amount, due_day=day))
+    form = _expense_form(title, amount_toman, due_day)
+    errors, v = validate_expense(amount_toman, due_day)
+    if errors:
+        return invalid_response(request, db, user, errors, expense_form=form, expense_errors=errors)
+    db.add(MonthlyExpense(user_id=user.id, title=form["title"], amount_toman=v["amount"], due_day=v["day"]))
     db.commit()
-    flash(request, "هزینهٔ ماهانه ذخیره شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
+    return saved_response(request, "هزینهٔ ماهانه اضافه شد")
 
 
 @router.post("/profile/expenses/{expense_id}")
@@ -159,23 +121,26 @@ async def profile_update_expense(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    from app.debts import _not_found, invalid_response, saved_response
+    from app.debt_validation import validate_expense
+
     require_csrf(request, csrf)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
     item = db.get(MonthlyExpense, expense_id)
     if item is None or item.user_id != user.id:
-        flash(request, "هزینهٔ ماهانه پیدا نشد.", error=True)
-        return RedirectResponse("/profile?tab=debts", status_code=303)
-    form, amount, day, error = _read_expense_fields(title, amount_toman, due_day)
-    if error or amount is None or day is None:
-        return _render_expense_error(request, db, user, error or "مقادیر نامعتبر است", form, expense_id)
+        return _not_found(request, "هزینهٔ ماهانه پیدا نشد.")
+    form = _expense_form(title, amount_toman, due_day)
+    errors, v = validate_expense(amount_toman, due_day, Decimal(item.amount_toman))
+    if errors:
+        return invalid_response(request, db, user, errors, expense_form=form, expense_errors=errors,
+                                editing_expense_id=expense_id)
     item.title = form["title"]
-    item.amount_toman = amount
-    item.due_day = day
+    item.amount_toman = v["amount"]
+    item.due_day = v["day"]
     db.commit()
-    flash(request, "هزینهٔ ماهانه به‌روز شد")
-    return RedirectResponse("/profile?tab=debts", status_code=303)
+    return saved_response(request, "تغییرات ذخیره شد")
 
 
 @router.post("/profile/expenses/{expense_id}/delete")

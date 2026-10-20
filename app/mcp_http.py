@@ -91,10 +91,13 @@ def _debts(db: Session, user: User) -> dict:
 
     rows = []
     total = Decimal("0")
+    from app import debt_schedule as ds
+
     for debt in db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all():
-        amount = Decimal(debt.monthly_toman) * Decimal(debt.months_left)
-        total += amount
-        nxt = next_jalali_due(debt.due_day)
+        amount = ds.remaining(debt)
+        if ds.is_active(debt):  # paid-off debts (0 left) stay listed but are out of the total
+            total += amount
+        nxt = ds.next_due(debt)
         rows.append(
             {
                 "id": debt.id,
@@ -103,6 +106,7 @@ def _debts(db: Session, user: User) -> dict:
                 "months_left": debt.months_left,
                 "total_toman": _money(amount),
                 "due_jalali": f"{debt.due_year}/{debt.due_month:02d}/{debt.due_day:02d}",
+                "paid_off": not ds.is_active(debt),
                 "next_due_jalali": f"{nxt.year}/{nxt.month:02d}/{nxt.day:02d}" if nxt else None,
             }
         )
@@ -138,8 +142,9 @@ def _monthly_expenses(db: Session, user: User) -> dict:
 
 def _monthly_left(db: Session, user: User) -> dict:
     """Same figure as the dashboard مانده: salary − installments − monthly expenses."""
-    loans = db.query(Debt).filter(Debt.user_id == user.id).all()
-    installment = sum((Decimal(row.monthly_toman) for row in loans), Decimal("0"))
+    from app.debt_schedule import active_installment
+
+    installment = active_installment(db.query(Debt).filter(Debt.user_id == user.id).all())
     expense_total = sum(
         (
             Decimal(row.amount_toman)

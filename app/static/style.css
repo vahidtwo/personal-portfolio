@@ -2557,3 +2557,9 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .hero-shot{margin-top:16px}
 .hero-shot img{aspect-ratio:1120/747}
 @media (max-width:899px){.hero-shot img{aspect-ratio:360/779;max-width:360px;margin-inline:auto;border-radius:0}}
+
+/* «از پیامک»: spends saved automatically from a bank SMS (category sms_bank + idempotency key in the note) */
+.tag-sms {
+  display: inline-block; padding: 0 8px; line-height: 22px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  white-space: nowrap; background: var(--accent-muted); color: var(--chip-text, var(--accent));
+}

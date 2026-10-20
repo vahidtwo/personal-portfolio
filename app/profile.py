@@ -8,7 +8,7 @@ import secrets
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.config import PUBLIC_BASE_URL
@@ -41,12 +41,15 @@ router = APIRouter()
 
 @router.get("/profile", response_class=HTMLResponse)
 async def profile_form(request: Request, db: Session = Depends(get_db)):
+    tab = request.query_params.get("tab", "settings")
+    if tab == "assets":
+        # Phase 1: assets moved to their own page. Old links keep working (session cookie untouched).
+        return RedirectResponse("/assets", status_code=303)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
-    tab = request.query_params.get("tab", "assets")
-    if tab not in ("assets", "debts"):
-        tab = "assets"
+    if tab != "debts":
+        tab = "settings"
     debts, debt_total, next_debt_label = debt_rows(
         db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
     )
@@ -168,13 +171,12 @@ async def revoke_mcp_token(
     flash(request, "توکن MCP حذف شد.")
     return RedirectResponse("/profile", status_code=303)
 def _account_form(user: User, **overrides: str) -> dict[str, str]:
-    salary = Decimal(getattr(user, "salary_toman", 0) or 0)
-    text = format_amount_input(salary)
+    # Privacy mode: the stored salary is never put in the form; the input starts empty.
     data = {
         "full_name": user.full_name or "",
         "username": user.username,
         "mobile": user.mobile or "",
-        "salary_toman": text,
+        "salary_toman": "",
     }
     data.update(overrides)
     return data
@@ -201,7 +203,7 @@ def _render_account_error(request, db, user, message: str, account: dict):
         has_sanjeh_token=bool(user.sanjeh_token),
         car_fetched_label=format_when(user.car_fetched_at),
         car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        tab="assets",
+        tab="settings",
         account=account,
         account_error=message,
     )
@@ -213,7 +215,7 @@ async def profile_account(
     full_name: str = Form(""),
     username: str = Form(""),
     mobile: str = Form(""),
-    salary_toman: str = Form("0"),
+    salary_toman: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
     csrf: str = Form(""),
@@ -227,7 +229,7 @@ async def profile_account(
         "full_name": full_name.strip()[:80],
         "username": username,
         "mobile": mobile,
-        "salary_toman": salary_toman,
+        "salary_toman": "",  # never echoed back into the page
     }
     name = normalize_username(username)
     name_error = validate_username(name) or admin_name_change_error(user.username, name)
@@ -240,7 +242,11 @@ async def profile_account(
     if phone_error:
         return _render_account_error(request, db, user, phone_error, account)
     try:
-        salary = parse_decimal(salary_toman, field="حقوق ماهانه")
+        # Empty input = keep the stored salary (the form never shows it).
+        if to_latin_digits(salary_toman or "").strip() == "":
+            salary = Decimal(user.salary_toman or 0)
+        else:
+            salary = parse_decimal(salary_toman, field="حقوق ماهانه")
     except Exception as exc:
         return _render_account_error(
             request,
@@ -288,6 +294,7 @@ async def profile_save(
     cash_toman: str = Form("0"),
     sanjeh_token: str = Form(""),
     clear_sanjeh: str = Form(""),
+    next_url: str = Form("", alias="next"),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -330,18 +337,10 @@ async def profile_save(
         user.usd = parse_decimal(usd, field="usd")
         user.cash_toman = parse_decimal(cash_toman, field="cash")
     except Exception:
-        return render(
-            request,
-            "profile.html",
-            db,
-            error="یکی از مقادیر وارد شده نامعتبر است",
-            flash=None,
-            form=form,
-            account=_account_form(user),
-            has_sanjeh_token=bool(user.sanjeh_token),
-            car_fetched_label=format_when(user.car_fetched_at),
-            car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
-        )
+        from app.assets_page import render_assets
+
+        # Nothing is committed on this path; the typed values are shown again on the Assets page.
+        return render_assets(request, db, user, form=form, error="یکی از مقادیر وارد شده نامعتبر است")
     if clear_sanjeh == "1":
         user.sanjeh_token = None
         user.car_toman = Decimal("0")
@@ -360,6 +359,10 @@ async def profile_save(
             sanjeh_warning = "دارایی‌ها ذخیره شد، ولی قیمت خودرو از سنجه گرفته نشد. بعداً دوباره تلاش کنید."
     db.commit()
     await refresh_prices_and_snapshot_user(user.id)
+    # Only where we go next differs: the Assets page asks to come back to itself (exact internal path only).
+    if next_url == "/assets":
+        flash(request, sanjeh_warning or "ذخیره شد")
+        return RedirectResponse("/assets", status_code=303)
     flash(request, sanjeh_warning or "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -382,3 +385,19 @@ def holdings_form(user: User) -> dict[str, str]:
         "usd": format_qty_input(Decimal(user.usd or 0), 2),
         "cash_toman": format_amount_input(Decimal(user.cash_toman or 0)),
     }
+
+
+@router.get("/api/salary")
+def salary_reveal(request: Request, db: Session = Depends(get_db)):
+    """Salary and مانده for the signed-in user only, fetched when the eye button is tapped."""
+    no_store = {"Cache-Control": "no-store, private", "Pragma": "no-cache", "Vary": "Cookie"}
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"error": "login"}, status_code=401, headers=no_store)
+    from app.expenses import monthly_view
+
+    monthly = monthly_view(db, user)
+    return JSONResponse(
+        {"salary": monthly["income_month_label"], "left": monthly["monthly_left_label"]},
+        headers=no_store,
+    )

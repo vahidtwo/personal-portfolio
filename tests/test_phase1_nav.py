@@ -6,7 +6,7 @@ from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
 
 NAV_ORDER = [
     ("home", "خانه", "/dashboard"),
-    ("assets", "دارایی‌ها", "/profile?tab=assets"),
+    ("assets", "دارایی‌ها", "/assets"),
     ("spending", "خرج‌ها", "/dashboard?tab=daily"),
     ("debts", "بدهی‌ها", "/profile?tab=debts"),
     ("settings", "تنظیمات", "/profile?section=settings#account-settings"),
@@ -54,8 +54,8 @@ def test_nav_highlights_exactly_one_active_section(client, no_network):
     cases = {
         "/dashboard": "home",
         "/dashboard?tab=daily": "spending",
-        "/profile": "assets",
-        "/profile?tab=assets": "assets",
+        "/assets": "assets",
+        "/profile": "settings",
         "/profile?tab=debts": "debts",
         "/profile?section=settings": "settings",
     }
@@ -72,9 +72,9 @@ def test_settings_anchor_exists_and_profile_features_unchanged(client, no_networ
     html = client.get("/profile?section=settings").text
     assert 'id="account-settings"' in html
     assert 'name="new_password"' in html  # account form is shown under settings
-    assert 'name="gold_grams"' in html    # still the same assets tab underneath
+    assert 'name="gold_grams"' not in html  # Phase 1 piece 2: assets moved to /assets
     # privacy toggle and the collapsed «پیشرفته» MCP section are untouched
-    assert 'data-privacy-toggle="salary"' in client.get("/profile?tab=debts").text
+    assert 'data-salary-reveal' in client.get("/profile?tab=debts").text
     assert 'id="advanced"' in html and 'id="mcp-heading"' in html
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html
 
@@ -136,6 +136,7 @@ def test_bottom_bar_css_contract():
     assert "body.has-main-nav { padding-bottom: calc(var(--main-nav-h) + env(safe-area-inset-bottom) + var(--page-extra-bottom)); }" in mobile
     assert "minmax(var(--main-nav-item-min), 1fr)" in mobile and "--main-nav-item-min: 44px" in block
     assert "html.is-typing .main-nav" in mobile  # keyboard open -> bar hidden
-    assert "position: fixed" not in desktop[:desktop.index("@media (max-width: 899px)")]
+    # desktop: the nav (after <main> in the HTML) is placed in the top bar with fixed positioning
+    assert "position: fixed" in desktop[:desktop.index("@media (max-width: 899px)")]
     assert ".top-tabs" not in css and "#6b7287" not in css.lower()
     assert "::placeholder { color: var(--text-muted)" in css

@@ -1,6 +1,10 @@
 const VERSION = "inventory-v__STATIC_ASSET_VERSION__";
 const STATIC_CACHE = VERSION + "-static";
 const PAGE_CACHE = VERSION + "-pages";
+// The offline copy of the dashboard is private data: it must not outlive the session cookie.
+// Each stored copy carries the time it was stored (CACHED_AT_HEADER); older than this = deleted, not served.
+const SESSION_MAX_AGE_MS = Number("__SESSION_MAX_AGE_MS__") || 30 * 24 * 60 * 60 * 1000;
+const CACHED_AT_HEADER = "x-inventory-cached-at";
 
 const PRECACHE = [
   "/offline.html",
@@ -10,6 +14,7 @@ const PRECACHE = [
   "/static/number-format.js",
   "/static/dashboard.js",
   "/static/amount-input.js",
+  "/static/leave-guard.js",
   "/static/table-sort.js",
   "/static/pwa.js",
   "/static/logo.svg",
@@ -50,6 +55,8 @@ const PRECACHE = [
 function bypassServiceWorker(url) {
   if (url.pathname === "/download/my-inventory.apk") return true;
   if (url.pathname.endsWith(".apk")) return true;
+  // Private salary figure: never cached, never served offline.
+  if (url.pathname === "/api/salary") return true;
   return false;
 }
 
@@ -115,33 +122,82 @@ async function networkFirstStatic(request) {
   }
 }
 
+function clearPrivatePages() {
+  return caches.delete(PAGE_CACHE);
+}
+
+// The session is over (or never was): 401/403, or the server sent us to the login page.
+function isSessionEnd(response) {
+  if (!response) return false;
+  if (response.status === 401 || response.status === 403) return true;
+  if (response.redirected) {
+    try {
+      if (new URL(response.url).pathname === "/login") return true;
+    } catch (e) {}
+  }
+  return false;
+}
+
+function isLoginUrl(url) {
+  return url.origin === self.location.origin && url.pathname === "/login";
+}
+
+async function withCachedAt(response, now) {
+  const headers = new Headers(response.headers);
+  headers.set(CACHED_AT_HEADER, String(now));
+  const body = await response.clone().arrayBuffer();
+  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function isFresh(response, now) {
+  const stamp = Number(response.headers.get(CACHED_AT_HEADER));
+  if (!stamp || !Number.isFinite(stamp)) return false; // a copy without a timestamp is never trusted
+  return now - stamp >= 0 && now - stamp < SESSION_MAX_AGE_MS;
+}
+
+// A cached private page that is still within the session lifetime, or null (an expired one is deleted).
+async function freshCachedPage(cache, key, now) {
+  const cached = await cache.match(key);
+  if (!cached) return null;
+  if (isFresh(cached, now)) return cached;
+  await cache.delete(key);
+  return null;
+}
+
 async function networkFirstDashboard(request) {
   const cache = await caches.open(PAGE_CACHE);
+  let response;
   try {
-    const response = await fetch(request);
-    if (response.redirected) {
-      const finalUrl = new URL(response.url);
-      if (finalUrl.pathname === "/login") {
-        await caches.delete(PAGE_CACHE);
-        return response;
-      }
-    }
-    const type = response.headers.get("content-type") || "";
-    if (response.ok && type.includes("text/html")) {
-      await cache.put(request, response.clone());
-    }
-    return response;
+    response = await fetch(request);
   } catch (err) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    const portfolio = await cache.match("/dashboard");
-    if (portfolio) return portfolio;
-    const daily = await cache.match("/dashboard?tab=daily");
-    if (daily) return daily;
+    const now = Date.now();
+    const page =
+      (await freshCachedPage(cache, request, now)) ||
+      (await freshCachedPage(cache, "/dashboard", now)) ||
+      (await freshCachedPage(cache, "/dashboard?tab=daily", now));
+    if (page) return page;
     const offline = await caches.match("/offline.html");
     if (offline) return offline;
     throw err;
   }
+  // /dashboard only redirects when there is no valid session (to /login). A navigation fetch does not
+  // follow redirects ("opaqueredirect"), so any redirect here also ends the offline copy.
+  if (isSessionEnd(response) || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    await clearPrivatePages();
+    return response;
+  }
+  const type = response.headers.get("content-type") || "";
+  if (response.ok && type.includes("text/html")) {
+    await cache.put(request, await withCachedAt(response, Date.now()));
+  }
+  return response;
+}
+
+// Any other same-origin request: pass through, but a 401/403 or a redirect to /login ends the offline copy.
+async function watchSession(request) {
+  const response = await fetch(request);
+  if (isSessionEnd(response)) await clearPrivatePages();
+  return response;
 }
 
 self.addEventListener("fetch", (event) => {
@@ -152,7 +208,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request, { redirect: "manual" }).then(async (response) => {
         if (response.status === 302 || response.status === 303 || response.type === "opaqueredirect") {
-          await caches.delete(PAGE_CACHE);
+          await clearPrivatePages();
         }
         return response;
       })
@@ -160,9 +216,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return;
+
+  if (request.method !== "GET") {
+    // Form POSTs are left to the browser (an expired session redirects them to /login, handled below).
+    if (url.pathname.startsWith("/api/")) event.respondWith(watchSession(request));
+    return;
+  }
 
   if (bypassServiceWorker(url)) return;
+
+  // Reaching the login page means there is no session (logged out, expired or never logged in).
+  if (request.mode === "navigate" && isLoginUrl(url)) {
+    event.respondWith(clearPrivatePages().then(() => fetch(request)).catch(async () => {
+      const offline = await caches.match("/offline.html");
+      return offline || Response.error();
+    }));
+    return;
+  }
 
   if (url.pathname.startsWith("/static/")) {
     if (isMutableStatic(url.pathname)) {
@@ -180,11 +251,21 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" || url.pathname === "/offline.html") {
     event.respondWith(
-      fetch(request).catch(async () => {
-        const offline = await caches.match("/offline.html");
-        if (offline) return offline;
-        return Response.error();
-      })
+      fetch(request)
+        .then(async (response) => {
+          if (isSessionEnd(response)) await clearPrivatePages();
+          return response;
+        })
+        .catch(async () => {
+          const offline = await caches.match("/offline.html");
+          if (offline) return offline;
+          return Response.error();
+        })
     );
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(watchSession(request));
   }
 });

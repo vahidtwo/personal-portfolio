@@ -72,7 +72,7 @@
       {% endif %}
     </div>
     <div class="summary-actions">
-      <a class="btn btn-primary" href="/profile">ویرایش موجودی</a>
+      <a class="btn btn-primary" href="/assets">ویرایش موجودی</a>
     </div>
   </div>
 
@@ -84,20 +84,20 @@
       <canvas id="allocation-chart" role="img" aria-label="نمودار سهم هر دارایی از ارزش کل"></canvas>
     </div>
     {% else %}
-    <p class="chart-empty chart-empty-compact">هنوز دارایی‌ای با ارزش بیشتر از صفر ندارید. <a href="/profile">افزودن دارایی</a></p>
+    <p class="chart-empty chart-empty-compact">هنوز دارایی‌ای با ارزش بیشتر از صفر ندارید. <a href="/assets">افزودن دارایی</a></p>
     {% endif %}
   </aside>
 </section>
 
 <section class="card" aria-labelledby="month-report-heading">
   <div class="card-head">
-    <h2 id="month-report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-privacy-toggle="salary" aria-pressed="true" aria-label="نمایش یا پنهان کردن مانده"><svg class="privacy-icon privacy-icon-hide" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9.5 4.5 10.5 7-.4 1-1.2 2.3-2.3 3.5M6.1 6.1C4.2 7.5 2.8 9.4 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="privacy-icon privacy-icon-show" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg><span class="privacy-label privacy-label-show">نمایش</span><span class="privacy-label privacy-label-hide">پنهان کردن</span></button></h2>
+    <h2 id="month-report-heading"><img class="section-logo" src="/static/logos/section-report.svg" alt="" width="20" height="20">گزارش ماهانه <button type="button" class="privacy-btn" data-salary-reveal aria-pressed="true" aria-label="نمایش مبلغ"><svg class="privacy-icon privacy-icon-hide" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9.5 4.5 10.5 7-.4 1-1.2 2.3-2.3 3.5M6.1 6.1C4.2 7.5 2.8 9.4 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="privacy-icon privacy-icon-show" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg><span class="privacy-label privacy-label-show">نمایش</span><span class="privacy-label privacy-label-hide">پنهان کردن</span></button></h2>
     <p class="card-desc">مانده = حقوق − اقساط این ماه − هزینهٔ ماهانه. روی ارزش پرتفوی اثری ندارد.</p>
   </div>
   <dl class="net-line">
     <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr">{{ installment_month_label }}</bdi> تومان</dd></div>
     <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr">{{ expense_month_label }}</bdi> تومان</dd></div>
-    <div><dt>مانده</dt><dd class="num" data-mask="salary"><bdi dir="ltr">{{ monthly_left_label }}</bdi> تومان</dd></div>
+    <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
   </dl>
 </section>
 
@@ -136,7 +136,7 @@
       <canvas id="timeline-chart" role="img" aria-label="نمودار زمانی ارزش پرتفوی به تومان"></canvas>
     </div>
   </div>
-  <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/profile">ثبت دارایی</a></p>
+  <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/assets">افزودن دارایی</a></p>
 </section>
 
 <section class="card" aria-labelledby="table-heading">
@@ -148,7 +148,7 @@
   <div class="empty-state">
     <p class="empty-state-title">هنوز دارایی‌ای ثبت نکرده‌اید</p>
     <p class="empty-state-hint">مقدار طلا، سکه، ارز، دلار یا نقد خود را وارد کنید تا ارزش لحظه‌ای و سهم هر دارایی را اینجا ببینید.</p>
-    <a class="btn btn-primary" href="/profile">افزودن دارایی</a>
+    <a class="btn btn-primary" href="/assets">افزودن دارایی</a>
   </div>
   {% else %}
   <div class="table-wrap">
@@ -227,7 +227,7 @@
     </table>
   </div>
   {% if hidden_zero_count > 0 %}
-  <p class="table-note">{{ hidden_zero_count | string | fa }} دارایی با مقدار صفر پنهان است. <a href="/profile">ویرایش موجودی</a></p>
+  <p class="table-note">{{ hidden_zero_count | string | fa }} دارایی با مقدار صفر پنهان است. <a href="/assets">ویرایش موجودی</a></p>
   {% endif %}
   {% endif %}
 </section>
@@ -258,5 +258,6 @@
 {% else %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
+<script src="/static/leave-guard.js?v={{ static_v }}" defer></script>
 {% endif %}
 {% endblock %}

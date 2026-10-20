@@ -13,6 +13,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'inventory
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 HTTPS_ONLY = os.environ.get("HTTPS_ONLY", "0") == "1"
 SESSION_COOKIE_NAME = "inventory_session"
+# Session cookie lifetime. The service worker's offline copy of the dashboard expires after the same time.
+SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 CHANDE_URL = os.environ.get(
     "CHANDE_URL",
     "https://chande.net/api/v1/prices/current",
@@ -21,7 +23,7 @@ PRICE_REFRESH_HOURS = int(os.environ.get("PRICE_REFRESH_HOURS", "1"))
 PRICE_MANUAL_REFRESH_MINUTES = int(os.environ.get("PRICE_MANUAL_REFRESH_MINUTES", "5"))
 ENABLE_INTERNAL_SCHEDULER = os.environ.get("ENABLE_INTERNAL_SCHEDULER", "1") == "1"
 # Bump when static JS/CSS change so browsers and the service worker pick up new assets.
-STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20261017h")
+STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20261020a")
 # Public origin shown to users (e.g. MCP URL). Empty = use the request's own base URL.
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 

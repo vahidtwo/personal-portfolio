@@ -173,13 +173,13 @@ def test_unchanged_profile_resubmit_keeps_every_value(client, no_network):
         return out
 
     before = snapshot()
-    html = client.get("/profile").text
+    html = client.get("/assets").text  # Phase 1: the assets form lives on /assets, still posting to /profile
     assets = _form_fields(html, "/profile")
     assert assets["ada"] == "۰٫۱۲۳۴۵۶۷۸" and assets["gold_grams"] == "۱۲٫۵"
     assert assets["btc"] == "۰٫۰۰۰۰۰۰۰۱" and assets["cash_toman"] == "۱۸٬۵۰۰٬۰۰۰٬۰۰۰"
     assert client.post("/profile", data=assets).status_code == 200
     account = _form_fields(client.get("/profile").text, "/profile/account")
-    assert account["salary_toman"] == "۴۵٬۰۰۰٬۰۰۰٫۵"
+    assert account["salary_toman"] == ""  # privacy mode: stored salary never in the form; empty keeps it
     client.post("/profile/account", data={**account, "current_password": "", "new_password": ""})
     assert snapshot() == before
     assert snapshot()["ada"] == Decimal("0.12345678")

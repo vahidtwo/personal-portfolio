@@ -20,3 +20,9 @@ data/
 *.keystore
 keystore.properties
 .my-inventory-release/
+
+# IDE files
+.idea/
+
+# Firebase client config (never commit)
+android/app/google-services.json

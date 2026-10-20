@@ -100,7 +100,7 @@
           <td>{{ row.parent_name }}</td>
           <td>{{ row.child_name }}</td>
           <td class="num">{{ row.amount_label }}</td>
-          <td>{{ row.note or "—" }}</td>
+          <td>{% if row.from_sms %}<span class="tag tag-sms" title="ثبت خودکار از پیامک">از پیامک</span> {% endif %}{{ row.note_display or "—" }}</td>
           <td class="row-actions">
             <a class="btn btn-ghost btn-sm" href="/dashboard?tab=daily&jy={{ daily_year }}&jm={{ daily_month }}&page={{ daily_page }}&edit_spend={{ row.id }}">ویرایش</a>
             <form method="post" action="/profile/spends/{{ row.id }}/delete" class="inline-form" onsubmit="return confirm('این خرج حذف شود؟');">

@@ -24,6 +24,22 @@ from app.number_input import parse_int_required
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
+import re as _re
+
+# A spend saved by the Android app from an SMS: category «بانک» (slug sms_bank) and the note starts with
+# the app's idempotency key «[<64 hex>]» (see api_sms_spend). No DB column needed; manual spends never
+# get this prefix from the web form.
+_SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
+
+
+def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, str]:
+    """(from_sms, note without the internal key) for one spend."""
+    note = note or ""
+    m = _SMS_KEY_PREFIX.match(note)
+    if m and category_slug == "sms_bank":
+        return True, note[m.end():]
+    return False, note
+
 router = APIRouter()
 
 def _viewed_jalali_month(request: Request, jy: str | None = None, jm: str | None = None) -> tuple[int, int]:
@@ -85,6 +101,8 @@ def daily_view(
                 "child_name": child.name if child else "—",
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
+                "from_sms": sms_spend_parts(row.note, child.slug if child else None)[0],
+                "note_display": sms_spend_parts(row.note, child.slug if child else None)[1],
                 "year": spent.year,
                 "month": spent.month,
                 "day": spent.day,

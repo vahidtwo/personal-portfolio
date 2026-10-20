@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import math
 import random
 import sys
 from datetime import datetime, timedelta, timezone
@@ -86,7 +87,8 @@ def _curve(hours_ago: int, rng: random.Random) -> float:
         return t7 + (t1 - t7) * (1 - (hours_ago - 24) / 144)
     span = 365 * 24 - 168
     base = 470_000_000 + (t7 - 470_000_000) * (1 - (hours_ago - 168) / span)
-    return base * (1 + rng.uniform(-0.008, 0.008))
+    # steady rise for the landing hero: a slow, small wave plus very little noise (no zigzag in the month view)
+    return base * (1 + 0.003 * math.sin(hours_ago / 170) + rng.uniform(-0.0012, 0.0012))
 
 
 def seed() -> None:

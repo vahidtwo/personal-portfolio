@@ -30,7 +30,7 @@ def _user(name="alice"):
 
 def test_assets_requires_login(client):
     r = client.get("/assets", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/login"
+    assert r.status_code == 303 and r.headers["location"] == "/auth"
 
 
 def test_old_profile_assets_urls_redirect_to_assets_and_keep_login(client, no_network):

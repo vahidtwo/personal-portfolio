@@ -472,10 +472,6 @@ body.menu-open { overflow: hidden; }
   gap: 12px;
 }
 
-.intro-previews-lg {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
-}
 
 .preview-card {
   margin: 0;
@@ -549,9 +545,6 @@ body.menu-open { overflow: hidden; }
   gap: 10px;
 }
 
-.landing-onboarding {
-  margin-top: 4px;
-}
 
 .nav-link-accent {
   color: var(--accent) !important;
@@ -2564,4 +2557,3 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .hero-shot{margin-top:16px}
 .hero-shot img{aspect-ratio:1120/747}
 @media (max-width:899px){.hero-shot img{aspect-ratio:360/779;max-width:360px;margin-inline:auto;border-radius:0}}
-.shot-phone img{max-width:300px;margin-inline:auto;border-radius:0}

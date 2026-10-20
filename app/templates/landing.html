@@ -1,59 +1,88 @@
-{% extends "base.html" %}
-{% block title %}موجودی من — پرتفوی شخصی{% endblock %}
-{% block content %}
-<div class="landing shell-wide">
-  <section class="landing-hero page-split" aria-labelledby="landing-heading">
-    <div class="landing-hero-copy">
-      {% set show_previews = false %}
-      {% include "partials/intro_panel.html" %}
-    <figure class="shot hero-shot" dir="rtl">
-    <picture>
-      <source media="(max-width: 899px) and (prefers-color-scheme: light)" srcset="/static/landing/hero-phone-light-360.webp?v={{ static_v }} 360w, /static/landing/hero-phone-light-720.webp?v={{ static_v }} 720w" sizes="80vw" width="360" height="779">
-      <source media="(max-width: 899px)" srcset="/static/landing/hero-phone-dark-360.webp?v={{ static_v }} 360w, /static/landing/hero-phone-dark-720.webp?v={{ static_v }} 720w" sizes="80vw" width="360" height="779">
-      <source media="(prefers-color-scheme: light)" srcset="/static/landing/hero-light-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-light-1680.webp?v={{ static_v }} 1680w" sizes="560px" width="1120" height="747">
-      <img src="/static/landing/hero-dark-1120.webp?v={{ static_v }}" srcset="/static/landing/hero-dark-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-dark-1680.webp?v={{ static_v }} 1680w" sizes="560px"
-           width="1120" height="747" loading="eager" fetchpriority="high" decoding="async"
-           alt="نمونهٔ داشبورد موجودی من در کامپیوتر و گوشی با اعداد ساختگی: خالص دارایی ۵۰۴٬۹۰۰٬۰۰۰ تومان، تغییر ۲۴ ساعت و ۷ روز، و کارت‌های طلا، سکه و بیت‌کوین">
-    </picture>
-    <figcaption>نمونه، اعداد ساختگی</figcaption>
-  </figure>
-    </div>
-    <div class="landing-cta card">
-      <h2 id="landing-heading">شروع در چند دقیقه</h2>
-      <p class="card-desc">حساب بسازید، دارایی‌هایتان را وارد کنید و ارزش لحظه‌ای را ببینید.</p>
-      <p class="card-desc privacy-note">اطلاعات شما روی سرور این سایت ذخیره می‌شود و مدیر سایت به آن دسترسی دارد؛ نسخه‌های پشتیبان پایگاه داده هم روی سرور و نزد مدیر سایت نگهداری می‌شوند. ارتباط با سایت از طریق HTTPS است، اما داده‌ها روی سرور رمزگذاری نمی‌شوند. رمز عبور شما فقط به‌صورت هش‌شده (bcrypt) ذخیره می‌شود و قابل خواندن نیست.</p>
-      <ol class="landing-steps">
-        <li><span class="step-num">۱</span> ثبت‌نام با نام کاربری</li>
-        <li><span class="step-num">۲</span> وارد کردن مقدار دارایی‌ها</li>
-        <li><span class="step-num">۳</span> مشاهده داشبورد و نمودار</li>
-      </ol>
-      <div class="landing-actions">
-        <a class="btn btn-primary btn-block" href="/register">ساخت حساب</a>
-        <a class="btn btn-ghost btn-block" href="/login">ورود</a>
-        <button type="button" class="btn btn-ghost btn-block" id="pwa-install-landing" hidden>نصب وب‌اپ (دسترسی سریع)</button>
-      </div>
-    </div>
-  </section>
+<!doctype html><html lang="fa" dir="rtl" data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>موجودی من — همهٔ دارایی‌هایتان، یک‌جا</title>
+<meta name="description" content="ارزش طلا، دلار، ارز دیجیتال و پول نقدتان را با قیمت روز ببینید؛ بدهی‌ها و خرج‌ها هم کنارش.">
+<script>(function(){var d=document.documentElement,t=null;try{t=localStorage.getItem("inventory-theme")}catch(e){}
+if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";d.setAttribute("data-theme",t);
+if(window.AndroidBridge)d.classList.add("in-app")})();</script>
+<link rel="preload" as="image" href="/static/landing/hero-dark-1120.webp?v={{ static_v }}" media="(prefers-color-scheme: dark)" fetchpriority="high">
+<link rel="preload" as="image" href="/static/landing/hero-light-1120.webp?v={{ static_v }}" media="(prefers-color-scheme: light)" fetchpriority="high">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/landing-v2.css?v={{ static_v }}"></head><body>
+<a class="skip-link" href="#main">رفتن به محتوا</a>
+<header class="top"><div class="wrap">
+ <a class="brand" href="/"><img src="/static/logo.svg" alt="" width="32" height="32">موجودی من</a>
+ <nav class="top-actions" aria-label="ورود"><a class="top-link" href="/auth">ورود</a></nav>
+</div></header>
+<main id="main">
+<section class="hero"><div class="wrap hero-grid">
+ <div>
+  <p class="eyebrow">برای دارایی‌های شخصی، به تومان</p>
+  <h1>همهٔ دارایی‌هایتان، یک‌جا و به‌روز</h1>
+  <p class="lead">طلا، دلار، ارز دیجیتال و پول نقدتان را وارد کنید؛ ارزش امروزشان را با قیمت بازار می‌بینید. بدهی و خرج هم کنارش است.</p>
+  <div class="cta-row">
+   <a class="btn btn-primary" href="/auth">ورود یا ساخت حساب</a>
+   <a class="btn btn-ghost dl" href="#android"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>اپ اندروید</a>
+  </div>
+  <p class="cta-note">فقط نام کاربری و رمز؛ شمارهٔ تلفن نمی‌خواهیم.</p>
+ </div>
+ <figure class="shot">
+  <picture>
+   <source media="(prefers-color-scheme: light)" srcset="/static/landing/hero-light-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-light-1680.webp?v={{ static_v }} 1680w" sizes="(min-width:900px) 640px, 100vw" width="1120" height="747">
+   <img src="/static/landing/hero-dark-1120.webp?v={{ static_v }}" srcset="/static/landing/hero-dark-1120.webp?v={{ static_v }} 1120w, /static/landing/hero-dark-1680.webp?v={{ static_v }} 1680w" sizes="(min-width:900px) 640px, 100vw"
+   width="1120" height="747" loading="eager" fetchpriority="high" decoding="async"
+   alt="داشبورد موجودی من در گوشی و کامپیوتر: خالص دارایی، تغییر امروز و نمودار روند">
+  </picture>
+  <figcaption>نمونه، اعداد ساختگی</figcaption>
+ </figure>
+</div></section>
 
-  <section class="landing-android card" aria-labelledby="android-heading">
-    <div class="card-head">
-      <h2 id="android-heading">اپ اندروید (پیامک خودکار)</h2>
-    </div>
-    <p class="card-desc">فقط برای اندروید: همان وب‌اپ (داشبورد و پروفایل) داخل اپ باز می‌شود. پیامک بانکی با عبارت «برداشت» به‌صورت <strong>خرج روزانه</strong> ذخیره می‌شود.</p>
-    <ul class="landing-steps landing-steps-compact">
-      <li class="has-url"><span class="li-text">بعد از نصب، این آدرس را تأیید یا وارد کنید — بقیه همان صفحه‌های سایت است:</span>
-        <span class="url-block" dir="ltr">https://portfolio.vahidtwo.ir</span></li>
-      <li>فقط پیامک‌های دارای «برداشت» خوانده می‌شوند، نه کل صندوق پیامک</li>
-      <li>برای ذخیره خودکار پیامک در اپ وارد حساب شوید</li>
-    </ul>
-    <a class="btn btn-primary btn-block" href="/download/my-inventory.apk" download="my-inventory.apk">دانلود my-inventory.apk</a>
-    {% if apk_version_fa %}
-    <p class="card-desc apk-version"><strong>نسخهٔ {{ apk_version_fa }}</strong>{% if apk_size_fa %}، {{ apk_size_fa }}{% endif %}</p>
-    {% endif %}
-    <p class="card-desc apk-uninstall-note">اگر نسخهٔ ۳ یا قدیمی‌تر را دارید، اول آن را حذف کنید، بعد نسخهٔ جدید را نصب کنید. نسخهٔ ۴ به بعد بدون حذف به‌روز می‌شود.</p>
-    {% if apk_sha256 %}
-    <p class="card-desc apk-hash" dir="ltr">SHA-256: {{ apk_sha256 }}</p>
-    {% endif %}
-  </section>
-</div>
-{% endblock %}
+<section class="block" aria-labelledby="b-h"><div class="wrap">
+ <h2 id="b-h">هرچه دارید و بدهکارید، در یک صفحه</h2>
+ <p class="sub">دیگر لازم نیست قیمت طلا را جدا بپرسید و حساب‌وکتاب را در دفترچه نگه دارید.</p>
+ <div class="benefits">
+  <article class="card benefit"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h3>خالص دارایی‌تان را یک‌جا ببینید</h3><p>جمع دارایی منهای بدهی، با نمودار روند از یک هفته تا چند سال.</p></article>
+  <article class="card benefit"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 10h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><h3>خرج‌ها خودشان ثبت می‌شوند</h3><p>در اپ اندروید، پیامکی که کلمهٔ انتخابی شما (مثلاً «برداشت») و یک مبلغ دارد، خرج روزانه ثبت می‌شود.</p></article>
+  <article class="card benefit"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><h3>بدهی و قسط جلوی چشمتان است</h3><p>برای هر وام، قسط ماهانه و ماه‌های مانده را بنویسید؛ جمع بدهی خودش حساب می‌شود.</p></article>
+  <article class="card benefit"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M9.5 10.5h4a1.5 1.5 0 0 1 0 3h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><h3>قیمت طلا و ارز هر ساعت به‌روز می‌شود</h3><p>قیمت‌ها از <a href="https://chande.net/">چنده</a> می‌آید؛ لازم نیست هر روز دستی عوضشان کنید.</p></article>
+ </div>
+</div></section>
+
+<section class="block" id="trust" aria-labelledby="t-h"><div class="wrap split">
+ <div class="trust">
+  <h2 id="t-h">اطلاعاتتان کجا می‌ماند؟</h2>
+  <ul>
+   <li><span class="dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>به حساب بانکی‌تان وصل نمی‌شویم</strong><span>مقدار دارایی‌ها را خودتان وارد می‌کنید.</span></div></li>
+   <li><span class="dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>کلمه‌های پیامک روی گوشی می‌مانند</strong><span>به سایت فرستاده نمی‌شوند. اپ فقط پیامک‌های تازه را می‌بیند، نه صندوق قبلی را.</span></div></li>
+   <li><span class="dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>شمارهٔ کارت فرستاده نمی‌شود</strong><span>از هر پیامک فقط مبلغ و یادداشتی کوتاه می‌آید؛ شمارهٔ کارت یا حساب به ****  تبدیل و مانده حذف می‌شود. شمارهٔ فرستنده هم نمی‌آید.</span></div></li>
+   <li><span class="dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>رمزتان خوانا ذخیره نمی‌شود</strong><span>فقط شکل رمزگذاری‌شدهٔ یک‌طرفه‌اش نگه داشته می‌شود.</span></div></li>
+  </ul>
+  <p class="honest">رک بگوییم: اطلاعات روی سرور همین سایت نگه داشته می‌شود و مدیر سایت به آن دسترسی دارد. ارتباط شما با سایت رمزگذاری‌شده است، ولی داده‌ها روی سرور رمزگذاری نمی‌شوند.</p>
+ </div>
+ <figure class="shot phone"><picture><source media="(prefers-color-scheme: light)" srcset="/static/landing/spend-phone-light-780.webp?v={{ static_v }}" width="780" height="1644"><img src="/static/landing/spend-phone-dark-780.webp?v={{ static_v }}" width="780" height="1644" loading="lazy" decoding="async"
+   alt="صفحهٔ ثبت خرج امروز در گوشی، با مبلغ به تومان و دسته‌بندی"></picture><figcaption>نمونه، اعداد ساختگی</figcaption></figure>
+</div></section>
+
+<section class="block" aria-labelledby="f-h"><div class="wrap">
+ <h2 id="f-h">پرسش‌های رایج</h2>
+ <div class="faq">
+  <details open><summary>با آیفون هم کار می‌کند؟</summary><p>بله، سایت در هر مرورگری باز می‌شود. فقط ثبت خودکار خرج از پیامک مخصوص اپ اندروید است.</p></details>
+  <details><summary>اپ اندروید را از کجا نصب کنم؟</summary><p>فایل نصب را از همین صفحه بگیرید. اندروید بار اول اجازهٔ نصب از این منبع را می‌پرسد. نسخهٔ تازه که بیاید، خود اپ خبرتان می‌کند.</p></details>
+  <details><summary>اگر رمزم را فراموش کنم چه؟</summary><p>مدیر سایت می‌تواند آن را بازنشانی کند.</p></details>
+ </div>
+</div></section>
+
+<section class="block final" id="android" aria-labelledby="c-h"><div class="wrap"><div class="card">
+ <h2 id="c-h">ببینید امروز روی هم چقدر دارید</h2>
+ <p class="sub">چند دقیقه طول می‌کشد: حساب بسازید، دارایی‌هایتان را وارد کنید، تمام.</p>
+ <div class="cta-row">
+  <a class="btn btn-primary" href="/auth">ورود یا ساخت حساب</a>
+  <a class="btn btn-ghost dl" href="/download/my-inventory.apk" download="my-inventory.apk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>دانلود اپ اندروید</a>
+ </div>
+ {% if apk_version_fa %}<p class="apk-meta dl">نسخهٔ {{ apk_version_fa }}{% if apk_size_fa %}، {{ apk_size_fa }}{% endif %}</p>{% endif %}
+</div></div></section>
+</main>
+<footer><div class="wrap">
+ <span>موجودی من — قیمت‌ها از چنده، هر ساعت</span>
+ <nav aria-label="پانویس"><a href="/auth">ورود</a><a href="#trust">حریم خصوصی</a><a class="dl" href="/static/my-inventory.apk.sha256">کد بررسی فایل نصب</a></nav>
+</div></footer>
+</body></html>

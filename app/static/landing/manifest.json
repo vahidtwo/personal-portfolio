@@ -76,6 +76,22 @@
    "height": 779,
    "bytes": 17958,
    "quality": 78
+  },
+  {
+   "file": "spend-phone-dark-780.webp",
+   "slot": "spend-phone",
+   "theme": "dark",
+   "width": 780,
+   "height": 1644,
+   "bytes": 24572
+  },
+  {
+   "file": "spend-phone-light-780.webp",
+   "slot": "spend-phone",
+   "theme": "light",
+   "width": 780,
+   "height": 1644,
+   "bytes": 25596
   }
  ],
  "slots": {}

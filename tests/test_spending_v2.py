@@ -233,3 +233,50 @@ def test_category_colours_reach_aa_with_white_and_bills_differs_from_sms():
 
     assert all(_contrast(c) >= 4.5 for c in PARENT_COLORS.values()), {k: round(_contrast(c), 2) for k, c in PARENT_COLORS.items()}
     assert PARENT_COLORS["bills"] != PARENT_COLORS["sms"]
+
+
+# ---------- legacy fractional rows (review #22, data safety) ----------
+def test_legacy_fractional_spend_loads_and_saves_unchanged(client, no_network, mehr28):
+    from app.formatting import format_amount_input, format_toman
+    from app.models import DailySpend
+
+    _register(client)
+    db, user, _, children = _user_cats()
+    cat, other = children[0], children[1]
+    other_form, other_id = _form(other), other.id
+    _add(db, user, cat, "125000.5", 27, note="قدیمی")  # saved before decimals were rejected
+    db.commit()
+    spend_id = db.query(DailySpend).filter_by(user_id=user.id).one().id
+    db.close()
+    page = client.get(DAILY)
+    assert page.status_code == 200 and format_toman(Decimal("125000.5")) in page.text  # loads and shows
+    edit = client.get(f"{DAILY}&edit_spend={spend_id}").text
+    prefilled = format_amount_input(Decimal("125000.5"))
+    assert f'value="{prefilled}"' in edit and 'data-sp-orig="125000.5"' in edit
+    form = {**other_form, "amount_toman": prefilled, "day": "۲۷", "note": "ویرایش‌شده", "csrf": _csrf(client, DAILY)}
+    r = client.post(f"/profile/spends/{spend_id}", data=form, headers={"Accept": "application/json"})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    db, user, _, _ = _user_cats()
+    row = db.get(DailySpend, spend_id)
+    assert (Decimal(row.amount_toman), row.note, row.category_id) == (Decimal("125000.5"), "ویرایش‌شده", other_id)
+    db.close()
+    # a different fraction on the same row, or any fraction on a new spend, is still rejected
+    bad = client.post(f"/profile/spends/{spend_id}", data={**form, "amount_toman": "۱۲۵۰۰۰٫۷", "csrf": _csrf(client, DAILY)},
+                      headers={"Accept": "application/json"})
+    assert bad.status_code == 422 and "amount_toman" in bad.json()["fields"]
+    new = client.post("/profile/spends", data={**form, "csrf": _csrf(client, DAILY)}, headers={"Accept": "application/json"})
+    assert new.status_code == 422 and "amount_toman" in new.json()["fields"]
+
+
+def test_js_allows_unchanged_legacy_fraction_only():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    static = Path(__file__).resolve().parents[1] / "app" / "static"
+    script = (f"const v=require({str(static / 'spending-page.js')!r});const b={{year:'۱۴۰۵',month:'۷',day:'۲۷'}};"
+              "console.log(JSON.stringify([v.validate({...b,amount:'۱۲۵٬۰۰۰٫۵',orig:'125000.5'}),"
+              "v.validate({...b,amount:'۱۲۵٬۰۰۰٫۷',orig:'125000.5'}),v.validate({...b,amount:'۱۲۵٬۰۰۰٫۵'})]));")
+    out = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20, cwd=static)
+    assert out.returncode == 0, out.stderr
+    a, b, c = json.loads(out.stdout)
+    assert a == {} and "amount_toman" in b and "amount_toman" in c

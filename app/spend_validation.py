@@ -38,8 +38,12 @@ def month_length(year: int, month: int) -> int:
     return 30 if jdatetime.date(year, 1, 1).isleap() else 29
 
 
-def validate_spend(amount: str, year: str, month: str, day: str) -> tuple[dict[str, str], Decimal | None, jdatetime.date | None]:
-    """({field: message} for every bad field, amount, date). Empty dict means valid."""
+def validate_spend(amount: str, year: str, month: str, day: str, existing: Decimal | None = None) -> tuple[dict[str, str], Decimal | None, jdatetime.date | None]:
+    """({field: message} for every bad field, amount, date). Empty dict means valid.
+
+    `existing` is the stored amount when editing: a legacy row saved with a fraction (e.g. 1500.5) may be
+    saved again as long as its amount is unchanged; decimals are rejected only on new input.
+    """
     errors: dict[str, str] = {}
     value: Decimal | None = None
     try:
@@ -49,7 +53,7 @@ def validate_spend(amount: str, year: str, month: str, day: str) -> tuple[dict[s
     else:
         if text.startswith("-") and text.lstrip("-").replace(".", "").strip("0") != "":
             errors["amount_toman"] = AMOUNT_POSITIVE
-        elif "." in text:
+        elif "." in text and not (existing is not None and Decimal(text) == Decimal(existing)):
             errors["amount_toman"] = AMOUNT_FORMAT
         else:
             value = Decimal(text) if text else Decimal("0")

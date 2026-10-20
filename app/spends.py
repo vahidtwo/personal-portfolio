@@ -241,7 +241,18 @@ def daily_view(
         "daily_month": month,
         "spend_form": spend_form,
         "editing_spend_id": editing["id"] if editing else editing_spend_id,
+        "spend_orig_amount": _orig_amount(db, user, editing["id"] if editing else editing_spend_id),
     }
+
+
+def _orig_amount(db: Session, user: User, spend_id: int | None) -> str:
+    """Stored amount (Latin, no grouping) of the row being edited; lets an unchanged legacy fraction save again."""
+    if not spend_id:
+        return ""
+    row = db.get(DailySpend, spend_id)
+    if row is None or row.user_id != user.id:
+        return ""
+    return format(Decimal(row.amount_toman).normalize(), "f")
 
 
 def _spend_form_dict(amount, year, month, day, category_id, note, parent_id: str = "") -> dict:
@@ -274,7 +285,12 @@ def _save_daily_spend(
     ensure_spend_categories(db, user)
     form = _spend_form_dict(amount_toman, year, month, day, category_id, note, parent_id)
     # Every bad field at once ({field: message}); the old single `error` stays for old clients.
-    errors, amount, spent = validate_spend(amount_toman, year, month, day)
+    existing_amount = None
+    if spend_id is not None:
+        current = db.get(DailySpend, spend_id)
+        if current is not None and current.user_id == user.id:
+            existing_amount = Decimal(current.amount_toman)
+    errors, amount, spent = validate_spend(amount_toman, year, month, day, existing_amount)
     child = None
     if category_id.isdigit():
         child = db.get(SpendCategory, int(category_id))

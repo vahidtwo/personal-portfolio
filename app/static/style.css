@@ -2719,6 +2719,8 @@ body.sp-locked{overflow:hidden}
   [data-sp-js] .sp-form:not(.open){display:none}
   .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;scroll-padding-bottom:96px;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 16px;background:var(--surface-solid,#11131a)}
   [data-theme=light] .sp-form.open{background:#fff}
+  .sp-form.open .sp-shead{position:sticky;top:-16px;z-index:3;margin:-16px -18px 8px;padding:12px 18px;background:var(--surface-solid,#11131a);border-bottom:1px solid var(--border)}
+  [data-theme=light] .sp-form.open .sp-shead{background:#fff}
   .sp-form.open .sp-x{display:grid;place-items:center}
   .sp-form.open{backdrop-filter:none;-webkit-backdrop-filter:none}
   .sp-form.open .form-actions{position:sticky;bottom:-16px;z-index:3;display:flex;gap:12px;margin:8px -18px -16px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:var(--surface-solid,#11131a);border-top:1px solid var(--border);flex-direction:row!important}

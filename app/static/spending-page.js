@@ -29,11 +29,12 @@
 
   /* {field: message} for every bad field; mirrors spend_validation.validate_spend. */
   function validate(v) {
+    // v.orig: the stored amount when editing; an unchanged legacy fraction may be saved again.
     var e = {};
     var t = N().normalize(v.amount);
     if (t === null) e.amount_toman = MSG.amountFormat;
     else if (/^-/.test(t) && /[1-9]/.test(t)) e.amount_toman = MSG.amountPositive;
-    else if (t.indexOf(".") !== -1) e.amount_toman = MSG.amountFormat;
+    else if (t.indexOf(".") !== -1 && !(v.orig && Number(t) === Number(v.orig))) e.amount_toman = MSG.amountFormat;
     else if (!(Number(t || "0") > 0)) e.amount_toman = MSG.amountPositive;
     var y = intOf(v.year), m = intOf(v.month), d = intOf(v.day);
     if (y === null || y < 1000 || y > 9999) e.year = MSG.year;
@@ -225,7 +226,7 @@
 
     /* ---------- validation ---------- */
     var FIELDS = { amount_toman: amt, year: form.elements.year, month: form.elements.month, day: form.elements.day };
-    function values() { return { amount: amt.value, year: FIELDS.year.value, month: FIELDS.month.value, day: FIELDS.day.value }; }
+    function values() { return { amount: amt.value, orig: amt.getAttribute("data-sp-orig") || "", year: FIELDS.year.value, month: FIELDS.month.value, day: FIELDS.day.value }; }
     function setErr(name, msg) {
       var input = FIELDS[name];
       var err = name === "category_id" ? $("#sp-category_id") : $("#err-" + name);

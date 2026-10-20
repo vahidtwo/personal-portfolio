@@ -96,3 +96,22 @@ def pop_flash(request: Request) -> tuple[str | None, bool]:
     message = request.session.pop("flash", None)
     is_error = bool(request.session.pop("flash_error", False))
     return message, is_error
+
+
+_LANDING_MANIFEST: dict | None = None
+
+
+def landing_manifest() -> dict:
+    """slot -> {"dark": [{file, w, h}, ...], "light": [...]} for the landing screenshots (scripts/landing_shots.py)."""
+    global _LANDING_MANIFEST
+    if _LANDING_MANIFEST is None:
+        path = BASE_DIR / "static" / "landing" / "manifest.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        _LANDING_MANIFEST = data.get("slots", {}) if isinstance(data, dict) else {}
+    return _LANDING_MANIFEST
+
+
+templates.env.globals["landing_manifest"] = landing_manifest

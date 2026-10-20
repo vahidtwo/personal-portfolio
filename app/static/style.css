@@ -2717,7 +2717,8 @@ body.sp-locked{overflow:hidden}
   .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;scroll-padding-bottom:96px;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 96px;background:var(--surface-solid,#11131a)}
   [data-theme=light] .sp-form.open{background:#fff}
   .sp-form.open .sp-x{display:grid;place-items:center}
-  .sp-form.open .form-actions{position:fixed;inset-inline:0;bottom:0;z-index:93;display:flex;gap:12px;margin:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:inherit;border-top:1px solid var(--border)}
+  .sp-form.open .form-actions{position:fixed;inset-inline:0;bottom:0;z-index:93;display:flex;gap:12px;margin:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:var(--surface-solid,#11131a);border-top:1px solid var(--border);flex-direction:row!important}
+  [data-theme=light] .sp-form.open .form-actions{background:#fff}
   .sp-form.open .form-actions .btn{flex:1;justify-content:center;min-height:48px}
   .sp-addbar{position:fixed;inset-inline:0;bottom:calc(var(--main-nav-h,56px) + env(safe-area-inset-bottom));padding:10px 16px;background:linear-gradient(to top,var(--bg) 62%,transparent);z-index:45}
   .sp-addbar .btn{width:100%;justify-content:center;min-height:48px;gap:8px}

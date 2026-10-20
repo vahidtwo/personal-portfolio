@@ -115,8 +115,8 @@ def attach_session_cookie_deletion(response: RedirectResponse) -> RedirectRespon
 def redirect_to_login(request: Request, *, status_code: int = 303) -> RedirectResponse:
     """Clear invalid auth state and redirect to login (never loop back to dashboard)."""
     invalidate_session(request)
-    target = "/login"
-    if request.url.path.rstrip("/") == target.rstrip("/"):
+    target = "/auth"
+    if request.url.path.rstrip("/") in ("/auth", "/login"):
         target = "/"
     response = RedirectResponse(target, status_code=status_code)
     return attach_session_cookie_deletion(response)

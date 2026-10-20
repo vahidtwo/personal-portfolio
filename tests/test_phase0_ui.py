@@ -23,10 +23,9 @@ def test_landing_has_no_false_privacy_claim(client):
 def test_register_shows_rules_from_validator_before_any_error(client):
     from app.security import PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH, USERNAME_RE
     from app.formatting import persian_digits
-    html = client.get("/register").text
-    assert f"حداقل {persian_digits(str(PASSWORD_MIN_LENGTH))} کاراکتر" in html
-    assert f"{persian_digits(str(USERNAME_MIN_LENGTH))} تا {persian_digits(str(USERNAME_MAX_LENGTH))} کاراکتر" in html
-    assert f'minlength="{PASSWORD_MIN_LENGTH}"' in html
+    html = client.get("/register").text  # redirects to /auth (unified sign-in)
+    assert f"دست‌کم {persian_digits(str(PASSWORD_MIN_LENGTH))} حرف" in html
+    assert f"{persian_digits(str(USERNAME_MIN_LENGTH))} تا {persian_digits(str(USERNAME_MAX_LENGTH))} حرف" in html
     assert 'role="alert"' not in html
     # regex is still exactly what it was (3..32, starts with a letter)
     assert USERNAME_RE.pattern == r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$"

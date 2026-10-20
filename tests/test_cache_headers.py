@@ -21,7 +21,7 @@ def test_anonymous_html_pages(client):
         r = client.get(path)
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/html"), path
         assert _no_store(r), path
-    for path in ("/login", "/register"):  # form pages
+    for path in ("/auth",):  # form page (/login and /register redirect here)
         r = client.get(path)
         assert r.status_code == 200 and _form_page(r), path
 

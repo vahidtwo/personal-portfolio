@@ -174,7 +174,7 @@ def test_sw_clears_offline_copy_on_logout():
 def test_logout_clears_browser_cache_and_marks_bfcache(client, no_network):
     _register(client)
     r = client.post("/logout", data={"csrf": _csrf(client, "/dashboard")}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/login"
+    assert r.status_code == 303 and r.headers["location"] == "/auth"
     assert r.headers["clear-site-data"] == '"cache"'
     js = (STATIC / "pwa.js").read_text(encoding="utf-8")
     assert "inventory-logged-out-at" in js and "event.persisted" in js

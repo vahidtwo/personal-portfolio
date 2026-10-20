@@ -17,6 +17,7 @@ from app.static_gzip import StaticGZipMiddleware
 from app.admin_users import router as admin_users_router
 from app.assets_page import router as assets_router
 from app.auth_routes import router as auth_router
+from app.unified_auth import router as unified_auth_router
 from app.config import (
     DATA_DIR,
     ENABLE_INTERNAL_SCHEDULER,
@@ -89,7 +90,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 # (bfcache and the browser's form restore) brings the typed values back; "no-cache" still makes every
 # normal load revalidate with the server, so a deploy is picked up on the next load. "private" keeps
 # shared proxies from storing them.
-FORM_PAGE_PATHS = frozenset({"/assets", "/profile", "/login", "/register"})
+FORM_PAGE_PATHS = frozenset({"/assets", "/profile", "/auth", "/login", "/register"})
 FORM_PAGE_CACHE_CONTROL = "no-cache, private"
 
 
@@ -122,6 +123,7 @@ async def health():
 app.include_router(pwa_router)
 app.include_router(push_router)
 app.include_router(auth_router)
+app.include_router(unified_auth_router)
 app.include_router(dashboard_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)

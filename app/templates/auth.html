@@ -1,0 +1,53 @@
+{#- Phase 3 unified sign-in (spec /workspace/mockups/phase3/spec.md §6): step "a" (username + password) or
+    step "b" (new account: repeat password). Standalone public page, dark. -#}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% if step == "b" %}ساخت حساب{% else %}ورود یا ساخت حساب{% endif %} · موجودی من</title>
+<meta name="theme-color" content="#050608">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/public.css?v={{ static_v }}">
+</head>
+<body>
+<a class="skip-link" href="#main">رفتن به محتوا</a>
+<header class="top"><div class="top-inner">
+  <a class="brand" href="/"><img src="/static/logo.svg" alt="" width="28" height="28">موجودی من</a>
+  <div class="top-actions"><a class="back-link" href="/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>صفحهٔ اصلی</a></div>
+</div></header>
+<main id="main" class="auth">
+{% if step == "b" %}
+<form class="card" method="post" action="/auth/create" data-auth-form novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="step-dots" aria-hidden="true"><i></i><i class="on"></i></div>
+  <h1>حساب تازه بسازیم؟</h1>
+  <p class="sub">حسابی با این نام کاربری نداریم. برای ساختنش، رمز را یک بار دیگر بنویسید.</p>
+  <div class="user-chip"><span class="av"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/></svg></span><div class="grow"><small>نام کاربری</small><b class="latin" dir="ltr">{{ username }}</b></div><a href="/auth?back=1">تغییر</a></div>
+  {% if error %}<div class="alert" role="alert"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/></svg><div><b>{{ error }}</b></div></div>{% endif %}
+  <label class="field"><span class="lbl">تکرار رمز عبور</span>
+    <span class="inp{% if error %} err{% endif %}"><input class="v" id="password_confirm" name="password_confirm" type="password" dir="ltr" autocomplete="new-password" required minlength="8" {% if error %}aria-invalid="true" aria-describedby="confirm-hint"{% endif %} autofocus><button class="eye" type="button" data-eye aria-label="نمایش رمز" aria-pressed="false">نمایش</button></span>
+    <p class="hint{% if error %} bad{% endif %}" id="confirm-hint">همان رمزی که در قدم قبل نوشتید</p></label>
+  <div class="actions"><button class="btn btn-primary btn-block" type="submit" data-busy-label="در حال ساخت…">ساخت حساب</button><a class="btn btn-ghost btn-block" href="/auth?back=1">برگشت</a></div>
+</form>
+{% else %}
+<form class="card" method="post" action="/auth/continue" data-auth-form novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h1>ورود یا ساخت حساب</h1>
+  <p class="sub">اگر حساب دارید وارد می‌شوید. اگر ندارید، در قدم بعد یکی می‌سازیم.</p>
+  {% if error %}<div class="alert" role="alert"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/></svg><div><b>{{ error }}</b></div></div>{% endif %}
+  <label class="field"><span class="lbl">نام کاربری</span>
+    <span class="inp"><input class="v" id="username" name="username" type="text" dir="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="32" value="{{ username }}" aria-describedby="username-hint"{% if not username %} autofocus{% endif %}></span>
+    <p class="hint" id="username-hint">۳ تا ۳۲ حرف، بدون فاصله</p></label>
+  <label class="field"><span class="lbl">رمز عبور</span>
+    <span class="inp{% if error %} err{% endif %}"><input class="v" id="password" name="password" type="password" dir="ltr" autocomplete="current-password" required aria-describedby="password-hint"{% if username %} autofocus{% endif %}><button class="eye" type="button" data-eye aria-label="نمایش رمز" aria-pressed="false">نمایش</button></span>
+    <p class="hint" id="password-hint">دست‌کم ۸ حرف</p></label>
+  <div class="actions"><button class="btn btn-primary btn-block" type="submit" data-busy-label="در حال بررسی…">ادامه</button></div>
+  <p class="note"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"/></svg><span>رمزتان را فراموش کردید؟ مدیر سایت می‌تواند آن را بازنشانی کند.</span></p>
+</form>
+{% endif %}
+</main>
+<script src="/static/auth.js?v={{ static_v }}" defer></script>
+</body>
+</html>

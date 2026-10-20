@@ -37,7 +37,7 @@
         </div>
         <p class="card-desc">بعد از این مرحله همان وب‌اپ (داشبورد، پروفایل، خرج روزانه) داخل اپ باز می‌شود. سرور اصلی از قبل تنظیم شده است؛ فقط «ادامه به داشبورد» را بزنید. اگر سرور دیگری دارید، از «تنظیمات پیشرفته» آن را عوض کنید.</p>
         <ul class="landing-steps landing-steps-compact">
-          <li>پیامک‌های دارای عبارت «برداشت» به‌صورت خرج روزانه ذخیره می‌شوند</li>
+          <li>اگر در تنظیمات پیامک روشنش کنید، پیامک‌های تازه‌ای که «برداشت» و یک مبلغ دارند خرج ثبت می‌شوند</li>
           <li>کل صندوق پیامک خوانده نمی‌شود</li>
           <li>برای ذخیره خودکار پیامک باید در اپ وارد حساب شوید</li>
         </ul>
@@ -59,10 +59,6 @@
                 </label>
                 <button type="button" id="reset-default" class="btn btn-block">بازگشت به آدرس پیش‌فرض</button>
               </div>
-              <label>
-                <span class="label-text">عبارت لازم در پیامک</span>
-                <input type="text" id="sms-phrase" value="برداشت" autocomplete="off">
-              </label>
             </div>
           </details>
         </form>
@@ -80,7 +76,6 @@
       var CONNECT_ERROR = "اتصال به سرور برقرار نشد. نشانی را بررسی کنید.";
       var form = document.getElementById("setup-form");
       var urlInput = document.getElementById("site-url");
-      var phraseInput = document.getElementById("sms-phrase");
       var errorEl = document.getElementById("setup-error");
       var button = document.getElementById("setup-submit");
       var advanced = document.getElementById("advanced");
@@ -136,7 +131,6 @@
 
       var saved = bridge(function (b) { return b.getServerUrl(); }, "");
       urlInput.value = (saved || "").trim() || DEFAULT_URL;
-      phraseInput.value = bridge(function (b) { return b.getSmsPhrase(); }, "") || "برداشت";
 
       var query = location.search || "";
       if (/[?&]error=connect\b/.test(query)) showErrorScreen();
@@ -151,7 +145,6 @@
           return;
         }
         urlInput.value = url;
-        var phrase = (phraseInput.value || "").trim() || "برداشت";
         if (!window.AndroidBridge) {
           showError("این صفحه فقط داخل اپ اندروید کار می‌کند.");
           return;
@@ -159,7 +152,6 @@
         setBusy(true, button);
         var accepted;
         try {
-          window.AndroidBridge.setSmsPhrase(phrase);
           accepted = window.AndroidBridge.setServerUrl(url);
         } catch (e) {
           showError(CONNECT_ERROR);

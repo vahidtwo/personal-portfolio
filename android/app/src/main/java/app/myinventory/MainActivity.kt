@@ -155,7 +155,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        askSmsPermission()
+        SmsPrefs.ensureMigrated(this)
+        askNotificationPermission()
         if (intent?.action == ACTION_OPEN_SETUP) {
             openAdvancedSetup()
         } else {
@@ -297,8 +298,9 @@ class MainActivity : AppCompatActivity() {
         return uri.host == baseHost
     }
 
-    private fun askSmsPermission() {
-        val needed = mutableListOf(Manifest.permission.RECEIVE_SMS)
+    /** SMS permission is asked only from SMS settings, when the user turns the switch on. */
+    private fun askNotificationPermission() {
+        val needed = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33) {
             needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }

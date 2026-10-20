@@ -62,6 +62,8 @@ android {
         create("qa") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
+            // -PqaDebuggable lets QA seed on-device prefs with run-as (e.g. an empty v5 SMS phrase).
+            isDebuggable = project.hasProperty("qaDebuggable")
             val qaBase = (project.findProperty("qaUpdateBaseUrl") as String?) ?: "http://10.0.2.2:8765"
             buildConfigField("String", "UPDATE_BASE_URL", "\"$qaBase\"")
             buildConfigField("String", "UPDATE_HTTP_HOST", "\"10.0.2.2\"")

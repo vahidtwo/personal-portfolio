@@ -29,19 +29,21 @@ class AndroidBridge(
             .getString(MainActivity.KEY_URL, "") ?: ""
     }
 
+    /** v5 pages only: keywords now live in the app's own SMS settings screen. Ignored. */
     @JavascriptInterface
-    fun setSmsPhrase(phrase: String) {
-        val value = phrase.trim().ifEmpty { MainActivity.DEFAULT_PHRASE }
-        context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit {
-            putString(MainActivity.KEY_PHRASE, value)
-        }
-    }
+    fun setSmsPhrase(@Suppress("UNUSED_PARAMETER") phrase: String) {}
 
+    /** Keywords never leave the phone, so web pages don't get them. */
     @JavascriptInterface
-    fun getSmsPhrase(): String {
-        val prefs = context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
-        return prefs.getString(MainActivity.KEY_PHRASE, MainActivity.DEFAULT_PHRASE)
-            ?: MainActivity.DEFAULT_PHRASE
+    fun getSmsPhrase(): String = ""
+
+    /** Opens the native SMS settings screen (keywords, switch, permission). */
+    @JavascriptInterface
+    fun openSmsSettings() {
+        context.startActivity(
+            android.content.Intent(context, SmsSettingsActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 
     @JavascriptInterface

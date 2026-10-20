@@ -43,7 +43,17 @@ def _apk_sha256() -> str | None:
 async def home(request: Request, db: Session = Depends(get_db)):
     if redirect := redirect_to_dashboard_if_authenticated(request, db):
         return redirect
-    return render(request, "landing.html", db, apk_sha256=_apk_sha256())
+    from app.pwa import apk_size_label_fa, load_android_release, to_fa_digits
+
+    release = load_android_release()
+    return render(
+        request,
+        "landing.html",
+        db,
+        apk_sha256=_apk_sha256(),
+        apk_version_fa=to_fa_digits(release["versionCode"]) if release else None,
+        apk_size_fa=apk_size_label_fa(release["size_bytes"]) if release else None,
+    )
 
 
 @router.head("/")

@@ -22,19 +22,19 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION != intent.action) return
         val prefs = context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
         val base = (prefs.getString(MainActivity.KEY_URL, "") ?: "").trimEnd('/')
-        val phrase = prefs.getString(MainActivity.KEY_PHRASE, MainActivity.DEFAULT_PHRASE)
-            ?: MainActivity.DEFAULT_PHRASE
         if (!base.startsWith("https://")) return
+        if (!SmsPrefs.isActive(context)) return
+        val keywords = SmsPrefs.keywords(context)
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val body = messages.joinToString("") { it.displayMessageBody ?: "" }
         val sender = messages.firstOrNull()?.originatingAddress ?: ""
-        if (phrase.isNotEmpty() && !body.contains(phrase)) return
-        val amount = parseAmount(body) ?: return
+        // One SMS → at most one spend, however many keywords it contains.
+        val amount = SmsKeywords.spendAmount(body, keywords) ?: return
         val pending = goAsync()
         val idem = sha256("$sender|$body")
         thread {
             try {
-                val note = body.replace("\n", " ").take(100)
+                val note = SmsKeywords.cleanNote(body)
                 val cookie = readCookie(base)
                 if (cookie.isNullOrBlank()) {
                     notifyError(context, "وارد نشده‌اید — در اپ لاگین کنید")
@@ -64,28 +64,6 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    private fun parseAmount(body: String): String? {
-        val normalized = body.map { ch ->
-            when (ch) {
-                in '۰'..'۹' -> '0' + (ch - '۰')
-                in '٠'..'٩' -> '0' + (ch - '٠')
-                else -> ch
-            }
-        }.joinToString("")
-        val patterns = listOf(
-            Regex("""(?:مبلغ|برداشت|withdraw)[^\d]{0,20}(\d[\d,]*)""", RegexOption.IGNORE_CASE),
-            Regex("""(\d[\d,]{3,})\s*(?:ریال|تومان|Rial|Toman)""", RegexOption.IGNORE_CASE),
-        )
-        val raw = patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1) } ?: return null
-        val digits = raw.replace(",", "")
-        val value = digits.toLongOrNull() ?: return null
-        if (value <= 0) return null
-        val lower = body.lowercase()
-        val rial = (lower.contains("ریال") || lower.contains("rial")) && !lower.contains("تومان") && !lower.contains("toman")
-        val toman = if (rial) value / 10 else value
-        if (toman <= 0) return null
-        return toman.toString()
-    }
 
     private fun postSpend(base: String, cookie: String, amount: String, note: String, idem: String): Boolean {
         val connection = (URL("$base/api/sms-spend").openConnection() as HttpURLConnection)

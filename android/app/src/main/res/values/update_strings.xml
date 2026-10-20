@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- All user-facing text of the in-app update notice (approved design, spec §6).
+     Numbers are formatted in UpdateCheck (Persian digits, «٫», «٪»); separators are «،». -->
+<resources>
+    <string name="update_sep">، </string>
+    <string name="update_version">نسخهٔ %1$s</string>
+    <string name="update_you_have">شما نسخهٔ %1$s را دارید</string>
+
+    <!-- 1. Available -->
+    <string name="update_available_title">نسخهٔ تازه آمده</string>
+    <string name="update_available_action">به‌روزرسانی</string>
+    <string name="update_available_action_cd">به‌روزرسانی به نسخهٔ %1$s</string>
+    <string name="update_later">بعداً</string>
+    <string name="update_available_fine">روی همین نسخه نصب می‌شود و ورود و اطلاعاتتان می‌ماند.\nاگر «بعداً» را بزنید، حداکثر روزی یک بار دوباره یادآوری می‌کنیم.</string>
+
+    <!-- 2. Downloading -->
+    <string name="update_downloading_title">در حال دریافت نسخهٔ %1$s</string>
+    <string name="update_downloading_meta">تا پایان دریافت، اینترنت را روشن نگه دارید.</string>
+    <string name="update_cancel">لغو</string>
+    <string name="update_progress_cd">%1$s درصد</string>
+
+    <!-- 3. Ready to install -->
+    <string name="update_ready_title">آمادهٔ نصب است</string>
+    <string name="update_ready_meta">نسخهٔ %1$s دریافت شد.</string>
+    <string name="update_ready_chip">فایل سالم است و امضایش بررسی شد</string>
+    <string name="update_ready_body">«نصب» را بزنید. اندروید می‌پرسد که آیا این به‌روزرسانی را نصب کنید؛ آنجا هم «نصب» را بزنید.</string>
+    <string name="update_ready_callout">بار اول، اندروید اجازهٔ «نصب از منابع ناشناس» را برای موجودی من می‌خواهد. در صفحه‌ای که باز می‌شود اجازه را روشن کنید و برگردید.</string>
+    <string name="update_install">نصب</string>
+    <string name="update_announce_ready">دریافت انجام شد. آمادهٔ نصب است.</string>
+
+    <!-- 4. Failed (network or checksum/signature mismatch) -->
+    <string name="update_failed_title">دریافت انجام نشد</string>
+    <string name="update_failed_body">اتصال قطع شد یا فایل کامل نرسید. اینترنت را بررسی کنید و دوباره امتحان کنید.</string>
+    <string name="update_retry">تلاش دوباره</string>
+    <string name="update_announce_failed">دریافت انجام نشد</string>
+</resources>

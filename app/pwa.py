@@ -1,7 +1,10 @@
 """PWA static routes."""
 
+import hashlib
+import json
+
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.firebase_push import service_worker_firebase_snippet
 from app.web import BASE_DIR
@@ -11,6 +14,72 @@ from app.config import SESSION_MAX_AGE_SECONDS, STATIC_ASSET_VERSION
 router = APIRouter()
 
 _APK_PATH = BASE_DIR / "static" / "my-inventory.apk"
+# Single source of truth for the Android release shown to the app's update notice.
+# Keep versionCode/versionName in sync with android/app/build.gradle.kts (a test checks it).
+_RELEASE_PATH = BASE_DIR / "android_release.json"
+_APK_DOWNLOAD_URL = "/download/my-inventory.apk"
+_sha_cache: dict[str, object] = {}
+
+
+def _apk_sha256_cached() -> str | None:
+    if not _APK_PATH.is_file():
+        return None
+    stat = _APK_PATH.stat()
+    key = (stat.st_mtime_ns, stat.st_size)
+    if _sha_cache.get("key") != key:
+        digest = hashlib.sha256()
+        with _APK_PATH.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        _sha_cache["key"] = key
+        _sha_cache["sha256"] = digest.hexdigest()
+    return _sha_cache["sha256"]  # type: ignore[return-value]
+
+
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def to_fa_digits(value) -> str:
+    return str(value).translate(_FA_DIGITS)
+
+
+def load_android_release() -> dict | None:
+    """versionCode/versionName/notes/min_required/cert_sha256 from android_release.json,
+    plus sha256 and size_bytes measured from the served APK file."""
+    try:
+        release = json.loads(_RELEASE_PATH.read_text(encoding="utf-8"))
+        info = {
+            "versionCode": int(release["versionCode"]),
+            "versionName": str(release["versionName"]),
+            "url": _APK_DOWNLOAD_URL,
+            "sha256": _apk_sha256_cached(),
+            "size_bytes": _APK_PATH.stat().st_size if _APK_PATH.is_file() else None,
+            "cert_sha256": release.get("cert_sha256") or None,
+            "notes": [str(n) for n in release.get("notes", [])],
+            # Parsed by the app but ignored for now: forced updates aren't approved.
+            "min_required": int(release.get("min_required", 0) or 0),
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return info
+
+
+def apk_size_label_fa(size_bytes: int | None) -> str | None:
+    """«حدود ۳ مگابایت» (rounded to whole megabytes, at least ۱)."""
+    if not size_bytes:
+        return None
+    mb = max(1, round(size_bytes / (1024 * 1024)))
+    return f"حدود {to_fa_digits(mb)} مگابایت"
+
+
+@router.get("/api/app-version")
+def android_app_version():
+    """Public: latest Android build, used by the app's update notice."""
+    info = load_android_release()
+    if info is None:
+        raise HTTPException(status_code=404, detail="اطلاعات نسخه در دسترس نیست")
+    return JSONResponse(info, headers={"Cache-Control": "no-cache"})
+
 
 @router.get("/manifest.webmanifest")
 def web_manifest():

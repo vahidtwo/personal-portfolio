@@ -221,7 +221,11 @@
 {% endif %}
 <section class="card auth-card wide" id="android-app-settings" hidden>
   <h2>اپ اندروید (پیامک)</h2>
-  <p class="card-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>
+  <p class="card-desc" id="android-sms-legacy-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>
+  <div id="android-sms-native" hidden>
+    <p class="card-desc">کلمه‌های پیامک فقط روی همین گوشی ذخیره می‌شوند و به سایت فرستاده نمی‌شوند.</p>
+    <button type="button" id="android-sms-open" class="btn btn-primary">تنظیمات پیامک</button>
+  </div>
   <form id="android-phrase-form" class="grid-form">
     <label>
       <span class="label-text">عبارت لازم در پیامک</span>
@@ -288,7 +292,20 @@
   const androidForm = document.getElementById("android-phrase-form");
   const androidPhrase = document.getElementById("android-sms-phrase");
   const androidStatus = document.getElementById("android-phrase-status");
-  if (window.AndroidBridge && androidCard && androidForm && androidPhrase) {
+  if (window.AndroidBridge && androidCard && typeof AndroidBridge.openSmsSettings === "function") {
+    // v6+: keywords live in the app's own screen, never on this page.
+    androidCard.hidden = false;
+    if (androidForm) androidForm.hidden = true;
+    const nativeBox = document.getElementById("android-sms-native");
+    nativeBox.hidden = false;
+    nativeBox.style.display = "grid";
+    nativeBox.style.gap = "12px";
+    const legacyDesc = document.getElementById("android-sms-legacy-desc");
+    if (legacyDesc) legacyDesc.hidden = true;
+    document.getElementById("android-sms-open").addEventListener("click", function () {
+      try { AndroidBridge.openSmsSettings(); } catch (e) {}
+    });
+  } else if (window.AndroidBridge && androidCard && androidForm && androidPhrase) {
     androidCard.hidden = false;
     try {
       androidPhrase.value = AndroidBridge.getSmsPhrase() || "برداشت";

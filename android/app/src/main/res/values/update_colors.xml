@@ -1,0 +1,8 @@
+<resources>
+    <color name="update_sheet">#0F1118</color>
+    <color name="update_text">#F4F6FB</color>
+    <color name="update_text_soft">#A7AEC0</color>
+    <color name="update_text_muted">#8B93A8</color>
+    <color name="update_on_primary">#04120E</color>
+    <color name="update_ok">#4ADE80</color>
+</resources>

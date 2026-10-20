@@ -13,4 +13,15 @@
             android:targetPackage="app.myinventory"
             android:targetClass="app.myinventory.MainActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="sms_settings"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_sms_short"
+        android:shortcutLongLabel="@string/shortcut_sms_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="app.myinventory"
+            android:targetClass="app.myinventory.SmsSettingsActivity" />
+    </shortcut>
 </shortcuts>

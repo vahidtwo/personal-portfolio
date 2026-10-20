@@ -72,5 +72,6 @@ def test_version_read_from_the_served_apk_matches_gradle():
     info = apk_info(apk)
     assert info["version"], "versionName not found in the APK manifest"
     if gradle.is_file():
-        name = re.search(r'versionName\s*=\s*"([^"]+)"', gradle.read_text(encoding="utf-8")).group(1)
+        line = re.search(r'^\s*versionName\s*=.*$', gradle.read_text(encoding="utf-8"), re.M).group(0)
+        name = re.findall(r'"([^"]+)"', line)[-1]  # last literal = default (QA override comes first)
         assert info["version"] == persian_digits(name).replace(".", "٫")

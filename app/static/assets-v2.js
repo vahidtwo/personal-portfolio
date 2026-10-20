@@ -21,6 +21,11 @@
   var isLatin = function (u) { return /^[A-Z]/.test(u || ""); };
 
   // Same rules as app/number_input.quantity_error.
+  // amount-input strips [data-thousands] to Latin on submit; we stay on the page, so paint «۲۵٬۰۰۰٬۰۰۰» back.
+  function repaintAmounts() {
+    form.querySelectorAll("[data-thousands]").forEach(function (f) { f.dispatchEvent(new Event("blur")); });
+  }
+
   function reason(raw, max) {
     var lead = String(raw || "").trim().replace(/\u2212/g, "-").charAt(0) === "-";
     var t = NF.normalize(raw);
@@ -118,14 +123,13 @@
       var r = check(input);
       if (r) errors.push({ input: input, short: SHORT[r] });
     });
-    if (errors.length) { summary(errors); return; }
+    if (errors.length) { repaintAmounts(); summary(errors); return; }
     summary([]);
     var old = $("[data-v2-save-error]", form); if (old) old.remove();
     if (!window.fetch || !window.FormData) { form.dispatchEvent(new Event("assets:saved")); form.submit(); return; }
     setBusy(true);
     var body = new FormData(form); // amount-input stripped [data-thousands] to Latin for the server
-    // fetch keeps us on the page, so paint the grouped Persian display back (e.g. «۲۵٬۰۰۰٬۰۰۰»).
-    form.querySelectorAll("[data-thousands]").forEach(function (f) { f.dispatchEvent(new Event("blur")); });
+    repaintAmounts();
     fetch(form.action, { method: "POST", body: body, headers: { Accept: "application/json" }, credentials: "same-origin" })
       .then(function (res) {
         return res.json().catch(function () { return null; }).then(function (data) { return { res: res, data: data }; });

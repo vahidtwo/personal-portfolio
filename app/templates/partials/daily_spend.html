@@ -1,3 +1,13 @@
+<section class="card sms-offer" id="sms-offer" aria-labelledby="sms-offer-heading" hidden>
+  <button type="button" class="sms-offer-close" data-sms-offer-dismiss aria-label="بستن این پیشنهاد">✕</button>
+  <h2 id="sms-offer-heading">خرج‌ها خودکار ثبت شوند؟</h2>
+  <p class="card-desc">اپ می‌تواند از پیامک‌های تازه‌ای که «برداشت» و یک مبلغ دارند، خرج را خودش ثبت کند. هر وقت بخواهید، از تنظیمات خاموش می‌شود.</p>
+  <div class="sms-offer-actions">
+    <button type="button" class="btn btn-primary" data-sms-offer-enable>فعال کردن</button>
+    <button type="button" class="btn btn-ghost" data-sms-offer-dismiss>نه، ممنون</button>
+  </div>
+</section>
+<script src="/static/sms-offer.js?v={{ static_v }}" defer></script>
 <section class="card daily-section daily-add" aria-labelledby="daily-add-heading">
   <h1 id="daily-add-heading">{% if editing_spend_id %}ویرایش خرج{% else %}ثبت خرج امروز{% endif %}</h1>
   <form method="post" action="{% if editing_spend_id %}/profile/spends/{{ editing_spend_id }}{% else %}/profile/spends{% endif %}" class="grid-form" id="daily-spend-form" data-leave-warn>

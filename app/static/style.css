@@ -2557,3 +2557,15 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .hero-shot{margin-top:16px}
 .hero-shot img{aspect-ratio:1120/747}
 @media (max-width:899px){.hero-shot img{aspect-ratio:360/779;max-width:360px;margin-inline:auto;border-radius:0}}
+
+/* SMS offer card (Android v7, shown only when AndroidBridge.getSmsAutoState() is "off") */
+/* Phase 3: SMS offer card (spending page, Android app only) and «از پیامک» tag on spends. */
+.sms-offer { position: relative; }
+.sms-offer[hidden] { display: none; }
+.sms-offer h2 { margin: 0 0 6px; font-size: 16px; padding-inline-end: 48px; }
+.sms-offer-close {
+  position: absolute; top: 8px; inset-inline-end: 8px; min-width: 44px; min-height: 44px;
+  border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer;
+}
+.sms-offer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sms-offer-actions .btn { min-height: 44px; }

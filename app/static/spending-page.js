@@ -346,6 +346,7 @@
       if (withSummary) {
         $$(".sp-tile b", sum).forEach(function (b) { b.innerHTML = '<i class="v2-skel" style="width:110px;height:22px;margin-top:6px"></i>'; });
         $$(".sp-bars li", sum).forEach(function (li) { li.innerHTML = '<i class="v2-skel" style="width:40%;height:14px"></i><i></i><i class="v2-skel bar" style="height:8px"></i>'; li.setAttribute("aria-hidden", "true"); });
+        $$(".sp-tile small, [data-sp-rest-toggle]", sum).forEach(function (el) { el.hidden = true; });
         sum.setAttribute("aria-busy", "true");
       }
     }

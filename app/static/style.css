@@ -2548,7 +2548,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 
 /* Batch 1 (Arabi review): every tap target at least 44×44 (box size, not font size). */
 .brand { min-height: 44px; display: inline-flex; align-items: center; }
-.menu-toggle { min-height: 44px; min-width: 44px; }
+.menu-toggle, .has-main-nav .menu-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
 #chart-range [data-range] { min-height: 44px; min-width: 44px; }
 .privacy-btn { min-height: 44px; min-width: 44px; }
 .dash a.btn-sm, .dash a.btn-text { min-height: 44px; display: inline-flex; align-items: center; }

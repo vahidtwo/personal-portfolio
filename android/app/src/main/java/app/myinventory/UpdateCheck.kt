@@ -115,7 +115,7 @@ object UpdateCheck {
         if (!page.scheme.equals("https", ignoreCase = true)) return false
         if (!page.host.equals(base.host, ignoreCase = true)) return false
         val path = (page.path ?: "").trimEnd('/')
-        path !in setOf("", "/login", "/register", "/logout")
+        path !in setOf("", "/auth", "/login", "/register", "/logout")
     }.getOrNull() ?: false
 
     // ---- Persian formatting («٫» decimal, «٪», Persian digits) ----

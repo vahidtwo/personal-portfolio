@@ -128,20 +128,20 @@
     <span><span id="chart-change-label">این ماه</span> <b id="chart-change" class="chg-text"></b></span>
   </div>
   <p class="chart-fs-hint">برای بزرگ‌نمایی دو انگشت را باز کنید یا چرخ ماوس را بچرخانید، برای جابه‌جایی بکشید و برای دیدن مقدار هر نقطه، روی نمودار نگه دارید.</p>
-  <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/profile">ثبت دارایی</a></p>
+  <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/assets">افزودن دارایی</a></p>
 </section>
 
 <section class="dash-assets" aria-labelledby="table-heading">
   <div class="card-head assets-head">
     <h2 id="table-heading">دارایی‌ها <span class="sub">{{ visible_rows | length | string | fa }} مورد · <span class="only-mob">تغییر ۷ روزه</span><span class="only-desk">بر اساس سهم</span></span></h2>
-    <a class="btn-text only-mob" href="/profile">ویرایش {{ ui_icon('chev') }}</a>
-    <a class="btn btn-ghost btn-sm only-desk" href="/profile">{{ ui_icon('edit') }}ویرایش دارایی‌ها</a>
+    <a class="btn-text only-mob" href="/assets">ویرایش {{ ui_icon('chev') }}</a>
+    <a class="btn btn-ghost btn-sm only-desk" href="/assets">{{ ui_icon('edit') }}ویرایش دارایی‌ها</a>
   </div>
   {% if not visible_rows %}
   <div class="empty-state">
     <p class="empty-state-title">هنوز دارایی‌ای ثبت نکرده‌اید</p>
     <p class="empty-state-hint">مقدار طلا، سکه، ارز، دلار یا نقد خود را وارد کنید تا ارزش لحظه‌ای و سهم هر دارایی را اینجا ببینید.</p>
-    <a class="btn btn-primary" href="/profile">افزودن دارایی</a>
+    <a class="btn btn-primary" href="/assets">افزودن دارایی</a>
   </div>
   {% else %}
   <div class="acards only-mob" id="asset-cards">
@@ -204,7 +204,7 @@
     </table>
   </div>
   {% if hidden_zero_count > 0 %}
-  <p class="table-note">{{ hidden_zero_count | string | fa }} دارایی با مقدار صفر پنهان است. <a href="/profile">ویرایش موجودی</a></p>
+  <p class="table-note">{{ hidden_zero_count | string | fa }} دارایی با مقدار صفر پنهان است. <a href="/assets">ویرایش موجودی</a></p>
   {% endif %}
   {% endif %}
 </section>
@@ -226,7 +226,7 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="chart-empty chart-empty-compact">هنوز دارایی‌ای با ارزش بیشتر از صفر ندارید. <a href="/profile">افزودن دارایی</a></p>
+  <p class="chart-empty chart-empty-compact">هنوز دارایی‌ای با ارزش بیشتر از صفر ندارید. <a href="/assets">افزودن دارایی</a></p>
   {% endif %}
 </aside>
 
@@ -269,5 +269,6 @@
 {% else %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
+<script src="/static/leave-guard.js?v={{ static_v }}" defer></script>
 {% endif %}
 {% endblock %}

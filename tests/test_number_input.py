@@ -173,7 +173,7 @@ def test_unchanged_profile_resubmit_keeps_every_value(client, no_network):
         return out
 
     before = snapshot()
-    html = client.get("/profile").text
+    html = client.get("/assets").text  # Phase 1: the assets form lives on /assets, still posting to /profile
     assets = _form_fields(html, "/profile")
     assert assets["ada"] == "۰٫۱۲۳۴۵۶۷۸" and assets["gold_grams"] == "۱۲٫۵"
     assert assets["btc"] == "۰٫۰۰۰۰۰۰۰۱" and assets["cash_toman"] == "۱۸٬۵۰۰٬۰۰۰٬۰۰۰"

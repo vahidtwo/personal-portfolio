@@ -32,13 +32,13 @@ def test_register_shows_rules_from_validator_before_any_error(client):
     assert USERNAME_RE.pattern == r"^[a-zA-Z][a-zA-Z0-9_]{2,31}$"
 
 
-def test_signup_lands_on_profile_with_assets_before_account(client, no_network):
+def test_signup_lands_on_assets_page(client, no_network):
     t = _csrf(client, "/register")
     r = client.post("/register", data={"username": "newbie", "password": "password123",
                                         "password_confirm": "password123", "csrf": t}, follow_redirects=False)
-    assert r.headers["location"] == "/profile"
-    html = client.get("/profile").text
-    assert html.index('name="gold_grams"') < html.index('name="new_password"')
+    assert r.headers["location"] == "/assets"  # Phase 1: assets moved off the profile page
+    html = client.get("/assets").text
+    assert 'name="gold_grams"' in html and 'name="new_password"' not in html
 
 
 def test_dashboard_empty_state_for_new_user(client, no_network):
@@ -200,7 +200,7 @@ def test_glossary_terms(client, no_network):
     _register(client)
     dash = client.get("/dashboard").text
     debts = client.get("/profile?tab=debts").text
-    assets = client.get("/profile").text
+    assets = client.get("/assets").text
     for html in (dash, debts):
         assert "هزینهٔ ماهانه" in html and "خرج ماهانه" not in html
     assert "دلار آمریکا" in assets and "دلار نقد" not in assets
@@ -225,10 +225,10 @@ def test_privacy_note_mentions_backups_and_hashed_passwords(client):
 def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_network):
     import re
     _register(client)
-    html = client.get("/profile").text
+    html = client.get("/assets").text
     for k in ("gold_grams", "btc", "usd", "cash_toman"):
         assert re.search(rf'<input name="{k}" value="" placeholder="۰"', html), k
-    assert re.search(r'<input name="salary_toman" value="" placeholder="۰"', html)
+    assert re.search(r'<input name="salary_toman" value="" placeholder="۰"', client.get("/profile").text)
     data = {k: "" for k in ("gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram",
                             "silver_grams", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman")}
     data["csrf"] = _csrf(client)
@@ -240,7 +240,7 @@ def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_ne
     db = SessionLocal(); u = db.query(User).filter_by(username="alice").one()
     assert u.btc == Decimal("0.5") and u.cash_toman == Decimal("18500000") and u.gold_grams == 0
     db.close()
-    html = client.get("/profile").text
+    html = client.get("/assets").text
     assert 'name="btc" value="۰٫۵"' in html
 
 

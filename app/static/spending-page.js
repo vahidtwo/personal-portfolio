@@ -59,8 +59,11 @@
     var wrap = amt.closest(".sp-amt");
     // Order under the field: error, words, suggestions. The error and the words line swap places
     // (one shows when the other hides), so blur validation doesn't shift the chips below mid-click.
-    var amtErr = $("#err-amount_toman");
-    $$(".amount-words, .amount-suggest", wrap).reverse().forEach(function (el) { amtErr.insertAdjacentElement("afterend", el); });
+    var amtErr = $("#err-amount_toman"), slot = document.createElement("div");
+    slot.className = "sp-amt-msg"; amtErr.before(slot); slot.appendChild(amtErr);
+    var words = $(".amount-words", wrap), sugg = $(".amount-suggest", wrap);
+    if (words) slot.appendChild(words);
+    if (sugg) slot.after(sugg);
 
     /* ---------- chips ---------- */
     var pChips = $("[data-sp-pchips]"), cChips = $("[data-sp-cchips]");

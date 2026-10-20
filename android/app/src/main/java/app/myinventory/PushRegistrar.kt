@@ -15,7 +15,6 @@ object PushRegistrar {
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) return@addOnCompleteListener
             val token = task.result ?: return@addOnCompleteListener
-            android.util.Log.d("FCM", "token=$token")
             registerToken(context, base, token)
         }
     }

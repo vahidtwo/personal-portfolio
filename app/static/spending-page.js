@@ -3,7 +3,9 @@
 (function () {
   "use strict";
   var W = typeof window !== "undefined" ? window : {};
-  var NF = W.NumberFa || (typeof require === "function" ? require("./number-format.js") : null);
+  // number-format.js loads after this file (page scripts block), so look it up when used.
+  var NF0 = W.NumberFa || (typeof require === "function" && typeof module !== "undefined" ? require("./number-format.js") : null);
+  function N() { return W.NumberFa || NF0; }
   var FA = "۰۱۲۳۴۵۶۷۸۹";
   function fa(n) { return String(n).replace(/\d/g, function (d) { return FA[Number(d)]; }); }
   function $(s, r) { return (r || document).querySelector(s); }
@@ -19,7 +21,7 @@
   var ORDER = ["amount_toman", "category_id", "year", "month", "day"];
 
   function intOf(raw) {
-    var t = NF.normalize(raw);
+    var t = N().normalize(raw);
     return t && /^\d+$/.test(t) ? Number(t) : null;
   }
   function isLeap(y) { return [1, 5, 9, 13, 17, 22, 26, 30].indexOf(y % 33) !== -1; } // jdatetime's rule
@@ -28,7 +30,7 @@
   /* {field: message} for every bad field; mirrors spend_validation.validate_spend. */
   function validate(v) {
     var e = {};
-    var t = NF.normalize(v.amount);
+    var t = N().normalize(v.amount);
     if (t === null) e.amount_toman = MSG.amountFormat;
     else if (/^-/.test(t) && /[1-9]/.test(t)) e.amount_toman = MSG.amountPositive;
     else if (t.indexOf(".") !== -1) e.amount_toman = MSG.amountFormat;

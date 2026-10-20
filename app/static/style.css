@@ -2936,3 +2936,5 @@ html.dv-locked{overflow:hidden}
 .dv-next,.dv-banner{background:#12302a}
 [data-theme=light] .dv-next,[data-theme=light] .dv-banner{background:#dff5ee}
 [data-theme=light] .dv-wrap :is(.dv-sub,.dv-cdesc,.dv-formula,.dv-hint,.dv-meta,.dv-row small,.dv-tile>span,.dv-tile small,.dv-empty p){color:#4f5868}
+.dv-summary a{min-width:44px;justify-content:center}
+.dv-skel-rows .dv-row{overflow:hidden}.dv-skel{max-width:100%}

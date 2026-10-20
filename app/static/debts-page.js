@@ -231,7 +231,9 @@
       showErrors(form, {});
       $("[data-dv-fail]", form).hidden = true;
       busy(form, true);
-      postForm(form).then(function (r) {
+      var body = new FormData(form);
+      repaint(form); // keep Persian digits on screen while saving (amount-input.js stripped them for the POST)
+      fetch(form.action, { method: "POST", body: body, credentials: "same-origin", headers: { Accept: "application/json" } }).then(function (r) {
         return r.json().then(function (body) { return { status: r.status, body: body }; });
       }).then(function (res) {
         busy(form, false);

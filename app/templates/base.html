@@ -45,10 +45,10 @@
     </div>
     <nav class="side-nav" aria-label="ناوبری">
       {% if user %}
-      <a class="nav-link {% if request.url.path.startswith('/profile') %}is-active{% endif %}" href="/profile">پروفایل</a>
+      <a class="nav-link {% if request.url.path.startswith('/profile') %}is-active{% endif %}" href="/profile">تنظیمات</a>
       {% with cls="nav-link" %}{% include "partials/apk_download.html" %}{% endwith %}
       {% if is_admin %}<a class="nav-link {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">مدیریت</a>{% endif %}
-      <form method="post" action="/logout" class="side-logout">
+      <form method="post" action="/logout" class="side-logout" data-confirm="logout">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button type="submit" class="btn btn-ghost">خروج از حساب</button>
       </form>
@@ -60,9 +60,10 @@
       {% endblock %}
       {% endif %}
       <button type="button" class="nav-link install-btn" id="pwa-install" hidden>نصب</button>
-      <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="تغییر پوسته">
+      <button type="button" class="btn-icon theme-toggle theme-toggle-labelled" id="theme-toggle" aria-label="پوسته: تیره. تغییر به روشن">
         <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
         <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
+        <span class="theme-toggle-label" aria-hidden="true">پوسته: تیره</span>
       </button>
     </nav>
   </aside>
@@ -81,9 +82,10 @@
       top bar (>=900px) or at the bottom (<900px), so the visual order is unchanged. -#}
   {% if user %}{% include "partials/main_nav.html" %}{% endif %}
   <footer class="foot">
-    <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a> · به‌روزرسانی ساعتی</p>
+    <p>قیمت‌ها از <a href="https://chande.net/" rel="noopener noreferrer">چنده</a>، به‌روزرسانی ساعتی</p>
   </footer>
   <script src="/static/privacy.js?v={{ static_v }}" defer></script>
+  <script src="/static/confirm-dialog.js?v={{ static_v }}" defer></script>
   <script src="/static/android-bridge.js?v={{ static_v }}" defer></script>
   {% if user and push_enabled %}
   <script id="firebase-config" type="application/json">{{ firebase_web_config_json }}</script>

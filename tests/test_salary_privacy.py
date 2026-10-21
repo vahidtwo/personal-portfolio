@@ -25,7 +25,7 @@ def _salary(username="alice"):
 def _save_account(client, salary, username="alice"):
     return client.post("/profile/account", data={"full_name": "", "username": username, "mobile": "",
                                                  "salary_toman": salary, "current_password": "",
-                                                 "new_password": "", "csrf": _csrf(client)},
+                                                 "new_password": "", "section": "salary", "csrf": _csrf(client)},
                        follow_redirects=False)
 
 
@@ -53,7 +53,7 @@ def test_no_salary_page_html_contains_the_amount(client, no_network):
 def test_edit_form_input_starts_empty(client, no_network):
     _setup(client)
     html = client.get("/profile?section=settings").text
-    assert '<input name="salary_toman" value="" placeholder="مبلغ جدید"' in html
+    assert '<input id="f-salary_toman" name="salary_toman" value="" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands' in html
 
 
 def test_endpoint_requires_auth(client, no_network):

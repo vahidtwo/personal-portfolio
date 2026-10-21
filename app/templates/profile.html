@@ -1,127 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{% if tab == "debts" %}بدهی‌ها، موجودی من{% else %}تنظیمات، موجودی من{% endif %}{% endblock %}
 {% block content %}
-<section class="card auth-card wide{% if tab == 'debts' %} dv-wrap{% endif %}">
+<section class="card auth-card wide{% if tab == 'debts' %} dv-wrap{% else %} v2-settings-wrap{% endif %}">
   {% if tab == 'debts' %}
   <h1>بدهی‌ها و هزینهٔ ماهانه</h1>
   {% include "partials/debts_v2.html" %}
   {% else %}
-  <h1>تنظیمات</h1>
-  {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
-  {% if error %}<p class="toast toast-warn" role="alert">{{ error }}</p>{% endif %}
-  <h2 id="account-settings">حساب و رمز عبور</h2>
-  <form method="post" action="/profile/account" class="grid-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% if account_error %}<p class="toast toast-warn" role="alert">{{ account_error }}</p>{% endif %}
-    <label>
-      <span class="label-text">نام</span>
-      <input name="full_name" value="{{ account.full_name }}" maxlength="80">
-    </label>
-    <label>
-      <span class="label-text">نام کاربری</span>
-      <input name="username" value="{{ account.username }}" dir="ltr" autocomplete="username">
-    </label>
-    <label>
-      <span class="label-text">موبایل</span>
-      <input name="mobile" value="{{ account.mobile }}" inputmode="tel" dir="ltr" placeholder="0912...">
-    </label>
-    <label>
-      <span class="label-text">حقوق ماهانه (تومان)</span>
-      <input name="salary_toman" value="" placeholder="مبلغ جدید" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands>
-      <span class="field-hint">مبلغ فعلی نمایش داده نمی‌شود. برای نگه داشتن آن خالی بگذارید.</span>
-    </label>
-    <label>
-      <span class="label-text">رمز فعلی</span>
-      <input name="current_password" type="password" autocomplete="current-password" dir="ltr">
-    </label>
-    <label>
-      <span class="label-text">رمز جدید</span>
-      <input name="new_password" type="password" autocomplete="new-password" dir="ltr">
-      <span class="field-hint">برای نگه داشتن رمز فعلی خالی بگذارید. تغییر نام کاربری یا رمز، رمز فعلی می‌خواهد.</span>
-    </label>
-    <div class="form-actions span-2">
-      <button type="submit" class="btn btn-primary">ذخیره حساب</button>
-    </div>
-  </form>
+  {% include "partials/settings_v2.html" %}
   {% endif %}
 </section>
-{% if tab != "debts" %}{# push, Android app, MCP, APK download + logout: settings tab only, never under «بدهی‌ها» #}
-{% if push_enabled %}
-<section class="card auth-card wide" id="push-settings">
-  <h2>اعلان‌ها</h2>
-  <p class="card-desc">در مرورگر یا اپ اندروید اعلان دریافت کنید. اعلان مرورگر فقط روی HTTPS کار می‌کند.</p>
-  <div class="landing-actions">
-    <button type="button" class="btn btn-primary" id="push-enable">فعال‌سازی اعلان</button>
-  </div>
-  <p id="push-status" class="toast toast-ok" role="status" hidden></p>
-  <form method="post" action="/profile/push-test" class="inline-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="btn btn-ghost btn-sm">ارسال آزمایشی</button>
-  </form>
-</section>
-{% endif %}
-<section class="card auth-card wide" id="android-app-settings" hidden>
-  <h2>اپ اندروید (پیامک)</h2>
-  <p class="card-desc" id="android-sms-legacy-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>
-  <div id="android-sms-native" hidden>
-    <p class="card-desc">کلمه‌های پیامک فقط روی همین گوشی ذخیره می‌شوند و به سایت فرستاده نمی‌شوند.</p>
-    <button type="button" id="android-sms-open" class="btn btn-primary">تنظیمات پیامک</button>
-  </div>
-  <form id="android-phrase-form" class="grid-form">
-    <label>
-      <span class="label-text">عبارت لازم در پیامک</span>
-      <input type="text" id="android-sms-phrase">
-    </label>
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary">ذخیره در اپ</button>
-    </div>
-    <p id="android-phrase-status" class="field-hint" role="status" hidden></p>
-  </form>
-</section>
-<details class="card auth-card wide advanced-card" id="advanced"{% if mcp_token %} open{% endif %}>
-  <summary class="advanced-summary">پیشرفته</summary>
-  <section class="advanced-body" aria-labelledby="mcp-heading">
-  <h2 id="mcp-heading">توکن MCP</h2>
-  <p class="card-desc">با این توکن شخصی می‌توانید دستیارهای هوش مصنوعی یا ابزارهای دیگر را به حسابتان وصل کنید تا موجودی و گزارش‌های شما را فقط بخوانند.</p>
-  <p class="field-hint">آدرس: <code dir="ltr" class="url-block">{{ mcp_url }}</code> — درخواست POST با هدر <code dir="ltr">Authorization: Bearer …</code></p>
-    {% if mcp_token %}
-    <p class="field-hint">این تنظیم یک بار نشان داده می‌شود. در Cursor بروید به Settings → MCP و کل JSON را در mcp.json بگذارید.</p>
-    <textarea id="mcp-cursor-config" readonly rows="12" dir="ltr">{{ mcp_cursor_config }}</textarea>
-    <button type="button" class="btn btn-ghost btn-sm" id="mcp-copy-config">کپی تنظیمات Cursor</button>
-    {% elif user.mcp_token_hash %}
-    <p class="field-status">توکن ذخیره شده است.</p>
-    {% else %}
-    <p class="field-hint">هنوز توکنی ساخته نشده است.</p>
-    {% endif %}
-    <form method="post" action="/profile/mcp-token" class="inline-form">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit" class="btn btn-primary btn-sm">{% if user.mcp_token_hash %}توکن جدید{% else %}ساخت توکن{% endif %}</button>
-    </form>
-    {% if user.mcp_token_hash %}
-    <form method="post" action="/profile/mcp-token/revoke" class="inline-form" onsubmit="return confirm('توکن MCP حذف شود؟');">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit" class="btn btn-danger btn-sm">حذف توکن</button>
-    </form>
-    {% endif %}
-  </section>
-</details>
-{% from "partials/nav_icons.html" import nav_icon %}
-<section class="card auth-card wide settings-rows" id="settings-account-actions" aria-label="حساب">
-  {% with cls="settings-row" %}{% include "partials/apk_download.html" %}{% endwith %}
-  {% if is_admin %}
-  <a class="settings-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
-  {% endif %}
-  <form method="post" action="/logout" class="settings-row-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="settings-row settings-row-danger">{{ nav_icon('logout') }}<span class="settings-row-label">خروج از حساب</span></button>
-  </form>
-</section>
-{% endif %}{# settings-only sections #}
 {% endblock %}
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
-{% if tab == "debts" %}<script src="/static/debts-page.js?v={{ static_v }}" defer></script>{% endif %}
+{% if tab == "debts" %}<script src="/static/debts-page.js?v={{ static_v }}" defer></script>{% else %}<script src="/static/settings-page.js?v={{ static_v }}" defer></script>{% endif %}
 <script>
   const copyConfig = document.getElementById("mcp-copy-config");
   const configBox = document.getElementById("mcp-cursor-config");

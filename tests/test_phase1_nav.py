@@ -85,7 +85,7 @@ def test_admin_link_and_logout_still_in_side_menu(client, no_network):
     _register(client)
     html = client.get("/dashboard").text
     assert 'action="/logout"' in html and 'id="menu-toggle"' in html
-    assert 'href="/profile">پروفایل</a>' in html
+    assert 'href="/profile">تنظیمات</a>' in html  # settings v2: one name for one page
 
 
 def _make_admin(monkeypatch, name="boss"):
@@ -96,8 +96,8 @@ def _make_admin(monkeypatch, name="boss"):
 def test_settings_has_logout_row_and_no_admin_link_for_regular_user(client, no_network):
     _register(client, "regular")
     html = client.get("/profile?section=settings").text
-    rows = html[html.index('id="settings-account-actions"'):]
-    rows = rows[:rows.index("</section>")]
+    rows = html[html.index('id="settings-account-actions"'):]  # settings v2: «اپ و اتصال‌ها» then the «خروج» card
+    rows = rows[:rows.index("</section>", rows.index('id="logout"'))]
     assert "خروج از حساب" in rows and 'action="/logout"' in rows and 'name="csrf"' in rows
     # admin entry is decided on the server: not in the HTML at all for non-admins
     assert 'href="/admin"' not in html
@@ -111,8 +111,8 @@ def test_admin_sees_admin_row_in_settings_and_menu(client, no_network, monkeypat
     _make_admin(monkeypatch)
     _register(client, "boss")
     html = client.get("/profile?section=settings").text
-    rows = html[html.index('id="settings-account-actions"'):]
-    rows = rows[:rows.index("</section>")]
+    rows = html[html.index('id="settings-account-actions"'):]  # settings v2: «اپ و اتصال‌ها» then the «خروج» card
+    rows = rows[:rows.index("</section>", rows.index('id="logout"'))]
     assert 'href="/admin"' in rows and "مدیریت" in rows
     assert rows.index("مدیریت") < rows.index("خروج از حساب")  # logout is the last row
     assert html.count('href="/admin"') == 2  # settings row + avatar/side menu

@@ -79,3 +79,28 @@ def test_integer_inputs_still_get_correct_chips():
     for typed in ("1,500", "۱۵۰۰", "۱٬۵۰۰", "1500"):
         opts = _run(f"m.suggestionsFor({json.dumps(typed)})")
         assert [o["label"] for o in opts] == want and [o["plain"] for o in opts] == ["15000", "150000"], typed
+
+
+def _type_keys(text: str):
+    """Per-key typing through the same repaint the input handler uses (reformat), caret included."""
+    code = (f"const m = require({json.dumps(str(JS))});let v='',c=0;"
+            f"for (const k of [...{json.dumps(text)}]) {{ v=v.slice(0,c)+k+v.slice(c); c+=1; const r=m.reformat(v,c); v=r.value; c=r.caret; }}"
+            "console.log(JSON.stringify({shown:v, caret:c, submitted:m.plainNumber(v)}));")
+    return json.loads(subprocess.run(["node", "-e", code], capture_output=True, text=True, check=True).stdout)
+
+
+@pytest.mark.parametrize("typed,shown,submitted", [
+    ("1500.5", "۱٬۵۰۰٫۵", "1500.5"),       # was «۱۵٬۰۰۵٫» / 15005: the caret jumped before the new «٫»
+    ("۱۵۰۰٫۵", "۱٬۵۰۰٫۵", "1500.5"),
+    ("1,500.25", "۱٬۵۰۰٫۲۵", "1500.25"),
+    ("150000", "۱۵۰٬۰۰۰", "150000"),
+])
+def test_per_key_typing_keeps_the_decimal_and_submits_what_was_typed(typed, shown, submitted):
+    out = _type_keys(typed)
+    assert (out["shown"], out["submitted"]) == (shown, submitted)
+    assert out["caret"] == len(out["shown"])  # caret stays at the end while typing
+
+
+def test_caret_stays_after_the_same_digit_on_a_mid_edit():
+    assert _run('m.reformat("12٬500", 2)') == {"value": "۱۲٬۵۰۰", "caret": 2}
+    assert _run('m.reformat("1500.", 5)') == {"value": "۱٬۵۰۰٫", "caret": 6}

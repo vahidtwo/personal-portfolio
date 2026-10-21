@@ -416,39 +416,13 @@ def big_toman(value: Decimal) -> dict:
 
 
 def next_instalment(debts: list[Debt], today: jdatetime.date) -> dict | None:
-    """Soonest instalment over all debts (same due-date rule as the debts page)."""
-    soonest = None
-    due_debts: list[Debt] = []
-    for debt in debts:
-        nxt = next_jalali_due(debt.due_day, today)
-        if nxt is None:
-            continue
-        if soonest is None or nxt < soonest:
-            soonest, due_debts = nxt, [debt]
-        elif nxt == soonest:
-            due_debts.append(debt)
-    if soonest is None:
+    """Soonest instalment over all ACTIVE debts (same due-date rule as the debts page; 0-left debts are out)."""
+    from app.debt_schedule import soonest
+
+    nearest = soonest(debts, today)
+    if nearest is None:
         return None
-    days = (soonest.togregorian() - today.togregorian()).days
-    if days == 0:
-        chip = "امروز"
-    elif days == 1:
-        chip = "فردا"
-    else:
-        chip = f"{persian_digits(str(days))} روز دیگر"
-    amount = sum((Decimal(d.monthly_toman) for d in due_debts), Decimal("0"))
-    titles = [(d.title or "").strip() for d in due_debts]
-    if len(due_debts) > 1:
-        title = f"{persian_digits(str(len(due_debts)))} قسط"
-    else:
-        title = titles[0] or "قسط"
-    return {
-        "amount_label": format_toman(amount),
-        "title": title,
-        "date_label": persian_digits(f"{soonest.day} {JALALI_MONTHS[soonest.month - 1]}"),
-        "chip": chip,
-        "days": days,
-    }
+    return {k: nearest[k] for k in ("amount_label", "title", "date_label", "chip", "days")}
 
 
 def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:

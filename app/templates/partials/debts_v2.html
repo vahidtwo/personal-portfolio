@@ -1,0 +1,196 @@
+{# Debts v2 (/profile?tab=debts). Context: `dv` from app.debts.debts_page. privacy.js hooks unchanged. #}
+{% set e = dv.debt_errors %}{% set xe = dv.expense_errors %}
+{% set plus %}<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{% endset %}
+<style>
+  /* load failed: tiles read «—» without a unit, and the next-due strip is hidden (review #24) */
+  .dv-page [data-dv-loadfail]:not([hidden]) ~ .dv-grid :is(.dv-unit,[data-dv-swap="next"]){display:none}
+</style>
+<div class="dv-page" data-dv-page{% if dv.sheet %} data-dv-open="{{ dv.sheet }}"{% endif %}>
+  <p class="dv-sub">وام‌ها و قسط‌ها، و پرداخت‌های ثابت هر ماه مثل اجاره و قبض.</p>
+  <div data-dv-swap="flash">
+    {% if flash %}<p class="toast {% if flash_error %}toast-warn{% else %}toast-ok{% endif %}" role="status">{{ flash }}</p>{% endif %}
+    {% if dv.banner %}
+    <div class="dv-banner" role="status" data-dv-banner>
+      <span>یک قسط از «{{ dv.banner.title }}» کم شد. قسط بعدی به ماه بعد رفت.</span>
+      <form method="post" action="/profile/debts/{{ dv.banner.id }}/unpaid" data-dv-action>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn btn-ghost">برگردان</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  <p class="dv-loadfail" role="alert" data-dv-loadfail hidden><span>بدهی‌ها باز نشد. اتصال را بررسی کنید و دوباره امتحان کنید.</span><button type="button" class="btn btn-ghost" data-dv-retry>دوباره</button></p>
+  <div class="dv-grid" data-dv-grid>
+    <section class="dv-card dv-sum" aria-labelledby="dv-sum-h">
+      {% if not dv.has_debts and not dv.has_expenses %}
+      <h2 id="dv-sum-h">از کجا شروع کنم؟</h2>
+      <p class="dv-cdesc">وام یا قسطی که دارید را با مبلغ هر قسط و تاریخ قسط بعدی اضافه کنید، و پرداخت‌های ثابت هر ماه مثل اجاره را در «هزینهٔ ماهانه». جمع‌ها و قسط بعدی همین‌جا نشان داده می‌شوند.</p>
+
+      {% else %}
+      <h2 id="dv-sum-h">این ماه</h2>
+      <div class="dv-tiles">
+        <div class="dv-tile"><span>قسط‌های این ماه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+{% include "partials/debts_left_tile.html" %}
+      </div>
+      <div data-dv-swap="next">
+      {% if dv.next %}
+      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num">{{ dv.next.amount_label }}</bdi> تومان</span><span class="d">{{ dv.next.chip }}</span></p>
+      {% endif %}
+      </div>
+      <p class="dv-formula">مانده = حقوق − قسط‌ها − هزینهٔ ماهانه. حقوق فقط با دکمهٔ چشم نشان داده می‌شود و ذخیره نمی‌شود.</p>
+      {% endif %}
+    </section>
+
+    <section class="dv-card" aria-labelledby="dv-debts-h" data-dv-list="debts">
+      <div class="dv-chead"><h2 id="dv-debts-h"><img class="section-logo" src="/static/logos/section-debts.svg" alt="" width="20" height="20">وام و قسط</h2>
+        {% if dv.has_debts %}<button type="button" class="btn btn-ghost" data-dv-add="debt">{{ plus }}<span>افزودن</span></button>{% endif %}</div>
+      <div data-dv-swap="debts">
+      {% if dv.has_debts %}
+      <p class="dv-cdesc">به ترتیب نزدیک‌ترین قسط.</p>
+      <ul class="dv-rows" aria-label="وام و قسط">
+        {% for r in dv.rows %}
+        <li class="dv-row{% if not r.active %} done{% endif %}" data-dv-row="{{ r.id }}">
+          <div class="t"><b>{{ r.display_title }}</b><small>{% if r.active %}{{ r.months_label }} قسط مانده، تا {{ r.end_label }}{% else %}همهٔ قسط‌ها پرداخت شده{% endif %}</small></div>
+          <div class="a"><b class="num"><bdi>{{ r.monthly_label }}</bdi></b><small>تومان در ماه</small></div>
+          <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ r.display_title }}" data-dv-dots>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
+          <div class="dv-meta">
+            {% if r.badge %}<span class="dv-badge {{ r.badge }}">{{ r.badge_label }}</span>{% endif %}
+            {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num">{{ r.total_label }}</b> تومان</span>{% else %}<span>از جمع‌ها بیرون است</span>{% endif %}
+          </div>
+          <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ r.display_title }}" hidden data-dv-menu>
+            <a role="menuitem" href="/profile?tab=debts&edit={{ r.id }}" data-dv-edit="debt" data-id="{{ r.id }}"
+               data-form='{{ {"title": r.title, "monthly_toman": r.monthly_raw, "months_left": r.months_raw, "due_year": r.due_year, "due_month": r.due_month, "due_day": r.due_day, "orig": r.monthly_orig} | tojson | forceescape }}'>ویرایش</a>
+            {% if r.active %}
+            <form method="post" action="/profile/debts/{{ r.id }}/paid" data-dv-action>
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="expect" value="{{ r.months_left }}">
+              <button type="submit" role="menuitem">پرداخت شد، یک قسط کم کن</button>
+            </form>
+            {% endif %}
+            <button type="button" role="menuitem" class="d" data-dv-del data-action="/profile/debts/{{ r.id }}/delete"
+                    data-title="{{ r.display_title }}" data-body="{% if r.active %}{{ r.months_label }} قسط {{ r.monthly_label }} تومانی، جمعاً {{ r.total_label }} تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد.{% else %}از فهرست برداشته می‌شود. حذف برگشت ندارد.{% endif %}"
+                    data-hint="{% if r.active %}اگر فقط یک قسط پرداخت کرده‌اید، «پرداخت شد» را بزنید.{% endif %}">حذف…</button>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="dv-sumrow"><span>جمع بدهی مانده</span><b class="num"><bdi>{{ dv.total_label }}</bdi> تومان</b></p>
+      {% else %}
+      <div class="dv-empty">
+        <h3>وام یا قسطی ثبت نشده است</h3>
+        <p>با ثبت مبلغ هر قسط و تاریخ قسط بعدی، جمع بدهی و قسط بعدی اینجا و در خانه نشان داده می‌شود.</p>
+        <button type="button" class="btn btn-primary" data-dv-add="debt">{{ plus }}<span>افزودن وام یا قسط</span></button>
+      </div>
+      {% endif %}
+      </div>
+      <ul class="dv-rows dv-skel-rows" aria-hidden="true">{% for _ in range(3) %}<li class="dv-row"><span class="dv-skel" style="height:18px;width:60%"></span><span class="dv-skel" style="height:18px;width:90px"></span><span></span><span class="dv-skel" style="height:14px;width:80%;grid-column:1/3"></span></li>{% endfor %}</ul>
+    </section>
+
+    <section class="dv-card" aria-labelledby="dv-exp-h" data-dv-list="expenses">
+      <div class="dv-chead"><h2 id="dv-exp-h"><img class="section-logo" src="/static/logos/section-expense.svg" alt="" width="20" height="20">هزینهٔ ماهانه</h2>
+        {% if dv.has_expenses %}<button type="button" class="btn btn-ghost" data-dv-add="expense">{{ plus }}<span>افزودن</span></button>{% endif %}</div>
+      <div data-dv-swap="expenses">
+      {% if dv.has_expenses %}
+      <p class="dv-cdesc">اجاره، قبض و پرداخت‌های تکراری؛ از مانده کم می‌شود، نه از دارایی.</p>
+      <ul class="dv-rows" aria-label="هزینهٔ ماهانه">
+        {% for x in dv.expenses %}
+        <li class="dv-row" data-dv-row="x{{ x.id }}">
+          <div class="t"><b>{{ x.display_title }}</b><small>روز {{ x.day_label }} هر ماه</small></div>
+          <div class="a"><b class="num"><bdi>{{ x.amount_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+          <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ x.display_title }}" data-dv-dots>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
+          <div class="dv-meta"><span>نوبت بعدی: <b>{{ x.next_label }}</b></span></div>
+          <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ x.display_title }}" hidden data-dv-menu>
+            <a role="menuitem" href="/profile?tab=debts&spend={{ x.id }}" data-dv-edit="expense" data-id="{{ x.id }}"
+               data-form='{{ {"title": x.title, "amount_toman": x.amount_raw, "due_day": x.due_day, "orig": x.amount_orig} | tojson | forceescape }}'>ویرایش</a>
+            <button type="button" role="menuitem" class="d" data-dv-del data-action="/profile/expenses/{{ x.id }}/delete"
+                    data-title="{{ x.display_title }}" data-body="ماهانه {{ x.amount_label }} تومان از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد." data-hint="">حذف…</button>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="dv-sumrow"><span>جمع هزینهٔ ماهانه</span><b class="num"><bdi>{{ dv.expense_label }}</bdi> تومان</b></p>
+      {% else %}
+      <div class="dv-empty">
+        <h3>هزینهٔ ماهانه‌ای ثبت نشده است</h3>
+        <p>اجاره، قبض یا هر پرداخت ثابت ماهانه را اضافه کنید تا «مانده از حقوق» درست حساب شود.</p>
+        <button type="button" class="btn btn-primary" data-dv-add="expense">{{ plus }}<span>افزودن هزینهٔ ماهانه</span></button>
+      </div>
+      {% endif %}
+      </div>
+      <ul class="dv-rows dv-skel-rows" aria-hidden="true">{% for _ in range(3) %}<li class="dv-row"><span class="dv-skel" style="height:18px;width:60%"></span><span class="dv-skel" style="height:18px;width:90px"></span><span></span><span class="dv-skel" style="height:14px;width:50%;grid-column:1/3"></span></li>{% endfor %}</ul>
+    </section>
+  </div>
+
+  {# ---- sheets (dialog on desktop). The POST targets and field names are the same as before. ---- #}
+  <div class="dv-scrim" data-dv-scrim hidden></div>
+  <section class="dv-sheet" role="dialog" aria-modal="true" aria-labelledby="dv-debt-title" data-dv-sheet="debt" {% if dv.sheet != "debt" %}hidden{% endif %}>
+    <div class="dv-shead"><h2 id="dv-debt-title" data-title-add="افزودن وام یا قسط" data-title-edit="ویرایش قسط">{% if dv.editing_id %}ویرایش قسط{% else %}افزودن وام یا قسط{% endif %}</h2><button type="button" class="dv-x" aria-label="بستن" data-dv-close>✕</button></div>
+    <p class="dv-summary" role="alert" data-dv-summary {% if not (dv.summary and dv.sheet == "debt") %}hidden{% endif %}>{% if dv.sheet == "debt" and dv.summary %}<strong>{{ dv.summary }}</strong>{% for f, label in dv.summary_links %}<a href="#dv-{{ f }}">{{ label }}</a>{% endfor %}{% endif %}</p>
+    <form method="post" action="{% if dv.editing_id %}/profile/debts/{{ dv.editing_id }}{% else %}/profile/debts{% endif %}" data-action-add="/profile/debts" class="grid-form" id="debt-form" novalidate data-dv-form="debt">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="span-2"><span class="label-text">عنوان</span>
+        <input id="dv-title" name="title" value="{{ dv.debt_form.title }}" maxlength="64" placeholder="مثلاً وام مسکن"></label>
+      <label class="span-2 dv-field"><span class="label-text">مبلغ هر قسط (تومان)</span>
+        <input id="dv-monthly_toman" name="monthly_toman" value="{{ dv.debt_form.monthly_toman }}" inputmode="numeric" dir="ltr" data-thousands{% if dv.editing_id and dv.debt_orig %} data-dv-orig="{{ dv.debt_orig }}"{% endif %} aria-describedby="dv-err-monthly_toman"{% if e.monthly_toman %} aria-invalid="true"{% endif %}>
+        <span class="dv-err" id="dv-err-monthly_toman" data-dv-err>{{ e.monthly_toman or "" }}</span></label>
+      <label class="span-2 dv-field"><span class="label-text">تعداد قسط مانده</span>
+        <input id="dv-months_left" name="months_left" value="{{ dv.debt_form.months_left | fa }}" inputmode="numeric" dir="ltr" aria-describedby="dv-err-months_left"{% if e.months_left %} aria-invalid="true"{% endif %}>
+        <span class="dv-err" id="dv-err-months_left" data-dv-err>{{ e.months_left or "" }}</span></label>
+      <fieldset class="span-2 dv-date"><legend class="label-text">تاریخ قسط بعدی</legend>
+        <div class="jalali-row">
+          <label><span class="label-text">روز</span><input id="dv-due_day" name="due_day" value="{{ dv.debt_form.due_day | fa }}" inputmode="numeric" placeholder="۱۵" dir="ltr" aria-describedby="dv-err-due_day dv-date-hint"{% if e.due_day %} aria-invalid="true"{% endif %}></label>
+          <label><span class="label-text">ماه</span><input id="dv-due_month" name="due_month" value="{{ dv.debt_form.due_month | fa }}" inputmode="numeric" placeholder="۸" dir="ltr" aria-describedby="dv-err-due_month dv-date-hint"{% if e.due_month %} aria-invalid="true"{% endif %}></label>
+          <label><span class="label-text">سال</span><input id="dv-due_year" name="due_year" value="{{ dv.debt_form.due_year | fa }}" inputmode="numeric" placeholder="{{ dv.today_year | string | fa }}" dir="ltr" aria-describedby="dv-err-due_year dv-date-hint"{% if e.due_year %} aria-invalid="true"{% endif %}></label>
+        </div>
+        <span class="dv-err" id="dv-err-due_day" data-dv-err>{{ e.due_day or "" }}</span>
+        <span class="dv-err" id="dv-err-due_month" data-dv-err>{{ e.due_month or "" }}</span>
+        <span class="dv-err" id="dv-err-due_year" data-dv-err>{{ e.due_year or "" }}</span>
+        <p class="dv-hint" id="dv-date-hint">روزِ این تاریخ، روز قسط در هر ماه است.</p>
+      </fieldset>
+      <p class="dv-preview span-2" aria-live="polite" data-dv-preview hidden></p>
+      <p class="dv-fail span-2" role="alert" data-dv-fail hidden>ذخیره نشد. اتصال برقرار نشد. چیزی که نوشتید سر جایش مانده است.</p>
+      <div class="form-actions span-2">
+        <button type="button" class="btn btn-ghost" data-dv-close>انصراف</button>
+        <button type="submit" class="btn btn-primary" data-dv-submit data-label="{% if dv.editing_id %}ذخیرهٔ تغییرات{% else %}افزودن قسط{% endif %}" data-label-add="افزودن قسط" data-label-edit="ذخیرهٔ تغییرات">{% if dv.editing_id %}ذخیرهٔ تغییرات{% else %}افزودن قسط{% endif %}</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="dv-sheet" role="dialog" aria-modal="true" aria-labelledby="dv-exp-title" data-dv-sheet="expense" {% if dv.sheet != "expense" %}hidden{% endif %}>
+    <div class="dv-shead"><h2 id="dv-exp-title" data-title-add="افزودن هزینهٔ ماهانه" data-title-edit="ویرایش هزینهٔ ماهانه">{% if dv.editing_expense_id %}ویرایش هزینهٔ ماهانه{% else %}افزودن هزینهٔ ماهانه{% endif %}</h2><button type="button" class="dv-x" aria-label="بستن" data-dv-close>✕</button></div>
+    <p class="dv-summary" role="alert" data-dv-summary {% if not (dv.summary and dv.sheet == "expense") %}hidden{% endif %}>{% if dv.sheet == "expense" and dv.summary %}<strong>{{ dv.summary }}</strong>{% for f, label in dv.summary_links %}<a href="#dvx-{{ f }}">{{ label }}</a>{% endfor %}{% endif %}</p>
+    <form method="post" action="{% if dv.editing_expense_id %}/profile/expenses/{{ dv.editing_expense_id }}{% else %}/profile/expenses{% endif %}" data-action-add="/profile/expenses" class="grid-form" id="expense-form" novalidate data-dv-form="expense">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="span-2"><span class="label-text">عنوان</span>
+        <input id="dvx-title" name="title" value="{{ dv.expense_form.title }}" maxlength="64" placeholder="مثلاً اجاره خانه"></label>
+      <label class="span-2 dv-field"><span class="label-text">مبلغ ماهانه (تومان)</span>
+        <input id="dvx-amount_toman" name="amount_toman" value="{{ dv.expense_form.amount_toman }}" inputmode="numeric" dir="ltr" data-thousands{% if dv.editing_expense_id and dv.expense_orig %} data-dv-orig="{{ dv.expense_orig }}"{% endif %} aria-describedby="dvx-err-amount_toman"{% if xe.amount_toman %} aria-invalid="true"{% endif %}>
+        <span class="dv-err" id="dvx-err-amount_toman" data-dv-err>{{ xe.amount_toman or "" }}</span></label>
+      <label class="span-2 dv-field"><span class="label-text">روز پرداخت در ماه</span>
+        <input id="dvx-due_day" name="due_day" value="{{ dv.expense_form.due_day | fa }}" inputmode="numeric" dir="ltr" placeholder="&#x2067;۱ تا ۳۱&#x2069;" aria-describedby="dvx-err-due_day dvx-day-hint"{% if xe.due_day %} aria-invalid="true"{% endif %}>
+        <span class="dv-err" id="dvx-err-due_day" data-dv-err>{{ xe.due_day or "" }}</span>
+        <span class="dv-hint" id="dvx-day-hint">اگر ماه کوتاه‌تر باشد، روز آخر ماه حساب می‌شود.</span></label>
+      <p class="dv-fail span-2" role="alert" data-dv-fail hidden>ذخیره نشد. اتصال برقرار نشد. چیزی که نوشتید سر جایش مانده است.</p>
+      <div class="form-actions span-2">
+        <button type="button" class="btn btn-ghost" data-dv-close>انصراف</button>
+        <button type="submit" class="btn btn-primary" data-dv-submit data-label-add="افزودن هزینه" data-label-edit="ذخیرهٔ تغییرات">{% if dv.editing_expense_id %}ذخیرهٔ تغییرات{% else %}افزودن هزینه{% endif %}</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="dv-sheet dv-confirm" role="alertdialog" aria-modal="true" aria-labelledby="dv-del-title" aria-describedby="dv-del-body" data-dv-sheet="delete" hidden>
+    <h2 id="dv-del-title" data-dv-del-title></h2>
+    <p id="dv-del-body" data-dv-del-body></p>
+    <p class="dv-hint" data-dv-del-hint></p>
+    <form method="post" action="" data-dv-del-form data-dv-action>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-dv-close data-dv-initial>انصراف</button>
+        <button type="submit" class="btn btn-danger">حذف</button>
+      </div>
+    </form>
+  </section>
+</div>

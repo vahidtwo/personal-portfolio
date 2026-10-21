@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import PUBLIC_BASE_URL
 from app.db import get_db
-from app.debts import debt_rows
+from app.debts import debt_rows, page_context_for_get
 from app.expenses import expense_form_for_request
 from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
@@ -100,6 +100,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         car_fetched_label=format_when(user.car_fetched_at),
         car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
         tab=tab,
+        dv=page_context_for_get(db, user, request) if tab == "debts" else None,
         debts=debts,
         debt_total_label=format_toman(debt_total),
         next_debt_label=next_debt_label,

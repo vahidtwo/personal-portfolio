@@ -1,6 +1,10 @@
 {# Debts v2 (/profile?tab=debts). Context: `dv` from app.debts.debts_page. privacy.js hooks unchanged. #}
 {% set e = dv.debt_errors %}{% set xe = dv.expense_errors %}
 {% set plus %}<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{% endset %}
+<style>
+  /* load failed: tiles read «—» without a unit, and the next-due strip is hidden (review #24) */
+  .dv-page [data-dv-loadfail]:not([hidden]) ~ .dv-grid :is(.dv-unit,[data-dv-swap="next"]){display:none}
+</style>
 <div class="dv-page" data-dv-page{% if dv.sheet %} data-dv-open="{{ dv.sheet }}"{% endif %}>
   <p class="dv-sub">وام‌ها و قسط‌ها، و پرداخت‌های ثابت هر ماه مثل اجاره و قبض.</p>
   <div data-dv-swap="flash">
@@ -21,15 +25,13 @@
       {% if not dv.has_debts and not dv.has_expenses %}
       <h2 id="dv-sum-h">از کجا شروع کنم؟</h2>
       <p class="dv-cdesc">وام یا قسطی که دارید را با مبلغ هر قسط و تاریخ قسط بعدی اضافه کنید، و پرداخت‌های ثابت هر ماه مثل اجاره را در «هزینهٔ ماهانه». جمع‌ها و قسط بعدی همین‌جا نشان داده می‌شوند.</p>
-      <div class="dv-tiles dv-tiles-one">
-{% include "partials/debts_left_tile.html" %}
-      </div>
+
       {% else %}
       <h2 id="dv-sum-h">این ماه</h2>
       <div class="dv-tiles">
-        <div class="dv-tile"><span>قسط‌های این ماه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small>تومان</small></div>
-        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small>تومان</small></div>
-        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small>تومان</small></div>
+        <div class="dv-tile"><span>قسط‌های این ماه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
 {% include "partials/debts_left_tile.html" %}
       </div>
       <div data-dv-swap="next">
@@ -96,7 +98,7 @@
         {% for x in dv.expenses %}
         <li class="dv-row" data-dv-row="x{{ x.id }}">
           <div class="t"><b>{{ x.display_title }}</b><small>روز {{ x.day_label }} هر ماه</small></div>
-          <div class="a"><b class="num"><bdi>{{ x.amount_label }}</bdi></b><small>تومان</small></div>
+          <div class="a"><b class="num"><bdi>{{ x.amount_label }}</bdi></b><small class="dv-unit">تومان</small></div>
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ x.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta"><span>نوبت بعدی: <b>{{ x.next_label }}</b></span></div>

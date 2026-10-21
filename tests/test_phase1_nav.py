@@ -74,6 +74,8 @@ def test_settings_anchor_exists_and_profile_features_unchanged(client, no_networ
     assert 'name="new_password"' in html  # account form is shown under settings
     assert 'name="gold_grams"' not in html  # Phase 1 piece 2: assets moved to /assets
     # privacy toggle and the collapsed «پیشرفته» MCP section are untouched
+    # Debts v2: the «مانده از حقوق» tile (with the eye button) shows once there is a debt or a monthly expense.
+    client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": "1000", "due_day": "1", "csrf": _csrf(client, "/profile?tab=debts")})
     assert 'data-salary-reveal' in client.get("/profile?tab=debts").text
     assert 'id="advanced"' in html and 'id="mcp-heading"' in html
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html

@@ -58,9 +58,12 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     client.post("/profile", data={**EMPTY_ASSETS, "btc": raw, "cash_toman": raw, "csrf": _csrf(client)})
     client.post("/profile/account", data={"full_name": "", "username": "alice", "mobile": "", "salary_toman": raw,
                                           "current_password": "", "new_password": "", "csrf": _csrf(client)})
-    client.post("/profile/debts", data={"title": "وام", "monthly_toman": raw, "months_left": "۱۲", "due_year": "۱۴۰۵",
+    # Debts, monthly expenses and spends are whole toman (v2 specs): a decimal is rejected at the field, not rounded.
+    whole = want == want.to_integral_value()
+    toman_raw, toman_want = (raw, want) if whole else ("۱۲", Decimal("12"))
+    client.post("/profile/debts", data={"title": "وام", "monthly_toman": toman_raw, "months_left": "۱۲", "due_year": "۱۴۰۵",
                                         "due_month": "۷", "due_day": "۱۵", "csrf": _csrf(client)})
-    client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": raw, "due_day": "۵", "csrf": _csrf(client)})
+    client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": toman_raw, "due_day": "۵", "csrf": _csrf(client)})
     client.get("/dashboard?tab=daily")
     db, alice = _alice()
     child = db.query(SpendCategory).filter(SpendCategory.user_id == alice.id, SpendCategory.parent_id.is_not(None)).first()
@@ -75,8 +78,8 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     db, alice = _alice()
     try:
         assert alice.btc == want and alice.cash_toman == want and alice.salary_toman == want
-        assert db.query(Debt).filter_by(user_id=alice.id).one().monthly_toman == want
-        assert db.query(MonthlyExpense).filter_by(user_id=alice.id).one().amount_toman == want
+        assert db.query(Debt).filter_by(user_id=alice.id).one().monthly_toman == toman_want
+        assert db.query(MonthlyExpense).filter_by(user_id=alice.id).one().amount_toman == toman_want
         amounts = sorted(Decimal(s.amount_toman) for s in db.query(DailySpend).filter_by(user_id=alice.id))
         assert amounts == sorted([want, spend_want])
     finally:

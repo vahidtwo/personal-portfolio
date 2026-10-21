@@ -108,7 +108,7 @@ def test_instalment_due_today_in_the_0000_0330_window(client, freeze, no_network
     tile = html[html.index('id="tile-next-debt"'):html.index('id="tile-month-spend"')]
     assert re.search(r'badge-due[^"]*">امروز<', tile) and "۲۶ مهر" in tile
     debts = client.get("/profile?tab=debts").text
-    assert "۱۴۰۵/۰۷/۲۶" in debts  # same date on the debts page
+    assert "قسط بعدی: <b>۲۶ مهر</b>" in debts and "امروز" in debts  # same date on the debts page
     freeze(datetime(2026, 10, 17, 20, 0, tzinfo=timezone.utc))  # 23:30 Tehran on the 25th
     tile = client.get("/dashboard").text
     tile = tile[tile.index('id="tile-next-debt"'):tile.index('id="tile-month-spend"')]

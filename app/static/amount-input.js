@@ -49,24 +49,29 @@
     return digits.slice(0, cut) + "." + digits.slice(cut);
   }
 
+  // As-you-type repaint: group the integer part only, keep the decimal separator and the fraction
+  // digits verbatim, and put the caret after the same number of digits AND separators it had.
+  // (Counting digits only put the caret BEFORE a "." that was just turned into "٫", so the next digit
+  // landed in the integer part: typing 1500.5 showed «۱۵٬۰۰۵٫» and submitted 15005.)
+  var KEPT = /[0-9.\u066B]/;
+  function reformat(value, caret) {
+    var next = displayAmount(value);
+    if (value === next || (!next && String(value).trim())) return { value: value, caret: caret }; // invalid: leave as typed
+    var before = toLatin(String(value).slice(0, caret)).replace(/[^0-9.\u066B]/g, "").length;
+    var seen = 0, pos = 0;
+    for (var i = 0; i < next.length && seen < before; i++) {
+      if (KEPT.test(toLatin(next[i]))) seen += 1;
+      pos = i + 1;
+    }
+    return { value: next, caret: before === 0 ? 0 : pos };
+  }
+
   function bindThousands(input) {
     function paint() {
-      var start = input.selectionStart || 0;
-      var digitsBefore = toLatin(input.value.slice(0, start)).replace(/\D/g, "").length;
-      var next = displayAmount(input.value);
-      if (input.value === next) return;
-      if (!next && input.value.trim()) return; // leave invalid text for the user (and server) to see
-      input.value = next;
-      var seen = 0;
-      var pos = next.length;
-      for (var i = 0; i < next.length; i++) {
-        if (/\d/.test(toLatin(next[i]))) seen += 1;
-        if (seen >= digitsBefore) {
-          pos = i + 1;
-          break;
-        }
-      }
-      input.setSelectionRange(pos, pos);
+      var r = reformat(input.value, input.selectionStart == null ? input.value.length : input.selectionStart);
+      if (r.value === input.value) return;
+      input.value = r.value;
+      if (document.activeElement === input) input.setSelectionRange(r.caret, r.caret);
     }
     input.addEventListener("input", paint);
     input.addEventListener("blur", paint);
@@ -193,7 +198,7 @@
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { amountInWords: amountInWords, amountWordsLine: amountWordsLine, SMALL_AMOUNT: SMALL_AMOUNT, chipOptions: chipOptions, suggestionsFor: suggestionsFor, chipLabel: chipLabel, plainNumber: plainNumber,
-                       formatAmount: formatAmount, displayAmount: displayAmount, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
+                       formatAmount: formatAmount, displayAmount: displayAmount, reformat: reformat, MAX_CHIP_FACTOR: MAX_CHIP_FACTOR };
   }
   if (typeof document === "undefined") return;
 

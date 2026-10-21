@@ -235,7 +235,7 @@ def test_migration_0003_up_down_keeps_data(tmp_path):
     c.execute("INSERT INTO holdings (user_id, asset_key, quantity, updated_at) VALUES (1,'btc',1,'2026-01-01')")
     c.commit()
     dump0 = [l for l in c.iterdump()]; c.close()
-    _alembic(db, "head")
+    _alembic(db, "0003_admin_audit_log")
     c = sqlite3.connect(db)
     assert "admin_audit_log" in {r[0] for r in c.execute("select name from sqlite_master where type='table'")}
     assert c.execute("select version_num from alembic_version").fetchone()[0] == "0003_admin_audit_log"

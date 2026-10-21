@@ -96,11 +96,20 @@ async def refresh_user_sanjeh_car(user: User) -> None:
         user.car_toman = 0
         user.car_count = 0
         user.car_fetched_at = None
+        user.sanjeh_status = None
         return
-    portfolio = await fetch_sanjeh_portfolio(user.sanjeh_token)
+    try:
+        portfolio = await fetch_sanjeh_portfolio(user.sanjeh_token)
+    except SanjehAuthError:
+        user.sanjeh_status = "rejected"  # old car value is kept and still counted
+        raise
+    except Exception:
+        user.sanjeh_status = "failed"
+        raise
     user.car_toman = portfolio.total_toman
     user.car_count = portfolio.car_count
     user.car_fetched_at = utcnow()
+    user.sanjeh_status = "ok"
 
 
 async def refresh_all_sanjeh_cars() -> None:

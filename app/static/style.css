@@ -2959,6 +2959,62 @@ html.dv-locked{overflow:hidden}
 .stat.stat-usd .mc{width:64px;height:20px;display:none}
 html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 @media (max-width:399px){.stat.stat-usd .mc{width:52px;height:18px}}
+
+/* ---- Car (Sanjeh) card v2 on /assets (scoped: .car-v2 / .car-*) ---- */
+:root{--car-ok:#3ee0b8;--car-warn:#f5b942;--car-bad:#ff8a80;--car-card:#11131a;--car-warn-bg:#2a2210;--car-bad-bg:#2b1513}
+[data-theme=light]{--car-ok:#08735a;--car-warn:#8a4a05;--car-bad:#b42318;--car-card:#fff;--car-warn-bg:#fff6e0;--car-bad-bg:#fdecea}
+.car-v2{display:grid;gap:14px}
+.car-v2 .btn,.car-sheet .btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.car-v2 .row{display:flex;align-items:center;gap:12px}
+.car-v2 .row.has-val{flex-wrap:wrap}
+.car-v2 .row.has-val .val{flex-basis:100%;margin:0;text-align:start;padding-inline-start:56px}
+.car-v2 .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#0f2a24;flex:none}
+[data-theme=light] .car-v2 .logo{background:#dff5ee}
+.car-v2 .ttl{font-weight:700;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.car-v2 .sub{font-size:13.5px;color:var(--text-muted);line-height:1.8}
+.car-v2 .val{font-size:22px;font-weight:800}
+.car-v2 .val small{display:block;font-size:12.5px;font-weight:400;color:var(--text-muted)}
+.car-v2 .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid currentColor}
+.car-v2 .pill.ok{color:var(--car-ok)}.car-v2 .pill.warn{color:var(--car-warn)}.car-v2 .pill.bad{color:var(--car-bad)}
+.car-v2 .acts{display:flex;gap:12px;flex-wrap:wrap}
+.car-v2 .acts .btn{flex:1 1 auto}
+.car-v2 .acts .more{width:44px;min-width:44px;padding:0;flex:none}
+.car-v2 .note{border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.9;border:1px solid;color:var(--text)}
+.car-v2 .note b{display:block;font-size:14.5px}
+.car-v2 .note.warn{border-color:var(--car-warn);background:var(--car-warn-bg)}.car-v2 .note.warn b{color:var(--car-warn)}
+.car-v2 .note.bad{border-color:var(--car-bad);background:var(--car-bad-bg)}.car-v2 .note.bad b{color:var(--car-bad)}
+.car-v2 .why{font-size:13.5px;color:var(--text-muted);line-height:1.9;margin:0}
+.car-v2 .car-help{color:var(--car-ok);font-weight:700;display:inline-flex;align-items:center;min-height:44px;justify-self:start}
+.car-v2 .menu{display:grid;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--car-card)}
+.car-v2 .menu[hidden]{display:none}
+.car-v2 .menu-item{min-height:48px;display:flex;align-items:center;padding:0 16px;color:var(--text);font-size:14.5px;text-decoration:none}
+.car-v2 .menu-item+.menu-item{border-top:1px solid var(--border)}
+.car-v2 .menu-item.danger{color:var(--car-bad);font-weight:700}
+.car-scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.car-scrim[hidden]{display:none}
+@media(min-width:768px){.car-scrim{align-items:center}}
+.car-sheet{background:var(--car-card);color:var(--text);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:20px 18px 24px;display:grid;gap:14px;max-height:92vh;overflow:auto;box-sizing:border-box}
+@media(min-width:768px){.car-sheet{border-radius:22px}}
+.car-sheet h2{margin:0;font-size:18px}.car-sheet p{margin:0;color:var(--text-muted);font-size:14px;line-height:1.9}
+.car-sheet ol{margin:0;padding-inline-start:22px;display:grid;gap:6px;font-size:14px;line-height:1.9;list-style:persian}
+.car-sheet>a{color:var(--car-ok);font-weight:700;display:inline-flex;align-items:center;min-height:44px;justify-self:start}
+.car-sheet form{display:grid;gap:10px}
+.car-field{display:grid;gap:6px}.car-field>span{font-weight:600;font-size:14px}
+.car-field input{min-height:48px;font-family:ui-monospace,monospace;box-sizing:border-box;width:100%}
+.car-field input[aria-invalid=true]{border-color:var(--car-bad);box-shadow:0 0 0 1px var(--car-bad)}
+.car-sheet .car-err{color:var(--car-bad);font-size:13.5px;font-weight:600}
+.car-sheet .car-hint{font-size:13px;line-height:1.8}
+.car-sheet .acts{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+.car-sheet .btn-danger{background:#ff8a80;color:#1a0503;border:0}[data-theme=light] .car-sheet .btn-danger{background:#c4320a;color:#fff}
+.car-toast{position:fixed;inset-inline:16px;bottom:96px;margin:auto;max-width:420px;background:#e9edf2;color:#0b0d12;border-radius:14px;padding:6px 8px 6px 16px;z-index:210;display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:14px}
+.car-toast[hidden]{display:none}
+.car-toast form{margin:0}
+.car-toast button{min-height:44px;background:none;border:0;color:#08735a;font:inherit;font-weight:800;padding:0 8px;cursor:pointer}
+@media(min-width:1024px){.car-toast{bottom:24px}}
+.car-busy .spin{width:16px;height:16px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;display:inline-block;vertical-align:-3px;margin-inline-end:8px;animation:carspin .8s linear infinite}
+@keyframes carspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.car-busy .spin{animation:none}}
+
 /* ---- Settings v2 (/profile, spec app-v2/settings). Scoped to #settings-v2 and the shared dialog. ---- */
 .auth-card.wide.v2-settings-wrap{background:none;border:0;box-shadow:none;padding:0;backdrop-filter:none;-webkit-backdrop-filter:none;width:min(720px,100%)}
 .v2-page{max-width:720px;margin:0 auto;display:grid;gap:16px;min-width:0}

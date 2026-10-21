@@ -56,11 +56,15 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     from app.models import DailySpend, Debt, MonthlyExpense, SpendCategory
     _register(client)
     client.post("/profile", data={**EMPTY_ASSETS, "btc": raw, "cash_toman": raw, "csrf": _csrf(client)})
-    client.post("/profile/account", data={"full_name": "", "username": "alice", "mobile": "", "salary_toman": raw,
-                                          "current_password": "", "new_password": "", "csrf": _csrf(client)})
     # Debts, monthly expenses and spends are whole toman (v2 specs): a decimal is rejected at the field, not rounded.
     whole = want == want.to_integral_value()
     toman_raw, toman_want = (raw, want) if whole else ("۱۲", Decimal("12"))
+    # Salary is whole toman too (settings v2 review): its own section, a decimal is rejected at the field.
+    r = client.post("/profile/account", data={"section": "salary", "salary_toman": raw, "csrf": _csrf(client)},
+                    headers={"Accept": "application/json"})
+    if not whole:
+        assert r.status_code == 422 and "بدون ممیز" in r.json()["errors"]["salary_toman"]
+    client.post("/profile/account", data={"section": "salary", "salary_toman": toman_raw, "csrf": _csrf(client)})
     client.post("/profile/debts", data={"title": "وام", "monthly_toman": toman_raw, "months_left": "۱۲", "due_year": "۱۴۰۵",
                                         "due_month": "۷", "due_day": "۱۵", "csrf": _csrf(client)})
     client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": toman_raw, "due_day": "۵", "csrf": _csrf(client)})
@@ -77,7 +81,7 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     assert client.post("/api/sms-spend", json={"amount_toman": raw, "note": "sms"}).status_code == 200
     db, alice = _alice()
     try:
-        assert alice.btc == want and alice.cash_toman == want and alice.salary_toman == want
+        assert alice.btc == want and alice.cash_toman == want and alice.salary_toman == toman_want
         assert db.query(Debt).filter_by(user_id=alice.id).one().monthly_toman == toman_want
         assert db.query(MonthlyExpense).filter_by(user_id=alice.id).one().amount_toman == toman_want
         amounts = sorted(Decimal(s.amount_toman) for s in db.query(DailySpend).filter_by(user_id=alice.id))
@@ -185,7 +189,9 @@ def test_unchanged_profile_resubmit_keeps_every_value(client, no_network):
     assert assets["btc"] == "۰٫۰۰۰۰۰۰۰۱" and assets["cash_toman"] == "۱۸٬۵۰۰٬۰۰۰٬۰۰۰"
     assert client.post("/profile", data=assets).status_code == 200
     account = _form_fields(client.get("/profile").text, "/profile/account")
-    assert account["salary_toman"] == ""  # privacy mode: stored salary never in the form; empty keeps it
-    client.post("/profile/account", data={**account, "current_password": "", "new_password": ""})
+    assert "salary_toman" not in account  # privacy + section saves: the account form never carries the salary
+    client.post("/profile/account", data={**account, "current_password": ""})
+    # the salary section re-sent empty keeps the legacy fractional salary untouched
+    client.post("/profile/account", data={"section": "salary", "salary_toman": "", "csrf": _csrf(client)})
     assert snapshot() == before
     assert snapshot()["ada"] == Decimal("0.12345678")

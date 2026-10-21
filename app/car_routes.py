@@ -27,6 +27,7 @@ router = APIRouter()
 REFRESH_COOLDOWN_S = 300  # after a SUCCESSFUL refresh: ~1 manual refresh per 5 minutes
 RETRY_COOLDOWN_S = 30  # after a failed refresh: «دوباره امتحان کنید» works again soon
 UNDO_WINDOW_S = 10
+_retry_after_failure: set[int] = set()  # cooldown came from a failed attempt
 _next_refresh_at: dict[int, float] = {}  # user id -> monotonic time the next manual refresh is allowed
 # single uvicorn worker (Dockerfile --workers 1): undo lives in memory for 10 s, never in the cookie
 _pending_undo: dict[int, tuple[float, dict]] = {}
@@ -34,6 +35,7 @@ _pending_undo: dict[int, tuple[float, dict]] = {}
 ERR_REJECTED = "سنجه این توکن را نپذیرفت. دوباره از سنجه کپی کنید."
 ERR_EMPTY = "توکن API سنجه را بچسبانید."
 ERR_FAILED = "سنجه فعلاً پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید."
+ERR_RETRY_SOON = "چند لحظه صبر کنید و دوباره امتحان کنید."
 ERR_TOO_SOON = "قیمت همین چند دقیقه پیش گرفته شد. کمی بعد دوباره امتحان کنید."
 TOAST_DISCONNECTED = "اتصال سنجه قطع شد."
 FLASH_CONNECTED = "به سنجه وصل شد."
@@ -138,6 +140,7 @@ async def car_connect(request: Request, csrf: str = Form(""), token: str = Form(
     db.commit()
     _pending_undo.pop(user.id, None)
     _next_refresh_at[user.id] = time.monotonic() + REFRESH_COOLDOWN_S  # just fetched successfully
+    _retry_after_failure.discard(user.id)
     return _ok(request, user, FLASH_CONNECTED)
 
 
@@ -150,9 +153,11 @@ async def car_refresh(request: Request, csrf: str = Form(""), db: Session = Depe
     if not user.sanjeh_token:
         return _ok(request, user)
     if time.monotonic() < _next_refresh_at.get(user.id, 0.0):
-        return _fail(request, user, "too_soon", ERR_TOO_SOON, status=429)
+        msg = ERR_RETRY_SOON if user.id in _retry_after_failure else ERR_TOO_SOON
+        return _fail(request, user, "too_soon", msg, status=429)
     # short guard while this attempt runs/after it fails; the 5-minute cooldown starts only on success
     _next_refresh_at[user.id] = time.monotonic() + RETRY_COOLDOWN_S
+    _retry_after_failure.add(user.id)
     try:
         await refresh_user_sanjeh_car(user)
     except SanjehAuthError:
@@ -163,6 +168,7 @@ async def car_refresh(request: Request, csrf: str = Form(""), db: Session = Depe
         db.commit()  # sanjeh_status = failed; old value kept
         return _fail(request, user, "failed", ERR_FAILED, status=200)
     _next_refresh_at[user.id] = time.monotonic() + REFRESH_COOLDOWN_S
+    _retry_after_failure.discard(user.id)
     db.commit()
     return _ok(request, user)
 

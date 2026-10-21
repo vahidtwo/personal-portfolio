@@ -29,7 +29,7 @@ def fake_sanjeh(monkeypatch):
     fake.calls = calls
     monkeypatch.setattr(cr, "fetch_sanjeh_portfolio", fake)
     monkeypatch.setattr(jobs, "fetch_sanjeh_portfolio", fake)
-    cr._next_refresh_at.clear()
+    cr._next_refresh_at.clear(); cr._retry_after_failure.clear()
     cr._pending_undo.clear()
     return fake
 
@@ -101,7 +101,7 @@ def test_refresh_states_and_cooldown(client, no_network, fake_sanjeh):
     csrf = _csrf(client, "/assets")
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.status_code == 429 and r.json()["error"] == "too_soon"
-    cr._next_refresh_at.clear()
+    cr._next_refresh_at.clear(); cr._retry_after_failure.clear()
     fake_sanjeh.down = True
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.json()["state"] == "fetchfail" and "سنجه فعلاً پاسخ نمی‌دهد" in r.json()["html"]
@@ -109,7 +109,7 @@ def test_refresh_states_and_cooldown(client, no_network, fake_sanjeh):
     assert u.sanjeh_status == "failed" and u.car_toman == Decimal("2850000000")  # old value still counted
     u.sanjeh_token = "BAD-NOW"; db.commit(); db.close()
     fake_sanjeh.down = False
-    cr._next_refresh_at.clear()
+    cr._next_refresh_at.clear(); cr._retry_after_failure.clear()
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.json()["state"] == "rejected" and "گذاشتن توکن تازه" in r.json()["html"]
     html = client.get("/assets").text
@@ -198,7 +198,7 @@ def test_failed_refresh_uses_short_cooldown_and_success_starts_five_minutes(clie
 
     _register(client)
     _connect(client, headers=JSON)
-    cr._next_refresh_at.clear()
+    cr._next_refresh_at.clear(); cr._retry_after_failure.clear()
     csrf = _csrf(client, "/assets")
     fake_sanjeh.down = True
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
@@ -206,7 +206,8 @@ def test_failed_refresh_uses_short_cooldown_and_success_starts_five_minutes(clie
     (uid, until), = cr._next_refresh_at.items()
     assert until - time.monotonic() <= cr.RETRY_COOLDOWN_S <= 60  # short, not 5 minutes
     # right away: still guarded (no hammering), with the same «too soon» answer
-    assert client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON).status_code == 429
+    r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
+    assert r.status_code == 429 and r.json()["message"] == "چند لحظه صبر کنید و دوباره امتحان کنید."
     # after the short cooldown Sanjeh is back: the retry goes through and fixes the state
     cr._next_refresh_at[uid] = time.monotonic() - 1
     fake_sanjeh.down = False
@@ -214,7 +215,8 @@ def test_failed_refresh_uses_short_cooldown_and_success_starts_five_minutes(clie
     assert r.status_code == 200 and r.json()["ok"] and r.json()["state"] == "connected"
     # success starts the full 5-minute cooldown
     assert cr._next_refresh_at[uid] - time.monotonic() > cr.RETRY_COOLDOWN_S
-    assert client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON).status_code == 429
+    r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
+    assert r.status_code == 429 and r.json()["message"] == cr.ERR_TOO_SOON
 
 
 def test_unknown_fetch_time_reads_nashkhas(client, no_network, fake_sanjeh):

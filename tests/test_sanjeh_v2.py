@@ -29,7 +29,7 @@ def fake_sanjeh(monkeypatch):
     fake.calls = calls
     monkeypatch.setattr(cr, "fetch_sanjeh_portfolio", fake)
     monkeypatch.setattr(jobs, "fetch_sanjeh_portfolio", fake)
-    cr._last_refresh.clear()
+    cr._next_refresh_at.clear()
     cr._pending_undo.clear()
     return fake
 
@@ -101,7 +101,7 @@ def test_refresh_states_and_cooldown(client, no_network, fake_sanjeh):
     csrf = _csrf(client, "/assets")
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.status_code == 429 and r.json()["error"] == "too_soon"
-    cr._last_refresh.clear()
+    cr._next_refresh_at.clear()
     fake_sanjeh.down = True
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.json()["state"] == "fetchfail" and "سنجه فعلاً پاسخ نمی‌دهد" in r.json()["html"]
@@ -109,7 +109,7 @@ def test_refresh_states_and_cooldown(client, no_network, fake_sanjeh):
     assert u.sanjeh_status == "failed" and u.car_toman == Decimal("2850000000")  # old value still counted
     u.sanjeh_token = "BAD-NOW"; db.commit(); db.close()
     fake_sanjeh.down = False
-    cr._last_refresh.clear()
+    cr._next_refresh_at.clear()
     r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
     assert r.json()["state"] == "rejected" and "گذاشتن توکن تازه" in r.json()["html"]
     html = client.get("/assets").text
@@ -188,3 +188,36 @@ def test_card_markup_contract(client, no_network, fake_sanjeh):
     assert "متصل" in card and "به‌روز شده" in card and "۲٬۸۵۰٬۰۰۰٬۰۰۰" in card and "۲ خودرو" in card
     assert 'id="car-sheet"' in html and 'id="car-confirm"' in html and "/static/car-card.js" in html
     assert 'action="/assets/car/disconnect"' in html.split("</form>", 1)[1]  # outside the holdings form
+
+
+def test_failed_refresh_uses_short_cooldown_and_success_starts_five_minutes(client, no_network, fake_sanjeh):
+    """Review fix: «دوباره امتحان کنید» must not be blocked for 5 minutes after a failure."""
+    import time
+
+    import app.car_routes as cr
+
+    _register(client)
+    _connect(client, headers=JSON)
+    cr._next_refresh_at.clear()
+    csrf = _csrf(client, "/assets")
+    fake_sanjeh.down = True
+    r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
+    assert r.json()["state"] == "fetchfail"
+    (uid, until), = cr._next_refresh_at.items()
+    assert until - time.monotonic() <= cr.RETRY_COOLDOWN_S <= 60  # short, not 5 minutes
+    # right away: still guarded (no hammering), with the same «too soon» answer
+    assert client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON).status_code == 429
+    # after the short cooldown Sanjeh is back: the retry goes through and fixes the state
+    cr._next_refresh_at[uid] = time.monotonic() - 1
+    fake_sanjeh.down = False
+    r = client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON)
+    assert r.status_code == 200 and r.json()["ok"] and r.json()["state"] == "connected"
+    # success starts the full 5-minute cooldown
+    assert cr._next_refresh_at[uid] - time.monotonic() > cr.RETRY_COOLDOWN_S
+    assert client.post("/assets/car/refresh", data={"csrf": csrf}, headers=JSON).status_code == 429
+
+
+def test_unknown_fetch_time_reads_nashkhas(client, no_network, fake_sanjeh):
+    _register(client)
+    db, u = _user(); u.sanjeh_token = "FAKE"; u.sanjeh_status = "failed"; u.car_fetched_at = None; db.commit(); db.close()
+    assert "آخرین قیمت: نامشخص" in client.get("/assets").text

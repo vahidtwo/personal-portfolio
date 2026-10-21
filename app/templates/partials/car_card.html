@@ -24,8 +24,8 @@
       </div>
       <div class="sub" data-car-sub>
         {% if car_state == "connected" %}{% if car_ago %}به‌روز شده {{ car_ago }}{% else %}هنوز قیمتی گرفته نشده{% endif %}
-        {% elif car_state == "fetchfail" %}آخرین قیمت: {{ car_ago or "—" }}
-        {% else %}آخرین قیمت معتبر: {{ car_ago or "—" }}{% endif %}
+        {% elif car_state == "fetchfail" %}آخرین قیمت: {{ car_ago or "نامشخص" }}
+        {% else %}آخرین قیمت معتبر: {{ car_ago or "نامشخص" }}{% endif %}
       </div>
     </div>
     <div class="val"><bdi class="num">{{ car_value_label }}</bdi><small>تومان، {{ car_count_label }} خودرو</small></div>

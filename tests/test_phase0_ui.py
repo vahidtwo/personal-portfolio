@@ -68,7 +68,7 @@ def test_debts_expenses_spends_empty_states(client, no_network):
     _register(client)
     html = client.get("/profile?tab=debts").text
     # Debts v2: each list has its own empty state with a primary button that opens the sheet.
-    assert "از کجا شروع کنم؟" in html and "data-salary-reveal" not in html and "مانده از حقوق" not in html  # replaces the tiles
+    assert "از کجا شروع کنم؟" in html and 'class="dv-tiles"' not in html and "<span>مانده از حقوق</span>" not in html  # replaces the tiles
     assert "وام یا قسطی ثبت نشده است" in html and 'data-dv-add="debt"><svg' in html and "افزودن وام یا قسط</span>" in html
     assert "هزینهٔ ماهانه‌ای ثبت نشده است" in html and 'data-dv-add="expense"><svg' in html and "افزودن هزینهٔ ماهانه</span>" in html
     daily = client.get("/dashboard?tab=daily").text

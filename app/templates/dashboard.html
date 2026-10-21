@@ -57,7 +57,7 @@
   <dl class="stats">
     <div class="stat"><dt>جمع دارایی</dt><dd data-mask="portfolio" title="{{ total_label }} تومان">{% if total_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ total_big.label }}</bdi> <small>{{ total_big.unit }}</small></dd></div>
     <div class="stat"><dt>جمع بدهی</dt><dd title="{{ debt_total_label }} تومان">{% if debt_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ debt_big.label }}</bdi> <small>{{ debt_big.unit }}</small></dd></div>
-    <div class="stat"><dt>معادل دلاری</dt><dd data-mask="portfolio"><bdi dir="ltr">{{ usd_portfolio_label }}</bdi> <small>دلار آمریکا</small></dd></div>
+    <div class="stat stat-usd"><dt>معادل دلاری</dt><dd><span data-mask="portfolio"><bdi dir="ltr">{{ usd_portfolio_label }}</bdi> <small>دلار آمریکا</small></span>{% if usd_spark %}<svg class="mc {{ usd_spark.kind }}" viewBox="0 0 64 20" width="64" height="20" role="img" aria-label="{{ usd_spark.label }}" focusable="false"><title>{{ usd_spark.label }}</title><path d="{{ usd_spark.path }}"/><circle cx="{{ usd_spark.end_x }}" cy="{{ usd_spark.end_y }}" r="2.2"/></svg>{% endif %}</dd></div>
   </dl>
   {% if missing_fa %}
   <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>
@@ -150,14 +150,16 @@
     <a class="btn btn-primary" href="/assets">افزودن دارایی</a>
   </div>
   {% else %}
+{% macro spark(sp) %}<svg class="mc {{ sp.kind }}" viewBox="0 0 {{ sp.width }} 24" width="{{ sp.width }}" height="24" role="img" aria-label="{{ sp.label }}" focusable="false"><title>{{ sp.label }}</title><path d="{{ sp.path }}"/><circle cx="{{ sp.end_x }}" cy="{{ sp.end_y }}" r="2.2"/></svg>{% endmacro %}
   <div class="acards only-mob" id="asset-cards">
     {% for row in visible_rows | sort(attribute='value_num', reverse=true) %}
     <div class="acard">
       <div class="r1">
         <span class="logo"><img src="/static/logos/{{ row.key }}.svg" alt="" width="24" height="24"></span>
         <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span>{% if row.key == "cash" %}وجه نقد{% else %}<bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}{% endif %}{% if row.usd_equiv_label %} · ≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار{% endif %}</span></div>
-        <div class="vl"><div><b>{{ row.value_label }}</b> <small>تومان</small></div><div class="sub2"><span>{{ row.share_label }}٪ سهم</span><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></div></div>
+        <div class="vl"><div><b>{{ row.value_label }}</b> <small>تومان</small></div></div>
       </div>
+      <div class="r2">{% if row.spark_mob %}{{ spark(row.spark_mob) }}{% endif %}<div class="sub2"><span>{{ row.share_label }}٪ سهم</span><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></div></div>
       <div class="line" aria-hidden="true"><i style="width:{{ row.share_width }}%;background:{{ row.color }}"></i></div>
     </div>
     {% endfor %}
@@ -195,7 +197,7 @@
           <td class="num muted">{{ row.unit_price_label }}</td>
           <td class="num n"><b>{{ row.value_label }}</b>{% if row.usd_equiv_label %}<div class="usd-equiv">≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار</div>{% endif %}</td>
           <td class="share-cell"><span class="share-pct">{{ row.share_label }}٪</span><span class="share-bar" aria-hidden="true"><i style="width:{{ row.share_width }}%;background:{{ row.color }}"></i></span></td>
-          <td class="n"><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></td>
+          <td class="n mc-cell">{% if row.spark_desk %}{{ spark(row.spark_desk) }}{% endif %}<span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></td>
         </tr>
         {% endfor %}
       </tbody>

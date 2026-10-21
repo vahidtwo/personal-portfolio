@@ -307,6 +307,93 @@ def net_worth_changes(snaps, view, debt_total: Decimal, now: datetime) -> dict:
     return out
 
 
+def build_week_asset_trends(snaps, view, now: datetime) -> dict[str, list[float]]:
+    """Unit price (toman) per asset: the last snapshot of each of the last 7 Tehran days, oldest
+    first, plus the live unit price. Restored from before 1cbd01d (#8); reads stored snapshots only
+    (``snapshot_unit_prices``), never fetches prices. Assets in NO_PRICE_MOVE_KEYS get no series."""
+    daily = chart_snapshots(sorted(snaps, key=lambda s: _as_utc(s.taken_at)), now, "day", timedelta(days=7))[-7:]
+    stored = [snapshot_unit_prices(snap) or {} for snap in daily]
+    trends: dict[str, list[float]] = {}
+    for row in view.rows:
+        if row.key in NO_PRICE_MOVE_KEYS:
+            trends[row.key] = []
+            continue
+        points = [float(prices[row.key]) for prices in stored if prices.get(row.key) is not None]
+        if row.unit_price is not None:
+            points.append(float(row.unit_price))
+        trends[row.key] = points
+    return trends
+
+
+def sparkline_path(values: list[float], width: int = 72, height: int = 24) -> str:
+    """SVG path, old to new left to right. Empty for fewer than 2 points; straight when flat."""
+    if len(values) < 2:
+        return ""
+    vmin, vmax = min(values), max(values)
+    span = vmax - vmin
+    if span <= 0:
+        mid = height / 2
+        return f"M 2,{mid:.1f} L {width - 2},{mid:.1f}"
+    n = len(values)
+    parts = []
+    for i, v in enumerate(values):
+        x = 2 + (i / (n - 1)) * (width - 4)
+        y = height - 2 - ((v - vmin) / span) * (height - 4)
+        parts.append(f"{x:.1f},{y:.1f}")
+    return "M " + parts[0] + " L " + " L ".join(parts[1:])
+
+
+def week_usd_series(snaps, usd_price, live_total, now: datetime) -> list[float]:
+    """«معادل دلاری» over 7 days: per Tehran day, the last snapshot's total_toman ÷ its stored
+    unit_price.usd, oldest first, then the live tile value (live_total ÷ usd_price). Snapshots with no
+    dollar price are skipped. Reads stored snapshots only."""
+    points: list[float] = []
+    daily = chart_snapshots(sorted(snaps, key=lambda s: _as_utc(s.taken_at)), now, "day", timedelta(days=7))[-7:]
+    for snap in daily:
+        usd = (snapshot_unit_prices(snap) or {}).get("usd")
+        if usd is None or usd <= 0 or snap.total_toman is None:
+            continue
+        points.append(float(Decimal(snap.total_toman) / usd))
+    if usd_price and usd_price > 0:
+        points.append(float(Decimal(live_total) / Decimal(usd_price)))
+    return points
+
+
+def usd_sparkline(values: list[float]) -> dict | None:
+    """Tile chart: colour from first → last point (flat when |change| < 0.05%)."""
+    path = sparkline_path(values, 64, 20)
+    if not path:
+        return None
+    first, last = values[0], values[-1]
+    pct = (last - first) / first * 100 if first else 0.0
+    kind = "flat" if abs(pct) < 0.05 else "up" if pct > 0 else "down"
+    amounts = f"از {format_number(Decimal(round(first)), 0)} به {format_number(Decimal(round(last)), 0)} دلار"
+    trend = "بدون تغییر" if kind == "flat" else ("بالا " if kind == "up" else "پایین ") + format_number(Decimal(str(abs(pct))).quantize(Decimal("0.1")), 1) + "٪"
+    end = path.split(" ")[-1].split(",")
+    return {"path": path, "kind": kind, "width": 64, "height": 20, "end_x": end[0], "end_y": end[1],
+            "label": f"معادل دلاری دارایی در ۷ روز گذشته: {amounts}، {trend}"}
+
+
+def sparkline(row_key: str, name_fa: str, values: list[float], chip: dict, width: int) -> dict | None:
+    """Mini chart for one asset row; direction and label follow the row's 7-day chip."""
+    path = sparkline_path(values, width)
+    if not path:
+        return None
+    kind = chip.get("kind")
+    if kind not in ("up", "down", "flat"):
+        kind = "up" if values[-1] > values[0] else "down" if values[-1] < values[0] else "flat"
+    pct = chip.get("label", "").replace("▲", "").replace("▼", "").strip()
+    if kind == "flat":
+        trend = "بدون تغییر"
+    else:
+        trend = "بالا رفت" if kind == "up" else "پایین آمد"
+        if pct and pct != "—":
+            trend += "، " + pct
+    end = path.split(" ")[-1].split(",")
+    return {"path": path, "kind": kind, "width": width, "end_x": end[0], "end_y": end[1],
+            "label": f"قیمت واحد {name_fa} در ۷ روز گذشته: {trend}"}
+
+
 def asset_week_change(row, then_prices: dict[str, Decimal] | None) -> tuple[dict, str]:
     """Unit-price change of one asset vs the 7-day reference snapshot: chip + sort key."""
     if row.key in NO_PRICE_MOVE_KEYS:
@@ -450,6 +537,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     week_prices = snapshot_unit_prices(
         reference_snapshot(recent_snaps, now, CHANGE_WINDOWS[1][1], CHANGE_WINDOWS[1][2])
     )
+    week_trends = build_week_asset_trends(recent_snaps, view, now)
     usd_row = next((row for row in view.rows if row.key == "usd"), None)
     usd_price = usd_row.unit_price if usd_row is not None else None
     rows = []
@@ -470,6 +558,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "name_fa": row.name_fa,
                 "color": ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
                 "week_chip": week_chip,
+                "spark_mob": sparkline(row.key, row.name_fa, week_trends.get(row.key, []), week_chip, 72),
+                "spark_desk": sparkline(row.key, row.name_fa, week_trends.get(row.key, []), week_chip, 64),
                 "quantity_label": quantity_label,
                 "unit_fa": "دلار" if row.key == "usd" else row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
@@ -507,8 +597,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     monthly = monthly_view(db, user)
     if usd_price is not None and usd_price > 0:
         usd_portfolio_label = _format_usd(view.total_toman / usd_price)
+        usd_spark = usd_sparkline(week_usd_series(recent_snaps, usd_price, view.total_toman, now))
     else:
         usd_portfolio_label = "—"
+        usd_spark = None
     today_j = tehran_today()  # same "today" as the debts and spending pages
     tab = request.query_params.get("tab", "portfolio")
     if tab not in ("portfolio", "daily"):
@@ -529,6 +621,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         month_spend=month_spend_tile(db, user, today_j) if tab != "daily" else None,
         net_label=format_toman(view.total_toman - debt_total),
         usd_portfolio_label=usd_portfolio_label,
+        usd_spark=usd_spark,
         changes=changes,
         income_month_label=monthly["income_month_label"],
         installment_month_label=monthly["installment_month_label"],

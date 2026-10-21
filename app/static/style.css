@@ -2940,3 +2940,20 @@ html.dv-locked{overflow:hidden}
 [data-theme=light] .dv-wrap :is(.dv-sub,.dv-cdesc,.dv-formula,.dv-hint,.dv-meta,.dv-row small,.dv-tile>span,.dv-tile small,.dv-empty p){color:#4f5868}
 .dv-summary a{min-width:44px;justify-content:center}
 .dv-skel-rows .dv-row{overflow:hidden}.dv-skel{max-width:100%}
+/* ---- Home: 7-day mini chart per asset row (spec addendum 2026-10-21). Stroke = trend colour, not asset colour. */
+.mc{display:block;flex:none;overflow:visible;--mc-up:#3ee0b8;--mc-down:#ff8a80;--mc-flat:#9aa3b2}
+[data-theme=light] .mc{--mc-up:#08735a;--mc-down:#b42318;--mc-flat:#5b6475}
+.mc path{fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mc.up path{stroke:var(--mc-up)}.mc.down path{stroke:var(--mc-down)}.mc.flat path{stroke:var(--mc-flat)}
+.mc circle{stroke:none}.mc.up circle{fill:var(--mc-up)}.mc.down circle{fill:var(--mc-down)}.mc.flat circle{fill:var(--mc-flat)}
+.acard .r2{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin-top:8px;min-width:0}
+.acard .r2 .mc{width:72px;height:24px}
+.acard .r2 .sub2{flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-inline-start:auto}
+@media (max-width:339px){.acard .r2 .mc{width:56px}}
+.dtable td.mc-cell{white-space:nowrap}.dtable td.mc-cell>*{vertical-align:middle}
+.dtable td.mc-cell .mc{display:inline-block;width:64px;height:24px;margin-inline-end:8px}
+/* «معادل دلاری» tile chart: hidden while the portfolio is masked, so neither shape nor label leaks. */
+.stat.stat-usd dd{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.stat.stat-usd .mc{width:64px;height:20px;display:none}
+html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
+@media (max-width:399px){.stat.stat-usd .mc{width:52px;height:18px}}

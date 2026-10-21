@@ -258,4 +258,4 @@ def test_page_contract(client, no_network, clock):
     assert 'id="debt-form"' in html and 'id="expense-form"' in html and 'data-dv-close>انصراف</button>' in html
     assert "پرداخت شد، یک قسط کم کن" in html and 'name="expect" value="9"' in html
     assert "۹ قسط ۱٬۷۵۰٬۰۰۰ تومانی، جمعاً ۱۵٬۷۵۰٬۰۰۰ تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد." in html
-    assert "/static/debts-page.js?v=20261020z" in html
+    assert "/static/debts-page.js?v=20261021a" in html

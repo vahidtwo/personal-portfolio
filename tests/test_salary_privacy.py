@@ -25,7 +25,7 @@ def _salary(username="alice"):
 def _save_account(client, salary, username="alice"):
     return client.post("/profile/account", data={"full_name": "", "username": username, "mobile": "",
                                                  "salary_toman": salary, "current_password": "",
-                                                 "new_password": "", "csrf": _csrf(client)},
+                                                 "new_password": "", "section": "salary", "csrf": _csrf(client)},
                        follow_redirects=False)
 
 

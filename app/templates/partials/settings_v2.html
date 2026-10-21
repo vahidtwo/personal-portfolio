@@ -1,5 +1,5 @@
 {#- Settings v2 (/profile): sections saved on their own (spec app-v2/settings). Every section posts to
-    /profile/account with the other account fields as hidden copies of their stored values. The stored
+    /profile/account with only its own fields (the server saves only that section). The stored
     salary is never in this HTML; «نمایش» fetches /api/salary on tap only. -#}
 {% from "partials/nav_icons.html" import nav_icon %}
 {%- set E = account_errors or {} -%}
@@ -10,9 +10,6 @@
 {%- macro summary(fields) -%}
 {%- set bad = [] -%}{%- for f, label in fields %}{% if E.get(f) %}{% set _ = bad.append((f, label)) %}{% endif %}{% endfor -%}
 {%- if bad %}<div class="v2-banner" role="alert" tabindex="-1" data-v2-summary><div><strong>{{ bad | length | string | fa }} مورد نیاز به اصلاح دارد</strong><ul>{% for f, label in bad %}<li><a href="#f-{{ f }}">{{ label }}</a></li>{% endfor %}</ul></div></div>{% endif -%}
-{%- endmacro -%}
-{%- macro copies(skip) -%}
-{%- for f, v in (("full_name", user.full_name or ""), ("username", user.username), ("mobile", user.mobile or "")) if f not in skip %}<input type="hidden" name="{{ f }}" value="{{ v }}">{% endfor -%}
 {%- endmacro -%}
 <div class="v2-page" id="settings-v2">
   <div class="v2-head"><h1>تنظیمات</h1><p>ظاهر، حساب و امنیت. هر بخش جدا ذخیره می‌شود.</p></div>
@@ -34,8 +31,6 @@
     <form method="post" action="/profile/account" class="v2-form" data-v2-section="account" novalidate>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="section" value="account">
-      <input type="hidden" name="salary_toman" value="">
-      <input type="hidden" name="new_password" value="">
       <div class="v2-grid">
         <label class="v2-field"><span>نام</span>
           <input id="f-full_name" name="full_name" value="{{ account.full_name }}" maxlength="80" autocomplete="name">
@@ -74,9 +69,6 @@
     <form method="post" action="/profile/account" class="v2-form{% if has_salary and sec != 'salary' %} v2-hide{% endif %}" id="v2-salform" data-v2-section="salary" novalidate>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="section" value="salary">
-      {{ copies(()) }}
-      <input type="hidden" name="current_password" value="">
-      <input type="hidden" name="new_password" value="">
       <label class="v2-field"><span>حقوق جدید (تومان)</span>
         <input id="f-salary_toman" name="salary_toman" value="" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands{{ inv("salary_toman", "h-salary_toman") }}>
         {{ hint("salary_toman", "مبلغ فعلی اینجا نمایش داده نمی‌شود.") }}{{ err("salary_toman") }}
@@ -94,8 +86,6 @@
     <form method="post" action="/profile/account" class="v2-form" data-v2-section="password" novalidate>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="section" value="password">
-      {{ copies(()) }}
-      <input type="hidden" name="salary_toman" value="">
       <div class="v2-grid">
         <label class="v2-field"><span>رمز فعلی</span>
           <input id="f-pw-current" name="current_password" type="password" autocomplete="current-password" dir="ltr" required{% if sec == "password" and E.get("current_password") %} aria-invalid="true" aria-describedby="e-pw-current"{% endif %}>

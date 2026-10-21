@@ -99,7 +99,8 @@
     } else if (section === "salary") {
       const raw = latin(get("salary_toman")).replace(/[٬,،\s]/g, "").replace("٫", ".");
       if (!raw) e.salary_toman = "مبلغ حقوق را بنویسید";
-      else if (!/^\d+(\.\d+)?$/.test(raw)) e.salary_toman = "حقوق ماهانه نامعتبر است";
+      else if (/^\d+\.\d*$/.test(raw)) e.salary_toman = "حقوق را بدون ممیز و به تومان کامل بنویسید؛ مثلاً ۴۵٬۰۰۰٬۰۰۰";
+      else if (!/^\d+$/.test(raw)) e.salary_toman = "حقوق ماهانه نامعتبر است";
     }
     return e;
   }

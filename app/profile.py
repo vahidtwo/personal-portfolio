@@ -236,6 +236,32 @@ def _render_account_error(request, db, user, errors: dict[str, str], account: di
     )
 
 
+SALARY_WHOLE = "حقوق را بدون ممیز و به تومان کامل بنویسید؛ مثلاً ۴۵٬۰۰۰٬۰۰۰"
+SALARY_INVALID = "حقوق ماهانه نامعتبر است"
+
+
+def parse_salary(raw: str, existing: Decimal | None = None) -> tuple[Decimal | None, str | None]:
+    """Whole toman only, like spending (#22): a new value with a fraction is rejected with a field error,
+    while a legacy stored fractional salary re-sent unchanged is accepted. Never rounds."""
+    from app.number_input import normalize_number_text
+
+    try:
+        text = normalize_number_text(raw or "")
+    except ValueError:
+        return None, SALARY_INVALID
+    if text == "":
+        return None, None  # nothing typed: keep the stored salary (the form never shows it)
+    if text.startswith("-"):
+        return None, SALARY_INVALID
+    try:
+        value = Decimal(text)
+    except Exception:
+        return None, SALARY_INVALID
+    if "." in text and not (existing is not None and value == Decimal(existing)):
+        return None, SALARY_WHOLE
+    return value, None
+
+
 @router.post("/profile/account")
 async def profile_account(
     request: Request,
@@ -249,60 +275,60 @@ async def profile_account(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """One route for every settings section. Each section posts the other account fields as hidden
-    copies of their stored values; empty salary keeps it and empty new_password keeps the password.
-    Errors are collected per field; fetch callers (Accept: application/json) get 422 JSON."""
+    """One route for every settings section. Only the posted `section`'s fields are read, validated and
+    saved (account: name/username/mobile; salary: salary_toman; password: current + new password);
+    every other column is left exactly as stored. Fetch callers (Accept: application/json) get 422 JSON."""
     require_csrf(request, csrf)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
     section = section if section in SECTIONS else "account"
     account = {
-        "full_name": full_name.strip()[:80],
-        "username": username,
-        "mobile": mobile,
+        "full_name": full_name.strip()[:80] if section == "account" else (user.full_name or ""),
+        "username": username if section == "account" else user.username,
+        "mobile": mobile if section == "account" else (user.mobile or ""),
         "salary_toman": "",  # never echoed back into the page
     }
     errors: dict[str, str] = {}
-    name = normalize_username(username)
-    admin_error = admin_name_change_error(user.username, name)
-    if validate_username(name):
-        errors["username"] = USERNAME_ERROR
-    elif admin_error:
-        errors["username"] = admin_error
-    elif db.query(User).filter(User.username == name, User.id != user.id).first() is not None:
-        errors["username"] = "این نام کاربری قبلاً ثبت شده"
-    phone, phone_error = _parse_mobile(mobile)
-    if phone_error:
-        errors["mobile"] = phone_error
-    salary = Decimal(user.salary_toman or 0)
-    try:
-        # Empty input = keep the stored salary (the form never shows it).
-        if to_latin_digits(salary_toman or "").strip() != "":
-            salary = parse_decimal(salary_toman, field="حقوق ماهانه")
-            if salary < 0:
-                raise ValueError
-    except Exception as exc:
-        errors["salary_toman"] = str(getattr(exc, "detail", None) or "حقوق ماهانه نامعتبر است")
-    password_change = new_password != ""
-    username_change = name != user.username
-    if password_change and validate_password(new_password):
-        errors["new_password"] = PASSWORD_ERROR
-    if (password_change or username_change) and "username" not in errors:
+    changes: dict = {}
+    if section == "account":
+        name = normalize_username(username)
+        admin_error = admin_name_change_error(user.username, name)
+        if validate_username(name):
+            errors["username"] = USERNAME_ERROR
+        elif admin_error:
+            errors["username"] = admin_error
+        elif db.query(User).filter(User.username == name, User.id != user.id).first() is not None:
+            errors["username"] = "این نام کاربری قبلاً ثبت شده"
+        phone, phone_error = _parse_mobile(mobile)
+        if phone_error:
+            errors["mobile"] = phone_error
+        if name != user.username and "username" not in errors:
+            if current_password == "":
+                errors["current_password"] = CURRENT_PW_MISSING_USER
+            elif not verify_password(current_password, user.password_hash):
+                errors["current_password"] = CURRENT_PW_WRONG
+        changes = {"full_name": account["full_name"], "username": name, "mobile": phone or ""}
+    elif section == "salary":
+        salary, salary_error = parse_salary(salary_toman, Decimal(user.salary_toman or 0))
+        if salary_error:
+            errors["salary_toman"] = salary_error
+        changes = {"salary_toman": salary} if salary is not None else {}
+    else:  # password
+        if validate_password(new_password):
+            errors["new_password"] = PASSWORD_ERROR
         if current_password == "":
-            errors["current_password"] = CURRENT_PW_MISSING_PW if password_change else CURRENT_PW_MISSING_USER
+            errors["current_password"] = CURRENT_PW_MISSING_PW
         elif not verify_password(current_password, user.password_hash):
             errors["current_password"] = CURRENT_PW_WRONG
+        if not errors:
+            changes = {"password_hash": hash_password(new_password)}
     if errors:
         if _wants_json(request):
             return JSONResponse({"errors": errors}, status_code=422)
         return _render_account_error(request, db, user, errors, account, section)
-    if password_change:
-        user.password_hash = hash_password(new_password)
-    user.full_name = account["full_name"]
-    user.username = name
-    user.mobile = phone or ""
-    user.salary_toman = salary
+    for key, value in changes.items():
+        setattr(user, key, value)
     db.commit()
     title, detail = SAVED_FA[section]
     flash(request, f"{title}. {detail}")

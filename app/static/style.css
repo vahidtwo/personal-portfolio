@@ -2730,8 +2730,10 @@ body.sp-locked{overflow:hidden}
   .sp-addbar .btn{width:100%;justify-content:center;min-height:48px;gap:8px}
 }
 /* ---- Assets v2 (mockups/app-v2/assets) ---- */
-:root{--danger-text:#ff8a80;--danger-bg:#ff6b5e}
-[data-theme="light"]{--danger-text:#b42318;--danger-bg:#c4320a}
+/* --danger-bg stays the soft tint from the dashboard block: a solid value here hid the text of
+   .badge-due.is-soon («۲ روز دیگر»), .delta-down and .chg.down (text color == background). */
+:root{--danger-text:#ff8a80}
+[data-theme="light"]{--danger-text:#b42318}
 .btn{min-height:44px}
 .v2-banner strong{display:block}.v2-banner ul{margin:4px 0 0;padding-inline-start:18px}
 .v2-banner a{color:var(--text);text-decoration:underline;text-underline-offset:3px;display:inline-block;min-height:28px}

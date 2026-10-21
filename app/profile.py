@@ -108,6 +108,8 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         debt_form=debt_form,
         account=_account_form(user),
         account_error=None,
+        account_errors={},
+        has_salary=Decimal(user.salary_toman or 0) > 0,
         **expense_form_for_request(db, user, request),
     )
 
@@ -169,7 +171,7 @@ async def revoke_mcp_token(
     require_csrf(request, csrf)
     user.mcp_token_hash = None
     db.commit()
-    flash(request, "توکن MCP حذف شد.")
+    flash(request, "توکن MCP غیرفعال شد.")
     return RedirectResponse("/profile", status_code=303)
 def _account_form(user: User, **overrides: str) -> dict[str, str]:
     # Privacy mode: the stored salary is never put in the form; the input starts empty.
@@ -189,11 +191,31 @@ def _parse_mobile(raw: str) -> tuple[str | None, str | None]:
     if digits == "":
         return "", None
     if not 10 <= len(digits) <= 15:
-        return None, "شماره موبایل باید ۱۰ تا ۱۵ رقم باشد"
+        return None, MOBILE_ERROR
     return digits, None
 
 
-def _render_account_error(request, db, user, message: str, account: dict):
+# Settings v2 copy (copy-table.md). Registration keeps its own wording in app.security.
+USERNAME_ERROR = "نام کاربری باید با حرف انگلیسی شروع شود و ۳ تا ۳۲ نویسه باشد"
+MOBILE_ERROR = "شماره موبایل ۱۰ تا ۱۵ رقم است؛ مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
+PASSWORD_ERROR = "رمز جدید دست‌کم ۸ نویسه باشد"
+CURRENT_PW_MISSING_USER = "برای تغییر نام کاربری، رمز فعلی را وارد کنید"
+CURRENT_PW_MISSING_PW = "برای تغییر رمز، رمز فعلی را وارد کنید"
+CURRENT_PW_WRONG = "رمز فعلی درست نیست"
+SECTIONS = ("account", "salary", "password")
+SAVED_FA = {
+    "account": ("حساب ذخیره شد", "نام و موبایل به‌روز شد."),
+    "salary": ("حقوق ذخیره شد", "مبلغ همچنان پنهان است."),
+    "password": ("رمز عبور تغییر کرد", "دفعهٔ بعد با رمز جدید وارد شوید."),
+}
+
+
+def _wants_json(request: Request) -> bool:
+    return "application/json" in request.headers.get("accept", "")
+
+
+def _render_account_error(request, db, user, errors: dict[str, str], account: dict, section: str = "account"):
+    """Every error at its field (settings v2); the first one is kept in account_error for old callers."""
     return render(
         request,
         "profile.html",
@@ -206,7 +228,11 @@ def _render_account_error(request, db, user, message: str, account: dict):
         car_value_label=format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
         tab="settings",
         account=account,
-        account_error=message,
+        account_error=next(iter(errors.values()), None),
+        account_errors=errors,
+        error_section=section,
+        has_salary=Decimal(user.salary_toman or 0) > 0,
+        mcp_url=(PUBLIC_BASE_URL or str(request.base_url).rstrip("/")) + "/mcp",
     )
 
 
@@ -219,59 +245,69 @@ async def profile_account(
     salary_toman: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
+    section: str = Form(""),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    """One route for every settings section. Each section posts the other account fields as hidden
+    copies of their stored values; empty salary keeps it and empty new_password keeps the password.
+    Errors are collected per field; fetch callers (Accept: application/json) get 422 JSON."""
     require_csrf(request, csrf)
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
+    section = section if section in SECTIONS else "account"
     account = {
         "full_name": full_name.strip()[:80],
         "username": username,
         "mobile": mobile,
         "salary_toman": "",  # never echoed back into the page
     }
+    errors: dict[str, str] = {}
     name = normalize_username(username)
-    name_error = validate_username(name) or admin_name_change_error(user.username, name)
-    if name_error:
-        return _render_account_error(request, db, user, name_error, account)
-    taken = db.query(User).filter(User.username == name, User.id != user.id).first()
-    if taken is not None:
-        return _render_account_error(request, db, user, "این نام کاربری قبلاً ثبت شده", account)
+    admin_error = admin_name_change_error(user.username, name)
+    if validate_username(name):
+        errors["username"] = USERNAME_ERROR
+    elif admin_error:
+        errors["username"] = admin_error
+    elif db.query(User).filter(User.username == name, User.id != user.id).first() is not None:
+        errors["username"] = "این نام کاربری قبلاً ثبت شده"
     phone, phone_error = _parse_mobile(mobile)
     if phone_error:
-        return _render_account_error(request, db, user, phone_error, account)
+        errors["mobile"] = phone_error
+    salary = Decimal(user.salary_toman or 0)
     try:
         # Empty input = keep the stored salary (the form never shows it).
-        if to_latin_digits(salary_toman or "").strip() == "":
-            salary = Decimal(user.salary_toman or 0)
-        else:
+        if to_latin_digits(salary_toman or "").strip() != "":
             salary = parse_decimal(salary_toman, field="حقوق ماهانه")
+            if salary < 0:
+                raise ValueError
     except Exception as exc:
-        return _render_account_error(
-            request,
-            db,
-            user,
-            str(getattr(exc, "detail", None) or "حقوق ماهانه نامعتبر است"),
-            account,
-        )
+        errors["salary_toman"] = str(getattr(exc, "detail", None) or "حقوق ماهانه نامعتبر است")
     password_change = new_password != ""
     username_change = name != user.username
-    if password_change or username_change:
-        if not verify_password(current_password, user.password_hash):
-            return _render_account_error(request, db, user, "رمز فعلی نادرست است", account)
+    if password_change and validate_password(new_password):
+        errors["new_password"] = PASSWORD_ERROR
+    if (password_change or username_change) and "username" not in errors:
+        if current_password == "":
+            errors["current_password"] = CURRENT_PW_MISSING_PW if password_change else CURRENT_PW_MISSING_USER
+        elif not verify_password(current_password, user.password_hash):
+            errors["current_password"] = CURRENT_PW_WRONG
+    if errors:
+        if _wants_json(request):
+            return JSONResponse({"errors": errors}, status_code=422)
+        return _render_account_error(request, db, user, errors, account, section)
     if password_change:
-        password_error = validate_password(new_password)
-        if password_error:
-            return _render_account_error(request, db, user, password_error, account)
         user.password_hash = hash_password(new_password)
     user.full_name = account["full_name"]
     user.username = name
     user.mobile = phone or ""
     user.salary_toman = salary
     db.commit()
-    flash(request, "حساب ذخیره شد")
+    title, detail = SAVED_FA[section]
+    flash(request, f"{title}. {detail}")
+    if _wants_json(request):
+        return JSONResponse({"ok": True, "title": title, "detail": detail})
     return RedirectResponse("/profile", status_code=303)
 
 

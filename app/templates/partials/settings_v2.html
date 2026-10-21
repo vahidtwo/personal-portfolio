@@ -1,0 +1,191 @@
+{#- Settings v2 (/profile): sections saved on their own (spec app-v2/settings). Every section posts to
+    /profile/account with the other account fields as hidden copies of their stored values. The stored
+    salary is never in this HTML; «نمایش» fetches /api/salary on tap only. -#}
+{% from "partials/nav_icons.html" import nav_icon %}
+{%- set E = account_errors or {} -%}
+{%- set sec = error_section or "" -%}
+{%- macro err(name) -%}{% if E.get(name) %}<span class="v2-err" id="e-{{ name }}">{{ E[name] }}</span>{% endif %}{%- endmacro -%}
+{%- macro inv(name, hint_id="") -%}{% if E.get(name) %} aria-invalid="true" aria-describedby="e-{{ name }}"{% elif hint_id %} aria-describedby="{{ hint_id }}"{% endif %}{%- endmacro -%}
+{%- macro hint(name, text) -%}<span class="v2-hint{% if E.get(name) %} v2-hide{% endif %}" id="h-{{ name }}">{{ text }}</span>{%- endmacro -%}
+{%- macro summary(fields) -%}
+{%- set bad = [] -%}{%- for f, label in fields %}{% if E.get(f) %}{% set _ = bad.append((f, label)) %}{% endif %}{% endfor -%}
+{%- if bad %}<div class="v2-banner" role="alert" tabindex="-1" data-v2-summary><div><strong>{{ bad | length | string | fa }} مورد نیاز به اصلاح دارد</strong><ul>{% for f, label in bad %}<li><a href="#f-{{ f }}">{{ label }}</a></li>{% endfor %}</ul></div></div>{% endif -%}
+{%- endmacro -%}
+{%- macro copies(skip) -%}
+{%- for f, v in (("full_name", user.full_name or ""), ("username", user.username), ("mobile", user.mobile or "")) if f not in skip %}<input type="hidden" name="{{ f }}" value="{{ v }}">{% endfor -%}
+{%- endmacro -%}
+<div class="v2-page" id="settings-v2">
+  <div class="v2-head"><h1>تنظیمات</h1><p>ظاهر، حساب و امنیت. هر بخش جدا ذخیره می‌شود.</p></div>
+  {% if flash %}<div class="v2-banner{% if not flash_error %} ok{% endif %}" role="{% if flash_error %}alert{% else %}status{% endif %}" id="v2-flash"><div>{{ flash }}</div></div>{% endif %}
+
+  <section class="v2-card" aria-labelledby="v2-th" id="appearance">
+    <h2 id="v2-th">ظاهر</h2>
+    <div class="v2-seg" role="radiogroup" aria-label="پوسته" data-theme-options>
+      <label>{{ nav_icon('moon') }}<input type="radio" name="theme_choice" value="dark">تیره</label>
+      <label>{{ nav_icon('sun') }}<input type="radio" name="theme_choice" value="light">روشن</label>
+      <label>{{ nav_icon('screen') }}<input type="radio" name="theme_choice" value="auto">خودکار<small>مثل دستگاه</small></label>
+    </div>
+    <p class="v2-hint v2-theme-status" id="v2-th-s" role="status">فقط روی همین دستگاه ذخیره می‌شود.</p>
+  </section>
+
+  <section class="v2-card" aria-labelledby="account-settings" id="account">
+    <h2 id="account-settings">حساب</h2>
+    {% if sec == "account" %}{{ summary((("full_name", "نام"), ("username", "نام کاربری"), ("mobile", "موبایل"), ("current_password", "رمز فعلی"))) }}{% endif %}
+    <form method="post" action="/profile/account" class="v2-form" data-v2-section="account" novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="section" value="account">
+      <input type="hidden" name="salary_toman" value="">
+      <input type="hidden" name="new_password" value="">
+      <div class="v2-grid">
+        <label class="v2-field"><span>نام</span>
+          <input id="f-full_name" name="full_name" value="{{ account.full_name }}" maxlength="80" autocomplete="name">
+        </label>
+        <label class="v2-field"><span>نام کاربری</span>
+          <input id="f-username" name="username" value="{{ account.username }}" dir="ltr" autocomplete="username" data-original="{{ user.username }}"{{ inv("username", "h-username") }}>
+          {{ hint("username", "۳ تا ۳۲ نویسه، با حرف انگلیسی شروع شود.") }}{{ err("username") }}
+        </label>
+        <label class="v2-field span-2"><span>موبایل</span>
+          <input id="f-mobile" name="mobile" value="{{ account.mobile }}" inputmode="tel" dir="ltr" autocomplete="tel"{{ inv("mobile", "h-mobile") }}>
+          {{ hint("mobile", "اختیاری. مثلاً ۰۹۱۲۳۴۵۶۷۸۹") }}{{ err("mobile") }}
+        </label>
+        <label class="v2-field span-2{% if not (sec == 'account' and E.get('current_password')) and account.username == user.username %} v2-hide{% endif %}" id="v2-cpw"><span>رمز فعلی</span>
+          <input id="f-current_password" name="current_password" type="password" autocomplete="current-password" dir="ltr"{% if sec == "account" %}{{ inv("current_password", "h-current_password") }}{% else %} aria-describedby="h-current_password"{% endif %}>
+          {% if sec == "account" %}{{ hint("current_password", "برای تغییر نام کاربری لازم است.") }}{{ err("current_password") }}{% else %}<span class="v2-hint" id="h-current_password">برای تغییر نام کاربری لازم است.</span>{% endif %}
+        </label>
+      </div>
+      <div class="v2-actions"><button type="submit" class="btn btn-primary">ذخیرهٔ حساب</button></div>
+    </form>
+  </section>
+
+  <section class="v2-card" aria-labelledby="v2-sal" id="salary">
+    <h2 id="v2-sal">حقوق ماهانه</h2>
+    <p class="v2-desc">فقط برای حساب «مانده» در گزارش ماهانه. همیشه پنهان است تا خودتان نمایشش دهید.</p>
+    {% if sec == "salary" %}{{ summary((("salary_toman", "حقوق جدید"),)) }}{% endif %}
+    {% if has_salary %}
+    <div class="v2-sal" id="v2-salrow">
+      <span class="grow"><span class="v" id="v2-salv" data-salary-mask>••••••</span> <span class="u">تومان</span></span>
+      <button type="button" class="btn btn-sm v2-ghost" id="v2-eye" aria-pressed="false" aria-controls="v2-salv">نمایش</button>
+      <button type="button" class="btn btn-sm v2-ghost" id="v2-saledit" aria-expanded="{% if sec == 'salary' %}true{% else %}false{% endif %}" aria-controls="v2-salform">تغییر</button>
+    </div>
+    <p class="v2-err v2-hide" id="v2-sal-fail" role="alert">نمایش نشد. اتصال را بررسی کنید و دوباره بزنید.</p>
+    {% else %}
+    <div class="v2-sal" id="v2-salrow"><span class="grow">هنوز حقوقی ثبت نکرده‌اید.</span></div>
+    {% endif %}
+    <form method="post" action="/profile/account" class="v2-form{% if has_salary and sec != 'salary' %} v2-hide{% endif %}" id="v2-salform" data-v2-section="salary" novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="section" value="salary">
+      {{ copies(()) }}
+      <input type="hidden" name="current_password" value="">
+      <input type="hidden" name="new_password" value="">
+      <label class="v2-field"><span>حقوق جدید (تومان)</span>
+        <input id="f-salary_toman" name="salary_toman" value="" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands{{ inv("salary_toman", "h-salary_toman") }}>
+        {{ hint("salary_toman", "مبلغ فعلی اینجا نمایش داده نمی‌شود.") }}{{ err("salary_toman") }}
+      </label>
+      <div class="v2-actions">
+        {% if has_salary %}<button type="button" class="btn btn-sm v2-ghost" id="v2-salcancel">انصراف</button>{% endif %}
+        <button type="submit" class="btn btn-primary btn-sm">ذخیرهٔ حقوق</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="v2-card" aria-labelledby="v2-pw" id="password">
+    <h2 id="v2-pw">رمز عبور</h2>
+    {% if sec == "password" %}{{ summary((("current_password", "رمز فعلی"), ("new_password", "رمز جدید"))) }}{% endif %}
+    <form method="post" action="/profile/account" class="v2-form" data-v2-section="password" novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="section" value="password">
+      {{ copies(()) }}
+      <input type="hidden" name="salary_toman" value="">
+      <div class="v2-grid">
+        <label class="v2-field"><span>رمز فعلی</span>
+          <input id="f-pw-current" name="current_password" type="password" autocomplete="current-password" dir="ltr" required{% if sec == "password" and E.get("current_password") %} aria-invalid="true" aria-describedby="e-pw-current"{% endif %}>
+          {% if sec == "password" and E.get("current_password") %}<span class="v2-err" id="e-pw-current">{{ E["current_password"] }}</span>{% endif %}
+        </label>
+        <label class="v2-field"><span>رمز جدید</span>
+          <input id="f-new_password" name="new_password" type="password" autocomplete="new-password" dir="ltr" required{{ inv("new_password", "h-new_password") }}>
+          {{ hint("new_password", "دست‌کم ۸ نویسه.") }}{{ err("new_password") }}
+        </label>
+      </div>
+      <div class="v2-actions"><button type="submit" class="btn btn-primary">تغییر رمز</button></div>
+    </form>
+  </section>
+
+  {% if push_enabled %}
+  <section class="v2-card" id="push-settings" aria-labelledby="v2-push">
+    <h2 id="v2-push">اعلان‌ها</h2>
+    <p class="v2-desc">در مرورگر یا اپ اندروید اعلان دریافت کنید. اعلان مرورگر فقط روی HTTPS کار می‌کند.</p>
+    <div class="landing-actions">
+      <button type="button" class="btn btn-primary" id="push-enable">فعال‌سازی اعلان</button>
+    </div>
+    <p id="push-status" class="toast toast-ok" role="status" hidden></p>
+    <form method="post" action="/profile/push-test" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn btn-ghost btn-sm">ارسال آزمایشی</button>
+    </form>
+  </section>
+  {% endif %}
+  <section class="v2-card" id="android-app-settings" hidden aria-labelledby="v2-android">
+    <h2 id="v2-android">اپ اندروید (پیامک)</h2>
+    <p class="v2-desc" id="android-sms-legacy-desc">همین صفحات وب داخل اپ نمایش داده می‌شوند. عبارت زیر برای فیلتر پیامک بانکی است (پیش‌فرض: برداشت).</p>
+    <div id="android-sms-native" hidden>
+      <p class="v2-desc">کلمه‌های پیامک فقط روی همین گوشی ذخیره می‌شوند و به سایت فرستاده نمی‌شوند.</p>
+      <button type="button" id="android-sms-open" class="btn btn-primary">تنظیمات پیامک</button>
+    </div>
+    <form id="android-phrase-form" class="grid-form">
+      <label>
+        <span class="label-text">عبارت لازم در پیامک</span>
+        <input type="text" id="android-sms-phrase">
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">ذخیره در اپ</button>
+      </div>
+      <p id="android-phrase-status" class="field-hint" role="status" hidden></p>
+    </form>
+  </section>
+
+  <section class="v2-card settings-rows" aria-labelledby="v2-app" id="settings-account-actions">
+    <h2 id="v2-app">اپ و اتصال‌ها</h2>
+    <div class="v2-rows">
+      {% with cls="settings-row v2-row" %}{% include "partials/apk_download.html" %}{% endwith %}
+      {% if is_admin %}
+      <a class="settings-row v2-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
+      {% endif %}
+    </div>
+    <details class="v2-adv" id="advanced"{% if mcp_token %} open{% endif %}>
+      <summary>پیشرفته: توکن MCP</summary>
+      <div class="v2-adv-body" aria-labelledby="mcp-heading">
+        <h3 id="mcp-heading" class="v2-hide">توکن MCP</h3>
+        <p class="v2-hint">دستیار هوش مصنوعی را فقط‌خواندنی به حسابتان وصل می‌کند.</p>
+        <p class="v2-hint">آدرس: <code dir="ltr" class="url-block">{{ mcp_url }}</code>، درخواست POST با هدر <code dir="ltr">Authorization: Bearer …</code></p>
+        {% if mcp_token %}
+        <div class="v2-banner ok" role="status"><div><strong>توکن ساخته شد. فقط همین یک بار نمایش داده می‌شود.</strong>این تنظیم را در Cursor ← Settings ← MCP بگذارید.</div></div>
+        <textarea id="mcp-cursor-config" class="v2-code" readonly rows="10" dir="ltr">{{ mcp_cursor_config }}</textarea>
+        <div class="v2-actions"><button type="button" class="btn btn-sm v2-ghost" id="mcp-copy-config">کپی تنظیمات</button></div>
+        {% elif user.mcp_token_hash %}
+        <p class="v2-status field-status">یک توکن فعال دارید.</p>
+        {% else %}
+        <p class="v2-status">هنوز توکنی نساخته‌اید.</p>
+        {% endif %}
+        <div class="v2-actions">
+          <form method="post" action="/profile/mcp-token" class="inline-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-primary btn-sm">{% if user.mcp_token_hash %}ساخت توکن جدید{% else %}ساخت توکن{% endif %}</button>
+          </form>
+          {% if user.mcp_token_hash %}
+          <form method="post" action="/profile/mcp-token/revoke" class="inline-form" data-confirm="revoke">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-sm v2-ghost">غیرفعال کردن توکن</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="v2-card" aria-label="خروج" id="logout">
+    <form method="post" action="/logout" class="settings-row-form" data-confirm="logout">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="settings-row settings-row-danger v2-row danger">{{ nav_icon('logout') }}<span class="settings-row-label">خروج از حساب</span></button>
+    </form>
+  </section>
+</div>

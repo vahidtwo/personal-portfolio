@@ -241,7 +241,7 @@ def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_ne
     html = client.get("/assets").text
     for k in ("gold_grams", "btc", "usd", "cash_toman"):
         assert re.search(rf'<input name="{k}" value="" placeholder="۰"', html), k
-    assert re.search(r'<input name="salary_toman" value="" placeholder="مبلغ جدید"', client.get("/profile").text)
+    assert '<input id="f-salary_toman" name="salary_toman" value="" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands' in client.get("/profile").text
     data = {k: "" for k in ("gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram",
                             "silver_grams", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman")}
     data["csrf"] = _csrf(client)
@@ -269,15 +269,15 @@ def test_mcp_box_in_collapsed_advanced_section_and_actions_work(client, no_netwo
     import re
     _register(client)
     html = client.get("/profile").text
-    m = re.search(r'<details class="card auth-card wide advanced-card" id="advanced">(.*?)</details>', html, re.S)
+    m = re.search(r'<details class="v2-adv" id="advanced">(.*?)</details>', html, re.S)
     assert m, "advanced section must be a collapsed <details> for every user"
     box = m.group(1)
-    assert "<summary class=\"advanced-summary\">پیشرفته</summary>" in box
-    assert "دستیارهای هوش مصنوعی" in box and "http://testserver/mcp" in box
-    assert 'action="/profile/mcp-token"' in box and "ساخت توکن" in box
-    # advanced is the last settings section; only the Phase 1 admin/logout rows (per mockup) follow it
+    assert "<summary>پیشرفته: توکن MCP</summary>" in box  # settings v2: inside «اپ و اتصال‌ها»
+    assert "دستیار هوش مصنوعی را فقط‌خواندنی" in box and "http://testserver/mcp" in box
+    assert 'action="/profile/mcp-token"' in box and "ساخت توکن" in box and "هنوز توکنی نساخته‌اید." in box
+    # only the «خروج» card follows the «اپ و اتصال‌ها» section
     after = html[html.rfind("</details>"):]
-    assert after.count("<section") == 1 and 'id="settings-account-actions"' in after, "advanced section is last before the logout rows"
+    assert after.count("<section") == 1 and 'id="logout"' in after, "logout card is last"
     # issue: details opens so the one-time config is visible, and the token works
     html = client.post("/profile/mcp-token", data={"csrf": _csrf(client)}).text  # follows redirect to /profile
     assert 'id="advanced" open>' in html
@@ -288,7 +288,8 @@ def test_mcp_box_in_collapsed_advanced_section_and_actions_work(client, no_netwo
     assert client.post("/mcp", json=rpc, headers=hdr).status_code == 200
     # later views: collapsed again, regenerate + revoke offered
     html = client.get("/profile").text
-    assert 'id="advanced">' in html and "توکن جدید" in html and 'action="/profile/mcp-token/revoke"' in html
+    assert 'id="advanced">' in html and "ساخت توکن جدید" in html and 'action="/profile/mcp-token/revoke"' in html
+    assert "یک توکن فعال دارید." in html and 'data-confirm="revoke"' in html and "confirm(" not in html
     client.post("/profile/mcp-token/revoke", data={"csrf": _csrf(client)})
     assert client.post("/mcp", json=rpc, headers=hdr).status_code == 401
     assert client.post("/mcp", json=rpc, headers={"Accept": "application/json"}).status_code == 401

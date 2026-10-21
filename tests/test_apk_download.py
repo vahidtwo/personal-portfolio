@@ -18,7 +18,7 @@ def test_download_row_renders_for_logged_in_user_in_settings_and_menu(client, no
     _register(client)
     html = client.get("/profile").text
     links = re.findall(r'<a class="([^"]+) apk-download" href="/download/my-inventory\.apk" data-apk-download>', html)
-    assert sorted(links) == ["nav-link", "settings-row"]  # avatar/side menu + Settings
+    assert sorted(links) == ["nav-link", "settings-row v2-row"]  # avatar/side menu + Settings
     assert html.count('<span class="settings-row-label">دریافت اپ اندروید</span>') == 2
     # version and size in their own isolated spans, so the digits can never run together («نسخهٔ ۴۰۳٫۰ مگابایت»)
     metas = re.findall(r'<span class="apk-meta">(.*?)</span>\s*<span class="apk-note">', html)
@@ -27,8 +27,8 @@ def test_download_row_renders_for_logged_in_user_in_settings_and_menu(client, no
         assert '<span class="apk-version">نسخهٔ <bdi>۳٫۰</bdi></span>' in meta
         assert '<span class="apk-size"><bdi>۴ مگابایت</bdi></span>' in meta
         assert re.sub(r"<[^>]+>", "", meta).strip() == "نسخهٔ ۳٫۰ · ۴ مگابایت"
-    rows = html[html.index('id="settings-account-actions"'):]
-    rows = rows[:rows.index("</section>")]
+    rows = html[html.index('id="settings-account-actions"'):]  # settings v2: «اپ و اتصال‌ها» then the «خروج» card
+    rows = rows[:rows.index("</section>", rows.index('id="logout"'))]
     assert "کروم" in rows and rows.index("دریافت اپ اندروید") < rows.index("خروج از حساب")  # logout stays last
     assert "روی گوشی اندروید باز کنید" in html and "data-apk-hint hidden" in html
     assert "/Android/i.test(navigator.userAgent)" in html

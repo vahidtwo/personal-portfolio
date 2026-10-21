@@ -1,0 +1,44 @@
+{#- Standalone Sanjeh forms + connect/replace sheet + disconnect dialog + undo toast (outside the holdings form).
+    Server-opened with ?car=connect|replace|confirm so all of it works without JS. -#}
+<form id="car-refresh-form" method="post" action="/assets/car/refresh" data-car-form hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+{% set sheet = car_open if car_open in ("connect", "replace") else None %}
+<div class="car-scrim" id="car-sheet" data-car-sheet {% if not sheet %}hidden{% endif %}>
+  <div class="car-sheet" role="dialog" aria-modal="true" aria-labelledby="car-sheet-title">
+    <h2 id="car-sheet-title" data-title-connect="اتصال به سنجه" data-title-replace="تعویض توکن سنجه">{% if sheet == "replace" %}تعویض توکن سنجه{% else %}اتصال به سنجه{% endif %}</h2>
+    <ol>
+      <li>در سنجه وارد شوید و خودروهایتان را ثبت کنید.</li>
+      <li>از بخش پروفایل، «توکن API» را کپی کنید.</li>
+      <li>توکن را این‌جا بچسبانید.</li>
+    </ol>
+    <a href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer">باز کردن sanjeh.app ↗</a>
+    <form method="post" action="/assets/car/connect" data-car-form data-car-connect novalidate>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="car-field"><span>توکن API سنجه</span>
+        <input type="password" name="token" id="car-token" dir="ltr" autocomplete="off" spellcheck="false" placeholder="3f9a…" maxlength="128"
+               aria-describedby="car-token-hint car-token-err"{% if car_err %} aria-invalid="true"{% endif %}>
+      </label>
+      <p class="car-err" id="car-token-err" data-car-err {% if not car_err %}hidden{% endif %}>{{ car_err or "" }}</p>
+      <p class="car-hint" id="car-token-hint">توکن فقط برای گرفتن قیمت خودرو استفاده می‌شود و نمایش داده نمی‌شود.</p>
+      <div class="acts">
+        <a class="btn btn-ghost" href="/assets#group-car" data-car-close>انصراف</a>
+        <button type="submit" class="btn btn-primary" data-busy="در حال بررسی با سنجه…"
+                data-label-connect="اتصال" data-label-replace="ذخیرهٔ توکن تازه">{% if sheet == "replace" %}ذخیرهٔ توکن تازه{% else %}اتصال{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="car-scrim" id="car-confirm" data-car-confirm {% if car_open != "confirm" %}hidden{% endif %}>
+  <div class="car-sheet" role="alertdialog" aria-modal="true" aria-labelledby="car-confirm-title" aria-describedby="car-confirm-body">
+    <h2 id="car-confirm-title">اتصال سنجه قطع شود؟</h2>
+    <p id="car-confirm-body">توکن پاک می‌شود و ارزش خودرو (<bdi class="num">{{ car_value_label or "۰" }}</bdi> تومان) از جمع دارایی‌ها و نمودارها حذف می‌شود. هر وقت خواستید می‌توانید دوباره وصل شوید.</p>
+    <form method="post" action="/assets/car/disconnect" data-car-form class="acts">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <a class="btn btn-ghost" href="/assets#group-car" data-car-close>انصراف</a>
+      <button type="submit" class="btn btn-danger" data-busy="در حال قطع…">قطع اتصال</button>
+    </form>
+  </div>
+</div>
+<div class="car-toast" role="status" data-car-toast {% if not car_undo %}hidden{% endif %}>
+  <span>اتصال سنجه قطع شد.</span>
+  <form method="post" action="/assets/car/undo" data-car-form><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">برگرداندن</button></form>
+</div>

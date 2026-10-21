@@ -86,32 +86,12 @@
     </div>
     <div class="assets-col">
       {{ asset_group(asset_groups[2]) }}
-      {#- Car: the existing Sanjeh token fields, unchanged (the new connection-status UI is Phase 3). -#}
+      {#- Car (Sanjeh) card v2: status + actions; the token is never in this form (see partials/car_forms.html). -#}
       <section class="asset-group" data-asset-group="car" aria-labelledby="group-car">
         <div class="asset-group-head">
           <h2 id="group-car">خودرو</h2>
-          {% if car_group_label %}<span class="asset-group-total"><bdi class="num">{{ car_group_label }}</bdi> تومان</span>{% endif %}
         </div>
-        <div class="sanjeh-block">
-          <div class="label-row">
-            <label class="label-text" for="sanjeh-token"><img class="asset-logo" src="/static/logos/car.svg" alt="" width="22" height="22">خودرو (سنجه)</label>
-            <a class="help-link" href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer" title="رفتن به سنجه برای تکمیل پروفایل و دریافت توکن">
-              <span class="help-icon" aria-hidden="true">?</span>
-              <span>راهنما: sanjeh.app</span>
-            </a>
-          </div>
-          <p class="field-hint">در سنجه پروفایل و خودروهای خود را تکمیل کنید، سپس توکن API را اینجا بگذارید.</p>
-          {% if has_sanjeh_token %}
-          <p class="field-status">توکن ذخیره شده است{% if car_value_label %}، ارزش فعلی: <span class="num">{{ car_value_label }}</span> تومان{% endif %}{% if car_fetched_label != "—" %}، آخرین به‌روزرسانی: {{ car_fetched_label }}{% endif %}</p>
-          {% endif %}
-          <input type="password" name="sanjeh_token" id="sanjeh-token" value="" autocomplete="off" dir="ltr" data-assets-extra placeholder="{% if has_sanjeh_token %}توکن جدید (اختیاری){% else %}Token ...{% endif %}">
-          {% if has_sanjeh_token %}
-          <label class="checkbox-row">
-            <input type="checkbox" name="clear_sanjeh" value="1" data-assets-extra>
-            <span>حذف توکن سنجه</span>
-          </label>
-          {% endif %}
-        </div>
+        {% include "partials/car_card.html" %}
       </section>
     </div>
   </div>
@@ -126,10 +106,12 @@
     <button type="submit" class="btn btn-primary btn-sm" data-assets-submit>ذخیرهٔ تغییرات</button>
   </div>
 </form>
+{% include "partials/car_forms.html" %}
 {% endblock %}
 {% block scripts %}
 <script src="/static/number-format.js?v={{ static_v }}" defer></script>
 <script src="/static/amount-input.js?v={{ static_v }}" defer></script>
 <script src="/static/assets-page.js?v={{ static_v }}" defer></script>
 <script src="/static/assets-v2.js?v={{ static_v }}" defer></script>
+<script src="/static/car-card.js?v={{ static_v }}" defer></script>
 {% endblock %}

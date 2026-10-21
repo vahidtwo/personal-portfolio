@@ -294,8 +294,6 @@ async def profile_save(
     matic: str = Form("0"),
     usd: str = Form("0"),
     cash_toman: str = Form("0"),
-    sanjeh_token: str = Form(""),
-    clear_sanjeh: str = Form(""),
     next_url: str = Form("", alias="next"),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
@@ -320,7 +318,6 @@ async def profile_save(
         "matic": matic,
         "usd": usd,
         "cash_toman": cash_toman,
-        "sanjeh_token": "",
     }
     # Assets v2: validate every field first and collect {field: message}; nothing is assigned or committed
     # unless all of them are valid. A form post still gets the HTML page (now with inline errors);
@@ -342,22 +339,8 @@ async def profile_save(
                              field_short={k: FIELD_ERROR_SHORT_FA[r] for k, r in reasons.items()})
     for name in HOLDING_FORM_FIELDS:
         setattr(user, name, parse_decimal(form[name], field=name))
-    if clear_sanjeh == "1":
-        user.sanjeh_token = None
-        user.car_toman = Decimal("0")
-        user.car_count = 0
-        user.car_fetched_at = None
-    elif sanjeh_token.strip():
-        user.sanjeh_token = sanjeh_token.strip()
+    # the Sanjeh token is no longer part of this form: car card v2 uses /assets/car/* (app/car_routes.py)
     sanjeh_warning = None
-    if user.sanjeh_token:
-        try:
-            await refresh_user_sanjeh_car(user)
-        except SanjehAuthError:
-            sanjeh_warning = "دارایی‌ها ذخیره شد، ولی توکن سنجه نامعتبر است و قیمت خودرو به‌روز نشد."
-        except Exception:
-            logger.exception("Sanjeh fetch failed on profile save")
-            sanjeh_warning = "دارایی‌ها ذخیره شد، ولی قیمت خودرو از سنجه گرفته نشد. بعداً دوباره تلاش کنید."
     db.commit()
     # Don't hold the redirect on chande.net (up to 20s): the next page renders with stored prices
     # (home v2 shows the stale/waiting line) and the fetch + snapshot run after the response is sent.

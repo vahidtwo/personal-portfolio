@@ -38,6 +38,8 @@ class User(Base):
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     _legacy_car_count: Mapped[int] = mapped_column("car_count", default=0)
     sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # last Sanjeh fetch outcome: 'ok' | 'rejected' | 'failed'; NULL (rows before 0004) = treated as connected
+    sanjeh_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mcp_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     car_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

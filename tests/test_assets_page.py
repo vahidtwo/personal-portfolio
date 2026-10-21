@@ -50,7 +50,7 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
     _register(client)
     form = _assets_form(client.get("/assets").text)
     handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "background_tasks", "db", "csrf", "clear_sanjeh", "next_url"}
-    assert handler_fields == set(QTY_FIELDS) | {"sanjeh_token"}
+    assert handler_fields == set(QTY_FIELDS)  # Sanjeh token moved to /assets/car/connect (car card v2)
     for name in handler_fields:
         assert form.count(f'name="{name}"') == 1, name
     assert 'name="csrf"' in form
@@ -164,21 +164,16 @@ def test_dashboard_edit_links_point_to_assets(client, no_network):
     assert 'href="/profile">ویرایش موجودی' not in html and 'href="/profile">افزودن دارایی' not in html
 
 
-def test_car_keeps_existing_sanjeh_fields_without_new_status_ui(client, no_network, monkeypatch):
-    async def fake_refresh(user):
-        user.car_toman = Decimal("680000000")
-        user.car_count = 1
-
-    monkeypatch.setattr(no_network, "refresh_user_sanjeh_car", fake_refresh)
+def test_holdings_form_has_no_sanjeh_inputs_and_ignores_old_fields(client, no_network):
+    """Car card v2: the token is never inside the holdings form; an old cached page posting it changes nothing."""
     _register(client)
-    html = client.get("/assets").text
-    assert 'name="sanjeh_token"' in html and 'name="clear_sanjeh"' not in html
-    client.post("/profile", data={"sanjeh_token": "tok", "csrf": _csrf(client, "/assets")})
-    html = client.get("/assets").text
-    assert "توکن ذخیره شده است" in html and 'name="clear_sanjeh"' in html and "۶۸۰٬۰۰۰٬۰۰۰" in html
-    assert "متصل به سنجه" not in html and "قطع اتصال" not in html and "خواندن دوباره" not in html
-    # the token is kept on a plain re-save (empty token field), exactly as before
-    client.post("/profile", data={"csrf": _csrf(client, "/assets")})
+    form = _assets_form(client.get("/assets").text)
+    assert 'name="sanjeh_token"' not in form and 'name="clear_sanjeh"' not in form and 'name="token"' not in form
+    db, u = _user()
+    u.sanjeh_token = "tok"
+    db.commit()
+    db.close()
+    client.post("/profile", data={"sanjeh_token": "other", "clear_sanjeh": "1", "csrf": _csrf(client, "/assets")})
     db, u = _user()
     assert u.sanjeh_token == "tok"
     db.close()

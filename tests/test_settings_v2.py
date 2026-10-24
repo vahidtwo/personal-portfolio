@@ -51,7 +51,7 @@ def test_sections_and_copy(client, no_network):
     # «رمز فعلی» in «حساب» is hidden until the username changes
     assert re.search(r'class="v2-field span-2 v2-hide" id="v2-cpw"', html)
     assert 'href="/profile">تنظیمات</a>' in html and "پروفایل" not in html
-    assert "چنده</a>، به‌روزرسانی ساعتی" in html
+    assert "چنده</a>" in html and "fm5.ir" in html and "به‌روزرسانی ساعتی" in html
     assert "/static/amount-input.js" in html and "/static/settings-page.js" in html
 
 

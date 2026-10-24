@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -7,6 +8,8 @@ from decimal import Decimal
 import httpx
 
 from app.config import CHANDE_URL
+
+logger = logging.getLogger(__name__)
 from app.models import utcnow
 
 # chande.net SILVER priceToman is per troy ounce; portfolio silver is held in grams.
@@ -45,7 +48,7 @@ def normalize_price_toman(key: str, raw: Decimal) -> Decimal:
     return raw
 
 
-async def fetch_chande_prices() -> list[FetchedPrice]:
+async def _fetch_chande_prices_live() -> list[FetchedPrice]:
     headers = {
         "Accept": "application/json",
         "User-Agent": "my-inventory/1.0 (+https://chande.net/)",
@@ -85,6 +88,16 @@ async def fetch_chande_prices() -> list[FetchedPrice]:
     if missing:
         raise ValueError("Missing symbols from chande.net: " + ", ".join(missing))
     return result
+
+
+async def fetch_chande_prices() -> list[FetchedPrice]:
+    try:
+        return await _fetch_chande_prices_live()
+    except Exception as exc:
+        logger.warning("chande.net unavailable (%s); using Arzban (fm5.ir) backup", exc)
+        from app.arzban import fetch_arzban_prices
+
+        return await fetch_arzban_prices()
 
 
 def _num(value: object) -> str | None:

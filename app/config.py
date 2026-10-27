@@ -19,6 +19,10 @@ CHANDE_URL = os.environ.get(
     "CHANDE_URL",
     "https://chande.net/api/v1/prices/current",
 )
+ARZBAN_PRICES_URL = os.environ.get(
+    "ARZBAN_PRICES_URL",
+    "https://fm5.ir/api/v1/prices",
+)
 PRICE_REFRESH_HOURS = int(os.environ.get("PRICE_REFRESH_HOURS", "1"))
 PRICE_MANUAL_REFRESH_MINUTES = int(os.environ.get("PRICE_MANUAL_REFRESH_MINUTES", "5"))
 ENABLE_INTERNAL_SCHEDULER = os.environ.get("ENABLE_INTERNAL_SCHEDULER", "1") == "1"

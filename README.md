@@ -71,6 +71,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `DATA_DIR` | `./data` | SQLite DB and optional auto-generated secret |
 | `HTTPS_ONLY` | `0` | Set `1` when users reach the site over HTTPS (required behind Cloudflare + secure cookies) |
 | `CHANDE_URL` | chande.net current prices API | Override only if the endpoint changes |
+| `ARZBAN_PRICES_URL` | fm5.ir `/api/v1/prices` | Backup when Chande fails (Arzban public API) |
 | `PRICE_REFRESH_HOURS` | `1` | In-app scheduler interval for prices + snapshots |
 | `PRICE_MANUAL_REFRESH_MINUTES` | `5` | Minimum time between dashboard price refreshes |
 | `ENABLE_INTERNAL_SCHEDULER` | `1` | Set `0` if you run `scripts/create_snapshot.py` via cron instead |

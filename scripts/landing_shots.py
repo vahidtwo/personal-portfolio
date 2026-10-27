@@ -2,7 +2,7 @@
 
 Run on every release that changes a pictured screen:
     pip install playwright pillow && python -m playwright install chromium   # once
-    python scripts/landing_shots.py            # writes app/static/landing/*.webp + manifest.json
+    python scripts/landing_shots.py            # writes app/static/landing/*.webp + manifest.json (git_sha = HEAD, or GIT_SHA)
 Options: --chrome /usr/bin/google-chrome  --raw-dir DIR (also keep the PNG captures)  --out DIR
 
 Safety: a fresh temporary SQLite under mktemp, the hourly price job off, no network, a fixed clock
@@ -216,12 +216,6 @@ def build(shots, out: Path):
         hero = canvas.convert("RGB")
         for w in (1680, 1120):
             save(sized(hero, w), f"hero-{theme}-{w}.webp")
-        # phone-only hero, 360 × 779 / 720 × 1558
-        ph = Image.new("RGBA", framed.size, BG[theme] + (255,))
-        ph.alpha_composite(framed)
-        ph = ph.convert("RGB").resize((720, 1558), Image.LANCZOS)
-        for w in (720, 360):
-            save(sized(ph, w), f"hero-phone-{theme}-{w}.webp")
         # slot 1 desktop, slot 2 phone, slot 3 chart, slot 4 spend
         for w in (1280, 640):
             save(sized(desk, w), f"dashboard-desktop-{theme}-{w}.webp", "desktop", theme)

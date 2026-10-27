@@ -1,10 +1,10 @@
-# Toman Portfolio
+# Daraiito
 
 **Self-hosted personal portfolio tracker for Iran — values in Toman, Persian UI, live market prices.**
 
 Track gold, silver, crypto, USD, cash, and car value (via [Sanjeh](https://sanjeh.app/)) in one dashboard. Prices come from [chande.net](https://chande.net/); history is stored as hourly snapshots so you can chart portfolio value over time.
 
-> UI language: **Persian (RTL)** · App title in the interface: **موجودی من**
+> UI language: **Persian (RTL)** · App title in the interface: **دارایی‌تو**
 
 ---
 

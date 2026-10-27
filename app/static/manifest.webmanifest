@@ -1,6 +1,6 @@
 {
-  "name": "موجودی من",
-  "short_name": "موجودی من",
+  "name": "دارایی‌تو",
+  "short_name": "دارایی‌تو",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

@@ -67,7 +67,7 @@
             }
             var messaging = firebase.messaging();
             messaging.onMessage(function (payload) {
-              var title = (payload.notification && payload.notification.title) || "موجودی من";
+              var title = (payload.notification && payload.notification.title) || "دارایی‌تو";
               var body = (payload.notification && payload.notification.body) || "";
               if (typeof Notification !== "undefined" && Notification.permission === "granted") {
                 new Notification(title, { body: body, icon: "/static/icons/icon-192.png" });

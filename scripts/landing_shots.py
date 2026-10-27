@@ -131,13 +131,18 @@ def capture(base, password, chrome, raw_dir):
                 assert r.status_code in (200, 303) and "/dashboard" in str(r.url) or r.status_code == 303, "demo login failed"
                 c.add_cookies([{"name": k, "value": v, "url": base} for k, v in hc.cookies.items()])
                 pg = c.new_page()
-                pg.clock.set_fixed_time(FROZEN_ISO)
+                pg.clock.set_system_time(FROZEN_ISO)  # runs from the frozen start (set_fixed_time would freeze Chart.js animations)
                 return c, pg
 
             def load(pg, path):
                 pg.goto(base + path, wait_until="networkidle")
                 pg.evaluate("document.fonts.ready")
-                pg.wait_for_timeout(500)
+                pg.wait_for_timeout(1800)  # let the Chart.js animations finish
+                # the allocation doughnut only paints once its panel has been scrolled into view
+                pg.evaluate("""()=>{const p=document.getElementById('pie-panel');if(p)p.scrollIntoView({block:'center'});}""")
+                pg.wait_for_timeout(1500)
+                pg.evaluate("scrollTo(0,0)")
+                pg.wait_for_timeout(300)
                 leaked = pg.evaluate(HIDE_USER_JS, "demo_nemoone")
                 assert not leaked, "demo username still in the page"
 
@@ -157,17 +162,16 @@ def capture(base, password, chrome, raw_dir):
             c, pg = ctx(390, 844, 2)
             load(pg, "/dashboard")
             shots[("phone", theme)] = grab(pg)
-            # slot 4: add-spend form, pre-filled (not saved) + the first recent spends
+            # slot 4: add-spend sheet (Spending v2: on a phone the form opens as a bottom sheet from the
+            # «ثبت خرج» bar), pre-filled but never saved
             load(pg, "/dashboard?tab=daily")
-            pg.fill('#daily-spend-form input[name="amount_toman"]', "350000")
-            pg.evaluate("""()=>{const f=document.getElementById('daily-spend-form');
-              const s=[...f.querySelectorAll('select')];const p=s[0];if(p){const o=[...p.options].find(o=>o.textContent.trim()==='خوراک');
-              if(o){p.value=o.value;p.dispatchEvent(new Event('change',{bubbles:true}));}}}""")
+            pg.click("[data-sp-addbar] [data-sp-open-form]")
+            pg.wait_for_timeout(500)
+            pg.fill("#sp-amount_toman", "350000")
+            pg.click("[data-sp-pchips] button:has-text('خوراک')")
             pg.fill('#daily-spend-form input[name="note"]', "ناهار")
             pg.locator("#daily-spend-form input[name=note]").blur()
-            top = pg.evaluate("document.querySelector('.daily-add').getBoundingClientRect().top + scrollY")
-            pg.evaluate(f"scrollTo(0,{max(0, top - 76)})")
-            pg.wait_for_timeout(300)
+            pg.wait_for_timeout(400)
             shots[("spend", theme)] = grab(pg)
             c.close()
         br.close()

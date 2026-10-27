@@ -1,6 +1,6 @@
 {
- "git_sha": "landing-v2",
- "generated_at": "2026-10-20T12:44:44Z",
+ "git_sha": "brand-copy-5eef16b",
+ "generated_at": "2026-10-27T16:42:53Z",
  "frozen_clock": "2026-10-20T08:30:00Z",
  "dataset_sha256": "21e5f364d00e5045c65c8a913d599bb28c1ddec1ed4685c52194892bdf3c20b9",
  "net_worth_toman": 504900000,
@@ -11,7 +11,7 @@
    "theme": null,
    "width": 1680,
    "height": 1120,
-   "bytes": 50326,
+   "bytes": 54432,
    "quality": 78
   },
   {
@@ -20,7 +20,7 @@
    "theme": null,
    "width": 1120,
    "height": 747,
-   "bytes": 29684,
+   "bytes": 32208,
    "quality": 78
   },
   {
@@ -29,7 +29,7 @@
    "theme": null,
    "width": 720,
    "height": 1558,
-   "bytes": 39002,
+   "bytes": 39546,
    "quality": 78
   },
   {
@@ -38,7 +38,7 @@
    "theme": null,
    "width": 360,
    "height": 779,
-   "bytes": 17132,
+   "bytes": 17370,
    "quality": 78
   },
   {
@@ -47,7 +47,7 @@
    "theme": "dark",
    "width": 780,
    "height": 1644,
-   "bytes": 24572,
+   "bytes": 24774,
    "quality": 78
   },
   {
@@ -56,7 +56,7 @@
    "theme": null,
    "width": 1680,
    "height": 1120,
-   "bytes": 53260,
+   "bytes": 56384,
    "quality": 78
   },
   {
@@ -65,7 +65,7 @@
    "theme": null,
    "width": 1120,
    "height": 747,
-   "bytes": 30618,
+   "bytes": 33382,
    "quality": 78
   },
   {
@@ -74,7 +74,7 @@
    "theme": null,
    "width": 720,
    "height": 1558,
-   "bytes": 40760,
+   "bytes": 41130,
    "quality": 78
   },
   {
@@ -83,7 +83,7 @@
    "theme": null,
    "width": 360,
    "height": 779,
-   "bytes": 17958,
+   "bytes": 17942,
    "quality": 78
   },
   {
@@ -92,7 +92,7 @@
    "theme": "light",
    "width": 780,
    "height": 1644,
-   "bytes": 25596,
+   "bytes": 26198,
    "quality": 78
   }
  ],

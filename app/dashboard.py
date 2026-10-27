@@ -510,15 +510,16 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         if fetched is not None and fetched.tzinfo is None:
             fetched = fetched.replace(tzinfo=timezone.utc)
         stale = fetched is None or utcnow() - fetched > CAR_REFRESH
-        if stale:
+        # a rejected token stays rejected until the user connects a new one: don't retry it on every page view
+        if stale and user.sanjeh_status != "rejected":
             try:
                 await refresh_user_sanjeh_car(user)
-                db.commit()
-                db.refresh(user)
             except SanjehAuthError:
                 pass
             except Exception:
                 logger.exception("Sanjeh refresh failed for user %s", user.id)
+            db.commit()  # stores the new value, or just the new sanjeh_status
+            db.refresh(user)
     prices = load_prices(db)
     view = build_portfolio(user, prices)
     now = utcnow()

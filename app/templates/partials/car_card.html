@@ -1,0 +1,52 @@
+{#- Car (Sanjeh) card v2. States: none | connected | fetchfail | rejected. No inputs here: it sits inside the
+    holdings form, so its buttons post the standalone forms in car_forms.html through form="…". -#}
+<div class="car-v2" data-car-card data-car-state="{{ car_state }}">
+{% if car_state == "none" %}
+  <div class="row">
+    <span class="logo" aria-hidden="true"><img src="/static/logos/car.svg" alt="" width="24" height="24"></span>
+    <div>
+      <div class="ttl">ارزش خودرو را از سنجه بگیرید</div>
+      <p class="why">قیمت روز خودروهایتان هر روز خودکار به دارایی‌ها اضافه می‌شود.</p>
+    </div>
+  </div>
+  <div class="acts">
+    <a class="btn btn-primary" href="/assets?car=connect#car-sheet" data-car-open="connect">اتصال به سنجه</a>
+  </div>
+  <a class="car-help" href="https://sanjeh.app/" target="_blank" rel="noopener noreferrer">باز کردن sanjeh.app ↗</a>
+{% else %}
+  <div class="row has-val">
+    <span class="logo" aria-hidden="true"><img src="/static/logos/car.svg" alt="" width="24" height="24"></span>
+    <div>
+      <div class="ttl">سنجه
+        {% if car_state == "connected" %}<span class="pill ok"><span aria-hidden="true">●</span> متصل</span>
+        {% elif car_state == "fetchfail" %}<span class="pill warn"><span aria-hidden="true">●</span> قیمت قدیمی</span>
+        {% else %}<span class="pill bad"><span aria-hidden="true">●</span> قطع</span>{% endif %}
+      </div>
+      <div class="sub" data-car-sub>
+        {% if car_state == "connected" %}{% if car_ago %}به‌روز شده {{ car_ago }}{% else %}هنوز قیمتی گرفته نشده{% endif %}
+        {% elif car_state == "fetchfail" %}آخرین قیمت: {{ car_ago or "نامشخص" }}
+        {% else %}آخرین قیمت معتبر: {{ car_ago or "نامشخص" }}{% endif %}
+      </div>
+    </div>
+    <div class="val"><bdi class="num">{{ car_value_label }}</bdi><small>تومان، {{ car_count_label }} خودرو</small></div>
+  </div>
+  {% if car_state == "fetchfail" %}
+  <div class="note warn" role="status"><b>سنجه فعلاً پاسخ نمی‌دهد</b>همان قیمت قبلی در جمع دارایی‌ها حساب شده است. بعداً خودکار دوباره تلاش می‌کنیم.</div>
+  {% elif car_state == "rejected" %}
+  <div class="note bad" role="status"><b>سنجه دیگر این توکن را نمی‌پذیرد</b>توکن احتمالاً منقضی یا عوض شده است. تا توکن تازه نگذارید، قیمت خودرو به‌روز نمی‌شود.</div>
+  {% endif %}
+  <div class="acts">
+    {% if car_state == "rejected" %}
+    <a class="btn btn-primary" href="/assets?car=replace#car-sheet" data-car-open="replace">گذاشتن توکن تازه</a>
+    {% else %}
+    <button type="submit" class="btn btn-ghost" form="car-refresh-form" data-car-refresh data-busy="در حال گرفتن قیمت از سنجه…">{% if car_state == "fetchfail" %}دوباره امتحان کنید{% else %}به‌روزرسانی قیمت{% endif %}</button>
+    {% endif %}
+    <button type="button" class="btn btn-ghost more" aria-label="گزینه‌های سنجه" aria-expanded="false" aria-controls="car-menu" data-car-menu-toggle hidden>⋯</button>
+  </div>
+  {#- without JS the menu is simply visible (two links); JS hides it behind ⋯ -#}
+  <div class="menu" id="car-menu" data-car-menu>
+    <a class="menu-item" href="/assets?car=replace#car-sheet" data-car-open="replace">تعویض توکن</a>
+    <a class="menu-item danger" href="/assets?car=confirm#car-confirm" data-car-open="confirm">قطع اتصال</a>
+  </div>
+{% endif %}
+</div>

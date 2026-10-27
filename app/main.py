@@ -16,6 +16,7 @@ from app.static_gzip import StaticGZipMiddleware
 
 from app.admin_users import router as admin_users_router
 from app.assets_page import router as assets_router
+from app.car_routes import router as car_router
 from app.auth_routes import router as auth_router
 from app.unified_auth import router as unified_auth_router
 from app.config import (
@@ -129,6 +130,7 @@ app.include_router(admin_users_router)
 app.include_router(db_admin_router)
 app.include_router(mcp_router)
 app.include_router(assets_router)
+app.include_router(car_router)
 app.include_router(profile_router)
 app.include_router(debts_router)
 app.include_router(expenses_router)

@@ -17,6 +17,7 @@ from app.db import get_db
 from app.formatting import format_toman, format_when
 from app.portfolio import ASSET_META, build_portfolio, load_prices
 from app.security import get_authenticated_user, redirect_to_login
+from app.car_routes import ERR_EMPTY, ERR_FAILED, ERR_REJECTED, car_context
 from app.web import pop_flash, render
 
 router = APIRouter()
@@ -100,10 +101,8 @@ def assets_context(user, db: Session, form: dict[str, str], saved: dict[str, str
         # only assets the user actually holds (a zero row without a price isn't news)
         "missing_names": [r["name"] for g in groups for r in g["rows"]
                           if r["key"] in view.missing_prices and (saved.get(r["field"]) or "").strip()],
-        # unchanged Sanjeh (car) fields, exactly as the old profile assets tab showed them
         "has_sanjeh_token": bool(user.sanjeh_token),
-        "car_fetched_label": format_when(user.car_fetched_at),
-        "car_value_label": format_toman(Decimal(user.car_toman or 0)) if user.sanjeh_token else None,
+        **car_context(user),  # car (Sanjeh) card v2; reads the DB only, never calls Sanjeh
     }
 
 
@@ -128,6 +127,8 @@ def render_assets(request: Request, db: Session, user, *, form: dict[str, str] |
         form=form,
         field_errors=field_errors or {},
         field_short=field_short or {},
+        car_open=request.query_params.get("car"),
+        car_err={"rejected": ERR_REJECTED, "empty": ERR_EMPTY, "failed": ERR_FAILED}.get(request.query_params.get("err") or ""),
         **assets_context(user, db, form, saved=saved, field_errors=field_errors or {}),
     )
 

@@ -125,8 +125,11 @@ class UpdateCheckTest {
 
     @Test fun eligiblePages() {
         assertTrue(UpdateCheck.isEligiblePage("$base/dashboard", base))
-        assertTrue(UpdateCheck.isEligiblePage("$base/profile?tab=debts", base))
+        assertTrue(UpdateCheck.isEligiblePage("$base/dashboard/", base))
+        assertTrue(UpdateCheck.isEligiblePage("$base/dashboard?tab=daily", base))
         for (page in listOf(
+            "$base/profile", "$base/profile?tab=debts", "$base/assets", "$base/spends", "$base/dashboard/x",
+            "$base/auth", "$base/auth?back=1", "$base/logout", "$base/dashboardx",
             "$base/", base, "$base/login", "$base/login?next=/", "$base/register",
             "file:///android_asset/www/setup.html", "file:///android_asset/www/setup.html?error=connect",
             "https://evil.example/dashboard", "http://portfolio.vahidtwo.ir/dashboard", null,

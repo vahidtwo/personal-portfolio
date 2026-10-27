@@ -2595,7 +2595,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .v2-banner .btn{min-height:44px;flex:none;margin-inline-start:auto}
 /* 4. First-time welcome */
 .v2-welcome{grid-area:hero;padding:22px 18px}
-.v2-welcome h1{font-size:24px;line-height:1.5;margin:0 0 6px}
+.v2-welcome h1{font-size:24px;line-height:1.5;margin:0 0 6px;text-wrap:balance}
 .v2-welcome p.lead{color:var(--text-soft,#a7aec0);margin:0 0 16px;line-height:1.8}
 .v2-steps{list-style:none;margin:0 0 18px;padding:0;display:grid;gap:12px}
 .v2-steps li{display:flex;gap:12px;align-items:center;min-height:56px;padding:8px 12px;border:1px solid var(--border);border-radius:14px}

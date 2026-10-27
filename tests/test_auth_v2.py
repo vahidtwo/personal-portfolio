@@ -57,7 +57,7 @@ def test_lockout_shows_minutes_and_retry_after_header(client, monkeypatch):
     assert "تا حدود ۱۵ دقیقهٔ دیگر بسته است." in r.text
     assert 'class="alert warn"' in r.text and 'role="alert"' in r.text and "data-autofocus" in r.text
     btn = re.search(r"<button[^>]*data-retry-seconds[^>]*>.*?</button>", r.text, re.S).group(0)
-    assert "disabled" in btn and re.search(r'data-retry-seconds="(88\d|89\d|900)"', btn) and "دوباره امتحان کنید، <bdi>۱۵</bdi> دقیقهٔ دیگر" in btn
+    assert "disabled" in btn and re.search(r'data-retry-seconds="(88\d|89\d|900)"', btn) and "دوباره امتحان کنید، ۱۵ دقیقهٔ دیگر" in btn and "<bdi" not in btn
     assert 'value="lockme"' in r.text and "password123" not in r.text
     # time passes: 5 minutes later it says 10, and the header counts down
     real = rate_limit.time.monotonic
@@ -179,7 +179,7 @@ def test_signup_limit_shows_minutes_header_and_keeps_back_link(client):
     assert "از این شبکه حساب زیادی ساخته شده." in lim.text
     assert "حدود ۶۰ دقیقهٔ دیگر دوباره امتحان کنید. اگر حساب دارید، نام کاربری را بررسی کنید." in lim.text
     btn = re.search(r"<button[^>]*data-retry-seconds[^>]*>.*?</button>", lim.text, re.S).group(0)
-    assert "disabled" in btn and "ساخت حساب، <bdi>۶۰</bdi> دقیقهٔ دیگر" in btn
+    assert "disabled" in btn and "ساخت حساب، ۶۰ دقیقهٔ دیگر" in btn and "<bdi" not in btn
     assert 'class="alert warn"' in lim.text and 'href="/auth?back=1"' in lim.text
     assert _users() == []
 

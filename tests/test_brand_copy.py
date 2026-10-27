@@ -85,3 +85,30 @@ def test_protected_items_unchanged():
 def test_session_cookie_name_unchanged():
     from app.config import SESSION_COOKIE_NAME
     assert SESSION_COOKIE_NAME == "inventory_session"
+
+
+def test_lock_button_label_is_one_text_node_without_double_space():
+    """The lock label used to be text + <bdi> + text inside a flex button (gap 10px), so the number floated
+    away from «دوباره امتحان کنید،». One text node, single spaces, same as what auth.js writes."""
+    html = (ROOT / "app/templates/auth.html").read_text(encoding="utf-8")
+    for label in ("دوباره امتحان کنید،", "ساخت حساب،"):
+        assert f"{label} {{{{ minutes_fa }}}} دقیقهٔ دیگر</button>" in html
+    assert "،  " not in html and "، <bdi" not in html
+    js = (ROOT / "app/static/auth.js").read_text(encoding="utf-8")
+    assert 'replace("{n}"' in js and "،  " not in js
+
+
+def test_welcome_heading_does_not_orphan_last_word_and_update_sheet_copy_keeps_it_together():
+    css = (ROOT / "app/static/style.css").read_text(encoding="utf-8")
+    assert re.search(r"\.v2-welcome h1\{[^}]*text-wrap:balance", css)
+    xml = (ROOT / "android/app/src/main/res/values/update_strings.xml").read_text(encoding="utf-8")
+    assert "دوباره\u00a0یادآوری\u00a0می‌کنیم." in xml
+    layout = (ROOT / "android/app/src/main/res/layout/update_sheet.xml").read_text(encoding="utf-8")
+    assert 'android:breakStrategy="balanced"' in layout
+    sms = (ROOT / "android/app/src/main/java/app/myinventory/SmsSettingsActivity.kt").read_text(encoding="utf-8")
+    assert "ثبت\u00a0کنیم؟" in sms
+
+
+def test_update_notice_is_dashboard_only_in_the_app_source():
+    src = (ROOT / "android/app/src/main/java/app/myinventory/UpdateCheck.kt").read_text(encoding="utf-8")
+    assert 'path == "/dashboard"' in src and '"/profile"' not in src

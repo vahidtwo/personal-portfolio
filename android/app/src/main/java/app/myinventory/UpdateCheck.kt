@@ -104,9 +104,9 @@ object UpdateCheck {
     }
 
     /**
-     * The notice may only appear over a normal site page after login: https on the saved
-     * host, and not the landing/login/register pages. Setup, loading, error and advanced
-     * screens are local file pages, so they never qualify.
+     * The notice may only appear on the dashboard (/dashboard, any query): https on the saved
+     * host. Every other page (landing, auth, profile, assets, spends...) and the local file
+     * pages (setup, loading, error, advanced) never qualify.
      */
     fun isEligiblePage(pageUrl: String?, savedBase: String?): Boolean = runCatching {
         if (pageUrl == null || savedBase == null) return false
@@ -115,7 +115,7 @@ object UpdateCheck {
         if (!page.scheme.equals("https", ignoreCase = true)) return false
         if (!page.host.equals(base.host, ignoreCase = true)) return false
         val path = (page.path ?: "").trimEnd('/')
-        path !in setOf("", "/auth", "/login", "/register", "/logout")
+        path == "/dashboard"
     }.getOrNull() ?: false
 
     // ---- Persian formatting («٫» decimal, «٪», Persian digits) ----

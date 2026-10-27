@@ -138,7 +138,7 @@ class SmsSettingsActivity : Activity() {
         v.addView(bullet("یک کد برای اینکه یک خرج دو بار ثبت نشود"))
         v.addView(bullet("شمارهٔ فرستندهٔ پیامک فرستاده نمی‌شود. اپ هم نمی‌تواند پیامک بفرستد."))
         v.addView(tv("بعد از این، اندروید هم اجازه را می‌پرسد. هر وقت بخواهید، از تنظیمات خاموش می‌شود.", 13f, muted))
-        v.addView(tv("خرج‌ها را خودکار ثبت کنیم؟", 18f, cText, bold = true).apply { accessibilityHeading() }, 0)
+        v.addView(tv("خرج‌ها را خودکار ثبت کنیم؟", 18f, cText, bold = true).apply { accessibilityHeading() }, 0)
         val dlg = android.app.Dialog(this)
         dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         val btns = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(12), 0, dp(12)) }

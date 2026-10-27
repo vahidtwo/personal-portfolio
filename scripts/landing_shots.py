@@ -2,7 +2,7 @@
 
 Run on every release that changes a pictured screen:
     pip install playwright pillow && python -m playwright install chromium   # once
-    python scripts/landing_shots.py            # writes app/static/landing/*.webp + manifest.json
+    python scripts/landing_shots.py            # writes app/static/landing/*.webp + manifest.json (git_sha = HEAD, or GIT_SHA)
 Options: --chrome /usr/bin/google-chrome  --raw-dir DIR (also keep the PNG captures)  --out DIR
 
 Safety: a fresh temporary SQLite under mktemp, the hourly price job off, no network, a fixed clock
@@ -131,13 +131,18 @@ def capture(base, password, chrome, raw_dir):
                 assert r.status_code in (200, 303) and "/dashboard" in str(r.url) or r.status_code == 303, "demo login failed"
                 c.add_cookies([{"name": k, "value": v, "url": base} for k, v in hc.cookies.items()])
                 pg = c.new_page()
-                pg.clock.set_fixed_time(FROZEN_ISO)
+                pg.clock.set_system_time(FROZEN_ISO)  # runs from the frozen start (set_fixed_time would freeze Chart.js animations)
                 return c, pg
 
             def load(pg, path):
                 pg.goto(base + path, wait_until="networkidle")
                 pg.evaluate("document.fonts.ready")
-                pg.wait_for_timeout(500)
+                pg.wait_for_timeout(1800)  # let the Chart.js animations finish
+                # the allocation doughnut only paints once its panel has been scrolled into view
+                pg.evaluate("""()=>{const p=document.getElementById('pie-panel');if(p)p.scrollIntoView({block:'center'});}""")
+                pg.wait_for_timeout(1500)
+                pg.evaluate("scrollTo(0,0)")
+                pg.wait_for_timeout(300)
                 leaked = pg.evaluate(HIDE_USER_JS, "demo_nemoone")
                 assert not leaked, "demo username still in the page"
 
@@ -157,17 +162,16 @@ def capture(base, password, chrome, raw_dir):
             c, pg = ctx(390, 844, 2)
             load(pg, "/dashboard")
             shots[("phone", theme)] = grab(pg)
-            # slot 4: add-spend form, pre-filled (not saved) + the first recent spends
+            # slot 4: add-spend sheet (Spending v2: on a phone the form opens as a bottom sheet from the
+            # «ثبت خرج» bar), pre-filled but never saved
             load(pg, "/dashboard?tab=daily")
-            pg.fill('#daily-spend-form input[name="amount_toman"]', "350000")
-            pg.evaluate("""()=>{const f=document.getElementById('daily-spend-form');
-              const s=[...f.querySelectorAll('select')];const p=s[0];if(p){const o=[...p.options].find(o=>o.textContent.trim()==='خوراک');
-              if(o){p.value=o.value;p.dispatchEvent(new Event('change',{bubbles:true}));}}}""")
+            pg.click("[data-sp-addbar] [data-sp-open-form]")
+            pg.wait_for_timeout(500)
+            pg.fill("#sp-amount_toman", "350000")
+            pg.click("[data-sp-pchips] button:has-text('خوراک')")
             pg.fill('#daily-spend-form input[name="note"]', "ناهار")
             pg.locator("#daily-spend-form input[name=note]").blur()
-            top = pg.evaluate("document.querySelector('.daily-add').getBoundingClientRect().top + scrollY")
-            pg.evaluate(f"scrollTo(0,{max(0, top - 76)})")
-            pg.wait_for_timeout(300)
+            pg.wait_for_timeout(400)
             shots[("spend", theme)] = grab(pg)
             c.close()
         br.close()
@@ -212,12 +216,6 @@ def build(shots, out: Path):
         hero = canvas.convert("RGB")
         for w in (1680, 1120):
             save(sized(hero, w), f"hero-{theme}-{w}.webp")
-        # phone-only hero, 360 × 779 / 720 × 1558
-        ph = Image.new("RGBA", framed.size, BG[theme] + (255,))
-        ph.alpha_composite(framed)
-        ph = ph.convert("RGB").resize((720, 1558), Image.LANCZOS)
-        for w in (720, 360):
-            save(sized(ph, w), f"hero-phone-{theme}-{w}.webp")
         # slot 1 desktop, slot 2 phone, slot 3 chart, slot 4 spend
         for w in (1280, 640):
             save(sized(desk, w), f"dashboard-desktop-{theme}-{w}.webp", "desktop", theme)

@@ -11,7 +11,7 @@
     <string name="update_available_action">به‌روزرسانی</string>
     <string name="update_available_action_cd">به‌روزرسانی به نسخهٔ %1$s</string>
     <string name="update_later">بعداً</string>
-    <string name="update_available_fine">روی همین نسخه نصب می‌شود و ورود و اطلاعاتتان می‌ماند.\nاگر «بعداً» را بزنید، حداکثر روزی یک بار دوباره یادآوری می‌کنیم.</string>
+    <string name="update_available_fine">روی همین نسخه نصب می‌شود و ورود و اطلاعاتتان می‌ماند.\nاگر «بعداً» را بزنید، حداکثر روزی یک بار دوباره یادآوری می‌کنیم.</string>
 
     <!-- 2. Downloading -->
     <string name="update_downloading_title">در حال دریافت نسخهٔ %1$s</string>

@@ -76,7 +76,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         mcp_cursor_config = json.dumps(
             {
                 "mcpServers": {
-                    "my-inventory": {
+                    "daraiito": {
                         "url": mcp_url,
                         "headers": {"Authorization": f"Bearer {mcp_token}"},
                     }
@@ -148,7 +148,7 @@ async def push_test_notification(
     sent = send_push_to_user(
         db,
         user.id,
-        title="موجودی من",
+        title="دارایی‌تو",
         body="اعلان آزمایشی",
         data={"type": "test"},
     )

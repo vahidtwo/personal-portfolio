@@ -13,7 +13,7 @@ class InventoryMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: "موجودی من"
+        val title = message.notification?.title ?: "دارایی‌تو"
         val body = message.notification?.body ?: message.data["body"] ?: ""
         showNotification(title, body)
     }

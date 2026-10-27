@@ -24,7 +24,7 @@
     <string name="update_ready_meta">نسخهٔ %1$s دریافت شد.</string>
     <string name="update_ready_chip">فایل سالم است و امضایش بررسی شد</string>
     <string name="update_ready_body">«نصب» را بزنید. اندروید می‌پرسد که آیا این به‌روزرسانی را نصب کنید؛ آنجا هم «نصب» را بزنید.</string>
-    <string name="update_ready_callout">بار اول، اندروید اجازهٔ «نصب از منابع ناشناس» را برای موجودی من می‌خواهد. در صفحه‌ای که باز می‌شود اجازه را روشن کنید و برگردید.</string>
+    <string name="update_ready_callout">بار اول، اندروید اجازهٔ «نصب از منابع ناشناس» را برای دارایی‌تو می‌خواهد. در صفحه‌ای که باز می‌شود اجازه را روشن کنید و برگردید.</string>
     <string name="update_install">نصب</string>
     <string name="update_announce_ready">دریافت انجام شد. آمادهٔ نصب است.</string>
 

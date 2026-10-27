@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if tab == "debts" %}بدهی‌ها، موجودی من{% else %}تنظیمات، موجودی من{% endif %}{% endblock %}
+{% block title %}{% if tab == "debts" %}بدهی‌ها، دارایی‌تو{% else %}تنظیمات، دارایی‌تو{% endif %}{% endblock %}
 {% block content %}
 <section class="card auth-card wide{% if tab == 'debts' %} dv-wrap{% else %} v2-settings-wrap{% endif %}">
   {% if tab == 'debts' %}

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 import json
 
+from app import config as _config
 from app.config import STATIC_ASSET_VERSION, firebase_web_config
 from app.formatting import format_number, format_toman, format_when, persian_digits
 from app.security import csrf_token, get_current_user, is_admin
@@ -81,6 +82,9 @@ def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
             "is_admin": is_admin(current),
             "csrf": csrf_token(request),
             "push_enabled": push_cfg is not None,
+            # Domain-move notice: server-side host check (the JS checks the host again and never runs in the app).
+            "move_notice": (request.url.hostname or "").lower() == _config.MOVE_NOTICE_OLD_HOST,
+            "move_new_url": _config.MOVE_NEW_URL,
             "firebase_web_config_json": json.dumps(push_cfg, ensure_ascii=False) if push_cfg else "",
         }
     )

@@ -4,6 +4,7 @@
 <script>(function(){var d=document.documentElement,t=null;try{t=localStorage.getItem("inventory-theme")}catch(e){}
 if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";d.setAttribute("data-theme",t);
 if(window.AndroidBridge)d.classList.add("in-app")})();</script>
+{% include "partials/hide_handoff.html" %}
 <link rel="preload" as="image" href="/static/landing/hero-dark-1120.webp?v={{ static_v }}" media="(prefers-color-scheme: dark)" fetchpriority="high">
 <link rel="preload" as="image" href="/static/landing/hero-light-1120.webp?v={{ static_v }}" media="(prefers-color-scheme: light)" fetchpriority="high">
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">

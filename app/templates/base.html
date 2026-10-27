@@ -14,6 +14,7 @@
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/static/style.css?v={{ static_v }}">
+  {% include "partials/hide_handoff.html" %}
   <script>
     try {
       // Values are shown by default; only an explicit "hide" choice ("1") masks them.
@@ -75,6 +76,16 @@
     <p>برای نصب در iPhone: دکمه <strong>Share</strong> سپس <strong>Add to Home Screen</strong>. پیامک خودکار فقط در اندروید است.</p>
     <button type="button" class="btn btn-ghost btn-sm" data-pwa-ios-dismiss>باشه</button>
   </div>
+  {% if user and move_notice %}
+  <section class="move-notice card" id="move-notice" data-new-url="{{ move_new_url }}" aria-labelledby="move-notice-h" hidden>
+    <h2 id="move-notice-h">آدرس دارایی‌تو عوض می‌شود: <bdi dir="ltr">daraiito.ir</bdi></h2>
+    <p>اطلاعاتتان همان است و می‌ماند؛ فقط یک بار باید دوباره وارد شوید. پنهان‌بودن مبلغ‌ها با آدرس همراه نمی‌شود: اگر آن را روشن کرده‌اید، از دکمهٔ زیر بروید؛ وگرنه در آدرس تازه نمایش مبلغ‌ها را دوباره پنهان کنید.</p>
+    <div class="move-notice-actions">
+      <a class="btn btn-primary btn-sm" id="move-notice-go" href="{{ move_new_url }}/">رفتن به <bdi dir="ltr">daraiito.ir</bdi></a>
+      <button type="button" class="btn btn-ghost btn-sm" data-move-notice-dismiss>فهمیدم</button>
+    </div>
+  </section>
+  {% endif %}
   <main id="main" class="shell">
     {% block content %}{% endblock %}
   </main>
@@ -87,6 +98,7 @@
   <script src="/static/privacy.js?v={{ static_v }}" defer></script>
   <script src="/static/confirm-dialog.js?v={{ static_v }}" defer></script>
   <script src="/static/android-bridge.js?v={{ static_v }}" defer></script>
+  {% if user and move_notice %}<script src="/static/move-notice.js?v={{ static_v }}" defer></script>{% endif %}
   {% if user and push_enabled %}
   <script id="firebase-config" type="application/json">{{ firebase_web_config_json }}</script>
   <script src="/static/push.js?v={{ static_v }}" defer></script>

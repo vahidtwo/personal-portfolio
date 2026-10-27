@@ -1,0 +1,4 @@
+{#- Domain move: the old-host notice links to https://daraiito.ir/#hide=1 when the user hides amounts. Privacy is stored per
+    origin, so the new host carries it over here. Exact "#hide=1" only; any other hash is ignored. It can only HIDE, never reveal.
+    The existing key "privacy-portfolio" is unchanged; the hash is stripped right after. Keep it before the privacy check. -#}
+<script>(function(){try{if(location.hash!=="#hide=1")return;localStorage.setItem("privacy-portfolio","1");history.replaceState(null,"",location.pathname+location.search)}catch(e){}})();</script>

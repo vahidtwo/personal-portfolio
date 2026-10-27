@@ -124,7 +124,7 @@ def dry_run_firebase_message(*, token: str = "dry-run-token") -> None:
     from firebase_admin import messaging
 
     message = messaging.Message(
-        notification=messaging.Notification(title="موجودی من", body="dry-run"),
+        notification=messaging.Notification(title="دارایی‌تو", body="dry-run"),
         token=token,
     )
     messaging.send(message, dry_run=True)
@@ -174,7 +174,7 @@ try {{
   firebaseMessaging = null;
 }}
 if (firebaseMessaging) firebaseMessaging.onBackgroundMessage(function (payload) {{
-  const title = (payload.notification && payload.notification.title) || "موجودی من";
+  const title = (payload.notification && payload.notification.title) || "دارایی‌تو";
   const body = (payload.notification && payload.notification.body) || "";
   const options = {{
     body: body,

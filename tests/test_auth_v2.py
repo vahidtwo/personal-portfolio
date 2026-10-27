@@ -187,7 +187,7 @@ def test_signup_limit_shows_minutes_header_and_keeps_back_link(client):
 def test_theme_follows_device_key_and_title_separator(client):
     page = client.get("/auth").text
     assert 'localStorage.getItem("inventory-theme")' in page and "prefers-color-scheme: light" in page
-    assert "<title>ورود یا ساخت حساب، موجودی من</title>" in page and "·" not in re.search(r"<title>.*?</title>", page).group(0)
+    assert "<title>ورود یا ساخت حساب، دارایی‌تو</title>" in page and "·" not in re.search(r"<title>.*?</title>", page).group(0)
     css = client.get("/static/public.css").text
     assert "[data-theme=light]" in css and "Dark only" not in css
     # the CTA button is solid accent, not the old gradient

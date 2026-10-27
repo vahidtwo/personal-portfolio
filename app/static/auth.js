@@ -37,7 +37,10 @@
     var digits = "۰۱۲۳۴۵۶۷۸۹", fa = function (n) { return String(n).replace(/\d/g, function (d) { return digits[d]; }); };
     var until = Date.now() + (parseInt(wait.dataset.retrySeconds, 10) || 0) * 1000;
     var lockedClass = wait.className, timer = null;
+    // the lock alert says "closed for N minutes"; hide it while the button is usable so the page never contradicts itself
+    var lockAlert = wait.form ? wait.form.querySelector(".alert") : null;
     var unlock = function () {
+      if (lockAlert) lockAlert.hidden = true;
       wait.disabled = false;
       wait.removeAttribute("aria-disabled");
       wait.textContent = wait.dataset.readyLabel || "ادامه";
@@ -66,7 +69,9 @@
           unlock();
         } else if (!timer) {
           // back to the locked name: lock again with the remaining time
+          if (lockAlert) lockAlert.hidden = false;
           wait.disabled = true;
+          wait.setAttribute("aria-disabled", "true");
           wait.className = lockedClass;
           tick();
           timer = setInterval(tick, 5000);

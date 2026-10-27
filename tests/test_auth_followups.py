@@ -7,15 +7,16 @@ from tests.test_auth_v2 import _continue, _locked_client
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_lock_copy_does_not_blame_only_the_username(client):
+def test_lock_copy_is_short_and_names_neither_limit(client):
     _locked_client(client)
     r = _continue(client, "lockme", "password123")
     assert r.status_code == 429
-    assert "ورود از این شبکه یا با این نام کاربری تا حدود ۱۵ دقیقهٔ دیگر بسته است." in r.text
+    assert "برای امنیت، ورود شما تا حدود ۱۵ دقیقهٔ دیگر بسته است." in r.text
+    assert "این شبکه" not in r.text and "با این نام کاربری" not in r.text
     # same text for a different name: no hint about which bucket fired
     other = _continue(client, "somebodyelse", "password123")
     if other.status_code == 429:
-        assert "ورود از این شبکه یا با این نام کاربری" in other.text
+        assert "برای امنیت، ورود شما تا حدود" in other.text
 
 
 def test_auth_theme_color_meta_follows_theme(client):
@@ -39,3 +40,13 @@ def test_locked_page_ships_the_unlock_on_username_edit_hook(client):
     assert re.search(r'<input[^>]*id="username"[^>]*>', r.text) and "readonly" not in re.search(r'<input[^>]*id="username"[^>]*>', r.text).group(0)
     js = (ROOT / "app" / "static" / "auth.js").read_text(encoding="utf-8")
     assert 'getElementById("username")' in js and 'addEventListener("input"' in js and "unlock()" in js
+
+
+def test_lock_alert_is_hidden_while_the_button_is_unlocked_by_an_edit(client):
+    _locked_client(client)
+    r = _continue(client, "lockme", "password123")
+    assert re.search(r'<div class="alert warn"[^>]*role="alert"', r.text)  # the alert JS hides is the first .alert in the form
+    js = (ROOT / "app" / "static" / "auth.js").read_text(encoding="utf-8")
+    assert 'querySelector(".alert")' in js and "lockAlert.hidden = true" in js and "lockAlert.hidden = false" in js
+    css = (ROOT / "app" / "static" / "public.css").read_text(encoding="utf-8")
+    assert ".alert[hidden]{display:none}" in css  # .alert is display:flex, which would beat the hidden attribute

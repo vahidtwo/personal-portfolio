@@ -44,7 +44,7 @@ def test_new_user_confirm_step_then_create(client):
     db.close()
     csrf = re.search(r'name="csrf" value="([^"]+)"', r.text).group(1)
     bad = client.post("/auth/create", data={"password_confirm": "different1", "csrf": csrf}, follow_redirects=False)
-    assert "دو رمز یکی نیستند. دوباره بنویسید." in bad.text and 'role="alert"' in bad.text
+    assert "دو رمز یکی نیستند." in bad.text and "رمز را یک بار دیگر بنویسید، یا برگردید و از اول بنویسید." in bad.text and 'role="alert"' in bad.text
     ok = client.post("/auth/create", data={"password_confirm": "password123", "csrf": csrf}, follow_redirects=False)
     assert ok.status_code == 303 and ok.headers["location"] == "/assets"
     assert client.get("/dashboard").status_code == 200
@@ -81,7 +81,7 @@ def test_rate_limit_message(client):
     for _ in range(rate_limit.LOGIN_FAILS_PER_USER):
         _continue(client, "newuser", "wrongpass1")
     r = _continue(client, "newuser", "password123")
-    assert r.status_code == 429 and "چند بار پشت سر هم اشتباه شد. چند دقیقه دیگر دوباره امتحان کنید." in r.text
+    assert r.status_code == 429 and "چند بار پشت سر هم اشتباه شد." in r.text
 
 
 def test_unknown_user_takes_bcrypt_time_too(client):

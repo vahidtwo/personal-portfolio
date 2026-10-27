@@ -1,4 +1,4 @@
-/* Public pages (landing + /auth), Phase 3 design (/workspace/mockups/phase3): app.css tokens + landing.css + auth.css. Dark only. */
+/* Public pages (landing + /auth), Phase 3 design (/workspace/mockups/phase3): app.css tokens + landing.css + auth.css. Dark by default; `[data-theme=light]` (per-device `inventory-theme`, set before paint by auth.html) at the end of the file. */
 /* Phase 1 mockup — tokens copied from app/static/style.css (redesign-phase0) */
 :root{
   color-scheme:dark;
@@ -522,3 +522,37 @@ body{min-height:100vh}
 .preview .shot-phone img{max-width:300px;margin-inline:auto;box-shadow:none;border-radius:0}
 .inp input.v{border:0;background:transparent;outline:none;min-width:0;height:100%;padding:0}
 .auth .actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+
+/* ---------- /auth v2 (app-v2/login spec): landing-v2 tokens, light theme, inline field errors, wait states ---------- */
+:root{--accent-ink:#04120e;--accent-text:#3ee0b8;--danger-text:#ff8a80;--warn-text:#f5b942;--warn-bg2:#2a2210;--danger-bg2:#2b1513;--inp-border:rgba(255,255,255,.22)}
+[data-theme=light]{color-scheme:light;--bg:#eef1f8;--bg-elevated:#fff;--surface:#fff;--surface-solid:#fff;--border:rgba(20,24,40,.10);--border-subtle:rgba(20,24,40,.08);
+ --text:#0f1219;--text-muted:#5e6678;--text-soft:#4b5468;--accent:#0d9f7a;--accent-muted:rgba(13,159,122,.12);--accent-text:#08735a;
+ --danger-text:#b42318;--warn-text:#8a4a05;--warn-bg2:#fff6e0;--danger-bg2:#fdecea;--inp-border:rgba(20,24,40,.28);--card-shadow:0 16px 40px rgba(20,24,40,.08);
+ --mesh-1:transparent;--mesh-2:rgba(13,159,122,.12);--mesh-3:transparent}
+[data-theme=light] body{background-color:#eef1f8}
+[data-theme=light] .top{background:rgba(238,241,248,.92)}
+[data-theme=light] .user-chip{background:#f4f6fb}
+[data-theme=light] .brand img{box-shadow:none}
+.btn-primary,.btn-primary:hover{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.btn-ghost{border-color:var(--inp-border);color:var(--text)}
+.back-link,.brand{min-height:44px;display:inline-flex;align-items:center;gap:8px;color:var(--text)}
+.auth .card{background:var(--surface-solid,#11131a);backdrop-filter:none}
+.inp{border-color:var(--inp-border)}
+.inp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-muted)}
+.inp.err{border-color:var(--danger-text);box-shadow:0 0 0 1px var(--danger-text)}
+.inp .eye{color:var(--accent-text);min-width:64px}
+.auth .hint.bad{color:var(--danger-text);font-weight:600}
+.auth .hint.warn{color:var(--warn-text);font-weight:600}
+.alert{background:var(--danger-bg2);border-color:var(--danger-text)}
+.alert svg{color:var(--danger-text)}
+.alert.warn{background:var(--warn-bg2);border-color:var(--warn-text)}
+.alert.warn svg{color:var(--warn-text)}
+.alert span{display:block;color:var(--text)}
+.alert:focus{outline:none}
+.alert:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.user-chip a,.note a{color:var(--accent-text)}
+.note svg{color:var(--accent-text)}
+.step-dots i{background:var(--inp-border)}
+.step-dots i.on{background:var(--accent)}
+.btn[disabled]{opacity:1;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--inp-border);cursor:not-allowed}
+.auth .sub b{color:var(--text)}

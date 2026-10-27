@@ -6,6 +6,7 @@ Safe because the app runs a single uvicorn worker. Counts reset on restart.
 from __future__ import annotations
 
 import ipaddress
+import math
 import time
 from collections import defaultdict, deque
 from threading import Lock
@@ -75,6 +76,24 @@ def is_limited(key: str, limit: int, window: float) -> bool:
             return False
         _prune(bucket, window, now)
         return len(bucket) >= limit
+
+
+def retry_after(key: str, limit: int, window: float) -> int:
+    """Seconds until `key` drops below `limit` again (0 when it is not limited).
+
+    That is when the oldest hit that still counts against the limit leaves the window. Rounded up, never 0
+    while limited, so it is safe to send as a `Retry-After` header.
+    """
+    now = time.monotonic()
+    with _lock:
+        bucket = _hits.get(key)
+        if not bucket:
+            return 0
+        _prune(bucket, window, now)
+        if len(bucket) < limit:
+            return 0
+        blocking = bucket[len(bucket) - limit]
+        return max(1, math.ceil(window - (now - blocking)))
 
 
 def record(key: str, window: float) -> None:

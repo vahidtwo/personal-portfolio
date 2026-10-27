@@ -30,24 +30,54 @@
       }
     });
   });
-  // Rate limit: the server already disabled the button; re-enable it when the wait is over.
+  // Rate limit: the server already disabled the button; re-enable it when the wait is over, or as soon as the
+  // username is edited to a different name (the lock is per name; the server still decides on submit).
   var wait = document.querySelector("button[data-retry-seconds]");
   if (wait) {
     var digits = "۰۱۲۳۴۵۶۷۸۹", fa = function (n) { return String(n).replace(/\d/g, function (d) { return digits[d]; }); };
     var until = Date.now() + (parseInt(wait.dataset.retrySeconds, 10) || 0) * 1000;
+    var lockedClass = wait.className, timer = null;
+    // the lock alert says "closed for N minutes"; hide it while the button is usable so the page never contradicts itself
+    var lockAlert = wait.form ? wait.form.querySelector(".alert") : null;
+    var unlock = function () {
+      if (lockAlert) lockAlert.hidden = true;
+      wait.disabled = false;
+      wait.removeAttribute("aria-disabled");
+      wait.textContent = wait.dataset.readyLabel || "ادامه";
+      wait.className = "btn btn-primary btn-block";
+    };
     var tick = function () {
       var left = Math.ceil((until - Date.now()) / 1000);
       if (left <= 0) {
-        wait.disabled = false;
-        wait.textContent = wait.dataset.readyLabel || "ادامه";
-        wait.className = "btn btn-primary btn-block";
+        unlock();
         clearInterval(timer);
+        timer = null;
         return;
       }
       var label = (wait.dataset.waitLabel || "").replace("{n}", fa(Math.max(1, Math.ceil(left / 60))));
       if (wait.textContent !== label) wait.textContent = label;
     };
-    var timer = setInterval(tick, 5000);
+    timer = setInterval(tick, 5000);
+    var uname = document.getElementById("username");
+    if (uname && !uname.readOnly) {
+      var norm = function (v) { return v.trim().toLowerCase(); };
+      var lockedName = norm(uname.value);
+      uname.addEventListener("input", function () {
+        if (until - Date.now() <= 0) return;
+        if (norm(uname.value) !== lockedName) {
+          if (timer) { clearInterval(timer); timer = null; }
+          unlock();
+        } else if (!timer) {
+          // back to the locked name: lock again with the remaining time
+          if (lockAlert) lockAlert.hidden = false;
+          wait.disabled = true;
+          wait.setAttribute("aria-disabled", "true");
+          wait.className = lockedClass;
+          tick();
+          timer = setInterval(tick, 5000);
+        }
+      });
+    }
   }
   var first = document.querySelector("[data-autofocus]");
   if (first) first.focus({ preventScroll: true });

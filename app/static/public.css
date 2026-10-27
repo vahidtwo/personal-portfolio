@@ -486,6 +486,7 @@ body{min-height:100vh}
 .auth .hint{font-size:12.5px;color:var(--text-muted);margin:6px 2px 0}
 .auth .hint.bad{color:#ff8a80}
 .alert{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border-radius:var(--radius-md);background:var(--danger-bg);border:1px solid rgba(255,107,94,.35);font-size:14px;line-height:1.8;color:var(--text)}
+.alert[hidden]{display:none}
 .alert svg{color:#ff8a80;flex:none;margin-top:3px;width:18px;height:18px}
 .alert b{display:block}
 .alert span{color:var(--text-soft);font-size:13.5px}

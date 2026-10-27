@@ -3083,3 +3083,18 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 .v2-dlg .v2-actions{justify-content:flex-end}.v2-dlg .btn{min-height:44px}
 .side-nav .theme-toggle.theme-toggle-labelled{border:1px solid var(--border);border-radius:12px;color:var(--text)}
 @media (max-width:599px){.v2-grid{grid-template-columns:minmax(0,1fr)}.v2-card{padding:16px}#settings-v2 .v2-actions .btn{flex:1}.v2-dlg .v2-actions .btn{flex:1}}
+
+/* One-time «آدرس عوض می‌شود» notice (old host only; move-notice.js un-hides it). Never in the Android app. */
+.move-notice {
+  margin: 12px auto 0;
+  width: min(1180px, calc(100% - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  background: var(--accent-muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.move-notice[hidden], .in-android-app .move-notice { display: none !important; }
+.move-notice h2 { margin: 0 0 4px; font-size: 16px; }
+.move-notice p { margin: 0 0 10px; color: var(--text-muted); }
+.move-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }

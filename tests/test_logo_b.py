@@ -32,7 +32,7 @@ def test_header_logo_has_no_glow_or_radius():
 
 def test_asset_version_bumped_and_precached():
     from app.config import STATIC_ASSET_VERSION
-    assert STATIC_ASSET_VERSION >= "20261028c"
+    assert STATIC_ASSET_VERSION >= "20261028e"
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
     for p in ["/static/favicon.ico", "/static/brand/daraiito-symbol-dark.svg", "/static/brand/daraiito-symbol-light.svg"]:
         assert f'"{p}"' in sw

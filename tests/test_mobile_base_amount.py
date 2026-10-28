@@ -49,3 +49,14 @@ def test_row_toman_values_masked_mobile_and_desktop(client, no_network):
     assert '<td class="num n num-strong"><span class="row-val" data-mask="portfolio" data-row-value>' in tfoot
     assert ".row-val[data-mask]::after { font-size: 15px;" in CSS
     assert 'html:not([data-show-portfolio="1"]) .row-val[data-mask="portfolio"] > * { display: none; }' in CSS
+
+
+def test_share_percent_masked_unit_price_not(client, no_network):
+    html, cards = _cards(client)
+    assert cards.count('class="acard"') == cards.count('<span class="share-val" data-mask="portfolio" data-share>') == 3
+    table = html[html.index('id="portfolio-table"'):html.index("</table>")]
+    tbody = table[table.index("<tbody>"):table.index("</tbody>")]
+    assert tbody.count("<tr") == tbody.count('<span class="share-pct share-val" data-mask="portfolio" data-share>') == 3
+    # «قیمت واحد» stays visible: its cell has no mask
+    assert re.search(r'<td class="num muted">[^<]+</td>', tbody)
+    assert ".share-val[data-mask]::after {" in CSS

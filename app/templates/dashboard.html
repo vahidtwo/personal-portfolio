@@ -156,7 +156,7 @@
     <div class="acard">
       <div class="r1">
         <span class="logo"><img src="/static/logos/{{ row.key }}.svg" alt="" width="24" height="24"></span>
-        <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span>{% if row.key == "cash" %}وجه نقد{% else %}<bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}{% endif %}{% if row.usd_equiv_label %} · ≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار{% endif %}</span></div>
+        <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span class="acard-base">{% if row.key == "cash" %}وجه نقد{% else %}<span class="acard-qty" data-mask="portfolio" data-base-amount><bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}</span>{% endif %}{% if row.usd_equiv_label %} · <span class="acard-qty" data-mask="portfolio">≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار</span>{% endif %}</span></div>
         <div class="vl"><div><b>{{ row.value_label }}</b> <small>تومان</small></div></div>
       </div>
       <div class="r2">{% if row.spark_mob %}{{ spark(row.spark_mob) }}{% endif %}<div class="sub2"><span>{{ row.share_label }}٪ سهم</span><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></div></div>

@@ -2253,6 +2253,9 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 /* Quantity line wraps instead of «…» (Arabi spec: name and quantity never truncated); each number stays whole. */
 .acard .nm > span { display: block; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
 .acard .nm > span bdi { white-space: nowrap; }
+/* mobile base amount (quantity + unit): muted, never split; masked by hide-amounts like other amounts */
+.acard .nm .acard-qty { white-space: nowrap; }
+.acard .nm .acard-qty[data-mask]::after { font-size: 12.5px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; }
 .acard .vl { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: left; white-space: nowrap; }
 .acard .vl b { font-size: 15.5px; font-weight: 700; }
 .acard .vl small { font-size: 12px; color: var(--text-muted); }

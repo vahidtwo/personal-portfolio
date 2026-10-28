@@ -82,9 +82,23 @@ def test_no_navigation_preload():
         {"marker": A, "online": "ok", "body": "<p>from fetch</p>", "go": "/dashboard"},
         {"marker": False, "online": "ok", "go": "/"},
     ])
-    assert r[-1] == {"preloadCalls": 0}
-    for word in ("navigationPreload", "preloadResponse", "Service-Worker-Navigation-Preload"):
+    assert r[-1]["preloadCalls"] == 0
+    assert r[-1]["preloadDisables"] == 1
+    for word in ("preloadResponse", "Service-Worker-Navigation-Preload", ".enable(", "setHeaderValue"):
         assert word not in SW
+
+
+def test_activate_disables_navigation_preload():
+    r = _sw([{"activate": True}])
+    assert r[-1]["preloadDisables"] == 1
+    assert r[-1]["preloadCalls"] == 0
+
+
+def test_install_precaches_in_batches_of_six():
+    r = _sw([{"install": True}])
+    precache = re.search(r"const PRECACHE = \[(.*?)\];", SW, re.S).group(1)
+    assert r[-1]["added"] == precache.count('"/')
+    assert r[-1]["maxAdding"] == 6
 
 
 def test_pwa_soft_refresh_is_guarded():

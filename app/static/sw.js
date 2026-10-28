@@ -104,38 +104,49 @@ function isMutableStatic(pathname) {
   return pathname.endsWith(".js") || pathname.endsWith(".css");
 }
 
+// Small batches so the install never crowds out the page navigation on a slow link.
+const PRECACHE_BATCH = 6;
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
       .then(async (cache) => {
-        await Promise.all(
-          PRECACHE.map(async (path) => {
-            try {
-              await cache.add(path);
-            } catch (err) {
-              console.warn("precache skip", path, err);
-            }
-          })
-        );
+        for (let i = 0; i < PRECACHE.length; i += PRECACHE_BATCH) {
+          await Promise.all(
+            PRECACHE.slice(i, i + PRECACHE_BATCH).map(async (path) => {
+              try {
+                await cache.add(path);
+              } catch (err) {
+                console.warn("precache skip", path, err);
+              }
+            })
+          );
+        }
       })
       .then(() => self.skipWaiting())
   );
 });
 
+// Navigation preload stays off: with it on, an offline cold start made the WebView report a main-frame error
+// even though this worker answered. An older worker may have turned it on, so it is turned off here.
+async function disableNavigationPreload() {
+  try {
+    const preload = self.registration && self.registration.navigationPreload;
+    if (preload) await preload.disable();
+  } catch (e) {}
+}
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
+    disableNavigationPreload()
+      .then(() => caches.keys())
       .then((keys) =>
         Promise.all(keys.filter((key) => !key.startsWith(VERSION)).map((key) => caches.delete(key)))
       )
       .then(() => self.clients.claim())
   );
 });
-
-// No navigation preload: with it on, an offline cold start made the WebView report a main-frame error even
-// though this worker answered (v10 app showed «اتصال به سرور»). Gorg NO-GO on #44, 2026-10-28.
 
 function isDashboard(url) {
   if (url.origin !== self.location.origin || url.pathname !== "/dashboard") return false;

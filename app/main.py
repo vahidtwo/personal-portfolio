@@ -74,7 +74,9 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Daraiito", lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
-app.add_middleware(SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY)
+app.add_middleware(
+    SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY, secret_key=_secret_key()
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=_secret_key(),

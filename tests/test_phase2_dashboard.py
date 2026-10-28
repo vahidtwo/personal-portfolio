@@ -119,7 +119,7 @@ def test_asset_week_chip(client):
 
 
 def test_chart_one_point_per_day_and_week(client):
-    """Arabi (batch 1): month/3-month = one point per Tehran day, year/all = one per week, no hourly ticks."""
+    """Month/3-month = one point per Tehran day, year/all = one per week, no hourly ticks."""
     from app.dashboard import CHART_DAILY_SPAN, chart_snapshots
 
     snaps = [_Snap(NOW - timedelta(hours=h)) for h in range(24 * 365 * 3, -1, -1)]  # hourly, 3 years
@@ -357,7 +357,7 @@ def test_four_assets_with_different_moves_show_four_different_7d_chips(client, n
 
 
 def test_hero_heading_title_and_muted_subline(client):
-    """Arabi (batch 1): «خالص دارایی» is the title at every width; «دارایی منهای بدهی» is a muted line under it."""
+    """«خالص دارایی» is the title at every width; «دارایی منهای بدهی» is a muted line under it."""
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     html = client.get("/dashboard").text

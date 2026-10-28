@@ -463,7 +463,7 @@
     const times = payload.times || [];
     const nowMs = payload.now || (times.length ? times[times.length - 1] : Date.now());
     const series = payload.series || [];
-    // Arabi: one point per Tehran day for week/month/3-month, one per week for year/all (server-bucketed).
+    // One point per Tehran day for week/month/3-month, one per week for year/all (server-bucketed).
     const weekly = payload.weekly && (payload.weekly.times || []).length >= 2 ? payload.weekly : null;
     function src() {
       if (weekly && (range === "365" || range === "all")) return weekly;

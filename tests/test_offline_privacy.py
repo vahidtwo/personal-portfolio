@@ -19,7 +19,7 @@ def _sw(steps, **extra):
 
 
 def test_offline_copy_not_served_and_deleted_when_session_marker_gone():
-    """Matin's case: cookie deleted, then offline -> private dashboard must not show."""
+    """Cookie deleted, then offline -> private dashboard must not show."""
     r = _sw([
         {"online": "ok", "offline_html": True, "go": "/dashboard"},
         {"online": False, "go": "/dashboard"},                   # marker still there: offline copy ok

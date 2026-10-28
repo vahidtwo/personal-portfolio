@@ -36,7 +36,7 @@ svg.i-sm{width:18px;height:18px}
 [data-theme=light] .brand .logo-light{display:block}
 .top-actions{margin-inline-start:auto;display:flex;align-items:center;gap:8px}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text-soft);display:grid;place-items:center}
-.avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;color:#04120e;background:linear-gradient(135deg,var(--accent),#5ad4f0 55%,var(--accent-violet))}
+.avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;color:#04120e;background:#3ee0b8}
 .top-nav{display:none}
 
 /* ---------- bottom nav (mobile) ---------- */

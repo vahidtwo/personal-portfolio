@@ -32,6 +32,8 @@ const PRECACHE = [
   "/static/pwa.js",
   "/static/logo.svg",
   "/static/favicon.ico",
+  "/static/icons/favicon-16.png",
+  "/static/icons/favicon-32.png",
   "/static/brand/daraiito-symbol-dark.svg",
   "/static/brand/daraiito-symbol-light.svg",
   "/static/icons/apple-touch-icon.png",

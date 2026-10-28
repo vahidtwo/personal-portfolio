@@ -1,4 +1,4 @@
-"""v11 startup: per-user cache-first dashboard, navigation preload, masks before first paint."""
+"""v11 startup: per-user cache-first dashboard, no navigation preload, masks before first paint."""
 import json
 import re
 import shutil
@@ -75,15 +75,16 @@ def test_logout_and_session_end_clear_the_cache():
     assert r[1]["pages"] == [] and r[1]["messages"][0]["type"] == "inventory-session-ended"
 
 
-def test_navigation_preload_enabled_and_used():
+def test_no_navigation_preload():
+    """#44 NO-GO: preload made v10's WebView fire a main-frame error on an offline cold start."""
     r = _sw([
         {"activate": True},
-        {"marker": A, "preload": "<p>from preload</p>", "online": "ok", "body": "<p>from fetch</p>", "go": "/dashboard"},
-        {"marker": False, "preload": "<p>login via preload</p>", "go": "/"},
+        {"marker": A, "online": "ok", "body": "<p>from fetch</p>", "go": "/dashboard"},
+        {"marker": False, "online": "ok", "go": "/"},
     ])
-    assert r[-1] == {"preloadEnabled": True}
-    assert "from preload" in r[0]["body"] and "login via preload" in r[1]["body"]
-    assert "navigationPreload.enable()" in SW
+    assert r[-1] == {"preloadCalls": 0}
+    for word in ("navigationPreload", "preloadResponse", "Service-Worker-Navigation-Preload"):
+        assert word not in SW
 
 
 def test_pwa_soft_refresh_is_guarded():

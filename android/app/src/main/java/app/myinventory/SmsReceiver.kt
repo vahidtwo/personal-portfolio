@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.util.Log
 import android.webkit.CookieManager
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -35,17 +36,40 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         thread {
             try {
                 val note = SmsKeywords.cleanNote(body)
-                val cookie = readCookie(base)
-                if (cookie.isNullOrBlank()) {
-                    notifyError(context, "وارد نشده‌اید — در اپ لاگین کنید")
-                    return@thread
+                // v9: signed-in session on the saved host first; else the old host's (same backend).
+                val target = ServerAddress.smsTarget(base) { readCookie(it) }
+                val outcome = if (target == null) {
+                    Log.i(TAG, "sms: no signed-in session")
+                    ServerAddress.SmsOutcome.LOGIN_NEEDED
+                } else {
+                    val code = runCatching { postSpend(target.first, target.second, amount, note, idem) }
+                        .onFailure { Log.w(TAG, "sms: post failed", it) }.getOrNull()
+                    Log.i(TAG, "sms: post code=$code")
+                    ServerAddress.smsOutcome(code)
                 }
-                val ok = postSpend(base, cookie, amount, note, idem)
-                if (ok) notifySaved(context, amount) else notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
+                when (outcome) {
+                    ServerAddress.SmsOutcome.SAVED -> notifySaved(context, amount)
+                    ServerAddress.SmsOutcome.LOGIN_NEEDED -> {
+                        // Shown in the app on next open too, in case notifications are off.
+                        prefs.edit().putBoolean(KEY_LOGIN_NEEDED, true).apply()
+                        notifyError(context, LOGIN_MESSAGE)
+                    }
+                    ServerAddress.SmsOutcome.FAILED -> notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
+                }
+            } catch (t: Throwable) {
+                // Never die silently in the background thread (that crashed the process with no notice).
+                Log.w(TAG, "sms: unexpected", t)
+                runCatching { notifyError(context, "ذخیره نشد — سرور در دسترس نیست") }
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "SmsReceiver"
+        const val KEY_LOGIN_NEEDED = "sms_login_needed"
+        const val LOGIN_MESSAGE = "وارد نشده‌اید — در اپ لاگین کنید"
     }
 
     private fun readCookie(base: String): String? {
@@ -65,9 +89,10 @@ class SmsReceiver : android.content.BroadcastReceiver() {
     }
 
 
-    private fun postSpend(base: String, cookie: String, amount: String, note: String, idem: String): Boolean {
+    private fun postSpend(base: String, cookie: String, amount: String, note: String, idem: String): Int {
         val connection = (URL("$base/api/sms-spend").openConnection() as HttpURLConnection)
         connection.requestMethod = "POST"
+        connection.instanceFollowRedirects = false
         connection.doOutput = true
         connection.connectTimeout = 15000
         connection.readTimeout = 15000
@@ -80,7 +105,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
         val code = connection.responseCode
         connection.disconnect()
-        return code in 200..299
+        return code
     }
 
     private fun notifySaved(context: Context, amount: String) {

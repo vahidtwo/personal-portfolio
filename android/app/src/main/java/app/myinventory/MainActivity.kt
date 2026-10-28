@@ -19,11 +19,13 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
 import androidx.core.view.WindowCompat
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
@@ -130,6 +132,18 @@ class MainActivity : AppCompatActivity() {
                 // Persist the session cookie right after each page (e.g. the /auth -> /dashboard login), not only
                 // in onPause: a process kill without onPause (force-stop, OOM) otherwise logs the user out.
                 CookieManager.getInstance().flush()
+                if (readingOldPrivacy) {
+                    if (url.startsWith(ServerAddress.OLD_DEFAULT)) {
+                        view.evaluateJavascript(
+                            "(function(){try{return localStorage.getItem('privacy-portfolio')}catch(e){return 'err'}})()",
+                        ) { r -> finishMove(r) }
+                    }
+                    return
+                }
+                if (url.startsWith("https://")) {
+                    applyPendingHide(url)
+                    checkNewHostPage(url)
+                }
                 if (url.startsWith("file:")) {
                     errorPending = false
                     showLoading(false)
@@ -163,8 +177,152 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action == ACTION_OPEN_SETUP) {
             openAdvancedSetup()
         } else {
-            restoreOrSetup(savedInstanceState)
+            startWithHostMove(savedInstanceState)
         }
+    }
+
+    /** True while the hidden WebView reads the old origin's privacy flag before the move. */
+    private var readingOldPrivacy = false
+
+    /**
+     * v9 move: a saved old default host becomes https://daraiito.ir after a quick /health check.
+     * Probe fails -> keep the old host, try again next launch. Custom hosts and fresh installs
+     * skip this. At most one try per cold launch. Old-host cookies are kept (rollback + SMS).
+     * Hidden amounts stay hidden: the old origin's "privacy-portfolio" flag is read first and
+     * carried over with the #36 #hide=1 handoff (plus a direct write on the new origin).
+     */
+    private fun startWithHostMove(savedInstanceState: Bundle?) {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val raw = prefs.getString(KEY_URL, "")
+        if (!ServerAddress.shouldMigrate(
+                raw, prefs.getBoolean(KEY_HOST_MIGRATED, false),
+                prefs.getInt(KEY_HOST_FALLBACK_COUNT, 0), moveTriedThisLaunch,
+            )
+        ) {
+            if (ServerAddress.shouldProbeOnLaunch(
+                    savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false),
+                    prefs.getBoolean(KEY_HOST_CONFIRMED, false), launchProbeDone,
+                )
+            ) {
+                probeNewHostThenStart(savedInstanceState)
+            } else {
+                restoreOrSetup(savedInstanceState)
+            }
+            return
+        }
+        moveTriedThisLaunch = true
+        showLoading(true)
+        thread {
+            val ok = HealthProbe.isUp(ServerAddress.DEFAULT)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (ok) readOldPrivacyThenMove() else restoreOrSetup(savedInstanceState)
+            }
+        }
+    }
+
+    /** Opens the old origin's /health (tiny JSON page) only to read its localStorage flag. */
+    private fun readOldPrivacyThenMove() {
+        readingOldPrivacy = true
+        showLoading(true)
+        web.loadUrl("${ServerAddress.OLD_DEFAULT}/health")
+        // Can't read it in time -> hide (fail-safe: never reveal).
+        web.postDelayed({ finishMove(null) }, PRIVACY_READ_TIMEOUT_MS)
+    }
+
+    private fun finishMove(jsResult: String?) {
+        if (!readingOldPrivacy) return
+        readingOldPrivacy = false
+        if (isFinishing || isDestroyed) return
+        val hide = ServerAddress.hideAfterMove(jsResult)
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit {
+            putString(KEY_URL, ServerAddress.DEFAULT)
+            putBoolean(KEY_HOST_MIGRATED, true)
+            putBoolean(KEY_PENDING_HIDE, hide)
+        }
+        web.stopLoading()
+        web.clearHistory()
+        showLoading(true)
+        web.loadUrl(ServerAddress.moveTarget(hide))
+    }
+
+    /** Belt and braces for the handoff: write the flag on the new origin itself, then reload once. */
+    private fun applyPendingHide(url: String) {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_PENDING_HIDE, false)) return
+        if (runCatching { Uri.parse(url).host }.getOrNull() != "daraiito.ir") return
+        prefs.edit { putBoolean(KEY_PENDING_HIDE, false) }
+        web.evaluateJavascript(
+            "(function(){try{if(localStorage.getItem('privacy-portfolio')==='1')return 'same';" +
+                "localStorage.setItem('privacy-portfolio','1');return 'set'}catch(e){return 'err'}})()",
+        ) { r -> if (r == "\"set\"") web.reload() }
+    }
+
+    /** Native /health check before loading the unconfirmed new host; dead -> old host (if its /health is OK). */
+    private fun probeNewHostThenStart(savedInstanceState: Bundle?) {
+        launchProbeDone = true
+        showLoading(true)
+        thread {
+            val newOk = HealthProbe.isUp(ServerAddress.DEFAULT)
+            val fallBack = !newOk && fallbackAllowed("${ServerAddress.DEFAULT}/health") &&
+                HealthProbe.isUp(ServerAddress.OLD_DEFAULT)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (newOk) newHostOkThisLaunch = true
+                if (fallBack) doFallBack() else restoreOrSetup(savedInstanceState)
+            }
+        }
+    }
+
+    private fun fallbackAllowed(failedUrl: String?): Boolean {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        return ServerAddress.shouldFallBack(
+            savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false), fallbackThisLaunch, failedUrl,
+        )
+    }
+
+    /** After the move, a failing new host sends the user back to the old one (once per launch). */
+    private fun maybeFallBackToOldHost(failedUrl: String?) {
+        if (!fallbackAllowed(failedUrl)) return
+        fallbackThisLaunch = true
+        thread {
+            if (!HealthProbe.isUp(ServerAddress.OLD_DEFAULT)) return@thread
+            runOnUiThread { if (!isFinishing && !isDestroyed) doFallBack() }
+        }
+    }
+
+    /** host_migrated=false -> the move is tried again on a later cold launch (count caps it at 3). */
+    private fun doFallBack() {
+        fallbackThisLaunch = true
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        prefs.edit {
+            putBoolean(KEY_HOST_MIGRATED, false)
+            putBoolean(KEY_HOST_FALLBACK, true)
+            putInt(KEY_HOST_FALLBACK_COUNT, prefs.getInt(KEY_HOST_FALLBACK_COUNT, 0) + 1)
+        }
+        lastFailedUrl = null
+        errorPending = false
+        loadRemote(ServerAddress.OLD_DEFAULT, "/dashboard")
+    }
+
+    /** SW-served offline page = a failed load; a real new-host page after an OK probe confirms the host. */
+    private fun checkNewHostPage(url: String) {
+        if (runCatching { Uri.parse(url).host }.getOrNull() != "daraiito.ir") return
+        web.evaluateJavascript(ServerAddress.OFFLINE_MARKER_JS) { r ->
+            if (ServerAddress.isOfflinePage(r)) {
+                maybeFallBackToOldHost(url)
+            } else if (newHostOkThisLaunch) {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit { putBoolean(KEY_HOST_CONFIRMED, true) }
+            }
+        }
+    }
+
+    /** An SMS could not be saved because nobody is signed in: say so in the app too. */
+    private fun showSmsLoginPromptIfNeeded() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        if (!prefs.getBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false)) return
+        prefs.edit { putBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false) }
+        Toast.makeText(this, "پیامک خرج ثبت نشد، چون وارد نشده‌اید. لطفاً دوباره وارد شوید.", Toast.LENGTH_LONG).show()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -184,6 +342,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        showSmsLoginPromptIfNeeded()
         UpdateNotifier.onResume(this)
     }
 
@@ -233,6 +392,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Never leave Android's "Webpage not available" page up: show our Persian error screen. */
     private fun showConnectionError(failedUrl: String?) {
+        if (readingOldPrivacy) { finishMove(null); return } // old host unreachable: move anyway, hidden
         UpdateNotifier.hideQuietly()
         if (failedUrl != null && failedUrl.startsWith("https://")) lastFailedUrl = failedUrl
         errorPending = true
@@ -240,6 +400,7 @@ class MainActivity : AppCompatActivity() {
         // The saved address is kept on purpose: being offline never wipes it.
         web.stopLoading()
         web.loadUrl(SETUP_ERROR_ASSET)
+        maybeFallBackToOldHost(failedUrl)
     }
 
     private fun retryLast() {
@@ -294,12 +455,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isAllowedRemoteUrl(uri: Uri): Boolean {
-        if (uri.scheme != "https") return false
-        val base = savedBaseUrl() ?: return true
-        val baseHost = runCatching { Uri.parse(base).host }.getOrNull() ?: return false
-        return uri.host == baseHost
-    }
+    private fun isAllowedRemoteUrl(uri: Uri): Boolean =
+        ServerAddress.isAllowedRemote(uri.scheme, uri.host, savedBaseUrl())
 
     /** SMS permission is asked only from SMS settings, when the user turns the switch on. */
     private fun askNotificationPermission() {
@@ -318,6 +475,17 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val PREFS = "app.myinventory"
         const val KEY_URL = "base_url"
+        const val KEY_HOST_MIGRATED = "host_migrated"
+        const val KEY_HOST_FALLBACK = "host_fallback_done"
+        const val KEY_HOST_FALLBACK_COUNT = "host_fallback_count"
+        const val KEY_PENDING_HIDE = "host_move_pending_hide"
+        const val KEY_HOST_CONFIRMED = "host_confirmed"
+        @Volatile private var launchProbeDone = false
+        @Volatile private var newHostOkThisLaunch = false
+        private const val PRIVACY_READ_TIMEOUT_MS = 6000L
+        /** Process-wide: reset on every cold launch. */
+        @Volatile private var moveTriedThisLaunch = false
+        @Volatile private var fallbackThisLaunch = false
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"

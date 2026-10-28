@@ -189,7 +189,7 @@ def test_profile_mcp_url_uses_request_or_public_base_url(client, no_network, mon
 def test_android_setup_prefills_public_server_url():
     from pathlib import Path
     html = (Path(__file__).resolve().parent.parent / "android/app/src/main/assets/www/setup.html").read_text(encoding="utf-8")
-    assert 'id="site-url"' in html and 'value="https://portfolio.vahidtwo.ir"' in html
+    assert 'id="site-url"' in html and 'value="https://daraiito.ir"' in html
     # a saved address still wins over the default
     assert ('urlInput.value = (saved || "").trim() || DEFAULT_URL;' in html
             or "if (saved) urlInput.value = saved;" in html)

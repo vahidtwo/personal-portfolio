@@ -36,11 +36,10 @@ function makeCaches() {
 
 const listeners = {};
 const messages = [];
-let preloadEnabled = false;
+let preloadCalls = 0; // must stay 0: the SW must never touch navigationPreload
 const DEFAULT_ID = "uTESTUSERaaaa0001";
 let clock = scenario.start || 1_000_000;
 let network = null; // function(request) -> Response | throws
-let preload = null; // navigation preload response factory (step.preload)
 const caches = makeCaches();
 const sandbox = {
   self: {
@@ -48,7 +47,7 @@ const sandbox = {
     addEventListener: (t, f) => (listeners[t] = f),
     skipWaiting() {},
     clients: { claim() {}, async get(id) { return { postMessage: (m) => messages.push({ to: id, ...m }) }; } },
-    registration: { navigationPreload: { async enable() { preloadEnabled = true; } } },
+    registration: { navigationPreload: { async enable() { preloadCalls++; }, async disable() { preloadCalls++; }, async setHeaderValue() { preloadCalls++; }, async getState() { preloadCalls++; return {}; } } },
   },
   caches,
   fetch: async (req) => { if (!network) throw new TypeError("offline"); return network(req); },
@@ -86,8 +85,7 @@ async function dispatch(path, { method = "GET", mode = "navigate" } = {}) {
   const request = { url, method, mode, clone() { return this; } };
   let responded = null;
   const waits = [];
-  const preloadResponse = Promise.resolve(preload ? preload(request) : undefined);
-  listeners.fetch({ request, resultingClientId: "client-" + path, respondWith: (p) => (responded = p), waitUntil: (p) => waits.push(p), preloadResponse });
+  listeners.fetch({ request, resultingClientId: "client-" + path, respondWith: (p) => (responded = p), waitUntil: (p) => waits.push(p) });
   if (!responded) return { handled: false };
   try {
     const res = await responded;
@@ -116,7 +114,6 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
     if (step.online === "redirect-login") network = () => html("<p>login</p>", 200, { redirected: true, url: "https://app.test/login" });
     if (step.online === "opaqueredirect") network = () => { const r = new Response(null, { status: 200 }); Object.defineProperty(r, "type", { value: "opaqueredirect" }); Object.defineProperty(r, "status", { value: 0 }); return r; };
     if (step.online === "login-page") network = () => html("<p>login</p>");
-    if (step.preload !== undefined) preload = step.preload ? () => html(step.preload) : null;
     if (step.activate) { let ap; listeners.activate({ waitUntil: (p) => (ap = p) }); await ap; }
     if (step.offline_html) await (await caches.open("inventory-vtest-static")).put("/offline.html", html("<p>offline page</p>"));
     if (step.go) {
@@ -124,6 +121,6 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
       out.push({ go: step.go, ...r, pages: await pageKeys(), stores: pageStores(), messages: messages.splice(0) });
     }
   }
-  out.push({ preloadEnabled });
+  out.push({ preloadCalls });
   console.log(JSON.stringify(out));
 })();

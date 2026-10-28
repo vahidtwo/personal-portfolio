@@ -58,5 +58,5 @@ def test_service_worker_registration_never_auto_reloads():
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
     # v11: only the signed-in /dashboard is cache-first (per-user, background refresh); other HTML stays
     # network-first with the offline fallback; logout still clears every page cache.
-    assert 'request.mode === "navigate"' in sw and "navigationResponse(event)" in sw and ".catch(async () =>" in sw
+    assert 'request.mode === "navigate"' in sw and "fetch(event.request)" in sw and ".catch(async () =>" in sw
     assert "k.includes(PAGES_MARK)" in sw and 'url.pathname === "/login"' in sw

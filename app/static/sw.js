@@ -130,26 +130,12 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(keys.filter((key) => !key.startsWith(VERSION)).map((key) => caches.delete(key)))
       )
-      .then(() => enableNavigationPreload())
       .then(() => self.clients.claim())
   );
 });
 
-// Navigation preload: the /dashboard request starts while this worker is still booting (v11 startup).
-async function enableNavigationPreload() {
-  try {
-    if (self.registration && self.registration.navigationPreload) await self.registration.navigationPreload.enable();
-  } catch (e) {}
-}
-
-// The preloaded response if the browser made one, else a normal fetch.
-async function navigationResponse(event) {
-  try {
-    const pre = await event.preloadResponse;
-    if (pre) return pre;
-  } catch (e) {}
-  return fetch(event.request);
-}
+// No navigation preload: with it on, an offline cold start made the WebView report a main-frame error even
+// though this worker answered (v10 app showed «اتصال به سرور»). Gorg NO-GO on #44, 2026-10-28.
 
 function isDashboard(url) {
   if (url.origin !== self.location.origin || url.pathname !== "/dashboard") return false;
@@ -259,7 +245,7 @@ async function storeDashboard(request, response, id) {
 }
 
 // v11: stale-while-revalidate for the signed-in dashboard. A fresh-enough copy of THIS user's page is shown at
-// once; the network copy (navigation preload) replaces it in the cache, and the page is told so it can refresh
+// once; the network copy replaces it in the cache, and the page is told so it can refresh
 // quietly (pwa.js) or show it on the next open. No marker = no cache at all (network only, copies deleted).
 async function dashboardNavigation(event) {
   const request = event.request;
@@ -267,7 +253,7 @@ async function dashboardNavigation(event) {
   if (!id) {
     await clearPrivatePages();
     try {
-      return await navigationResponse(event);
+      return await fetch(event.request);
     } catch (err) {
       const offline = await caches.match("/offline.html");
       if (offline) return offline;
@@ -277,7 +263,7 @@ async function dashboardNavigation(event) {
   await dropOtherUsersPages(id);
   const cache = await caches.open(pageCacheName(id));
   const now = Date.now();
-  const network = navigationResponse(event);
+  const network = fetch(event.request);
   const cached = await freshCachedPage(cache, request, now);
   if (cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
     const clientId = event.resultingClientId || event.clientId;
@@ -344,7 +330,7 @@ self.addEventListener("fetch", (event) => {
 
   // Reaching the login page means there is no session (logged out, expired or never logged in).
   if (request.mode === "navigate" && isLoginUrl(url)) {
-    event.respondWith(clearPrivatePages().then(() => navigationResponse(event)).catch(async () => {
+    event.respondWith(clearPrivatePages().then(() => fetch(event.request)).catch(async () => {
       const offline = await caches.match("/offline.html");
       return offline || Response.error();
     }));
@@ -367,7 +353,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" || url.pathname === "/offline.html") {
     event.respondWith(
-      (request.mode === "navigate" ? navigationResponse(event) : fetch(request))
+      (request.mode === "navigate" ? fetch(event.request) : fetch(request))
         .then(async (response) => {
           if (isSessionEnd(response)) await clearPrivatePages();
           return response;

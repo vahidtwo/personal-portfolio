@@ -10,6 +10,8 @@ import android.net.http.SslError
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
@@ -24,6 +26,7 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import kotlin.concurrent.thread
 
@@ -38,8 +41,15 @@ class MainActivity : AppCompatActivity() {
     /** After a successful retry, drop the error screen from the back stack. */
     private var clearHistoryOnSuccess = false
 
+    /** v11: the launch splash stays until the first page paints (or [StartupGate.SPLASH_MAX_MS]). */
+    private val startup = StartupGate()
+    /** v11: main-frame errors for a page the service worker actually served are ignored (see MainFrameErrors). */
+    private val frameErrors = MainFrameErrors()
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        startup.created(SystemClock.uptimeMillis())
+        installSplashScreen().setKeepOnScreenCondition { startup.keepSplash(SystemClock.uptimeMillis()) }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = Color.parseColor("#050608")
@@ -93,6 +103,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageCommitVisible(view: WebView, url: String?) {
                 super.onPageCommitVisible(view, url)
+                // v11: first paint of the new page -> drop the splash/cover now, not at onPageFinished (load).
+                // Not while the hidden old-host /health page is read, and not for a failed page (error screen next).
+                frameErrors.committed(url)
+                if (StartupGate.revealOnCommit(url, readingOldPrivacy, errorPending || frameErrors.pending != null)) {
+                    showLoading(false)
+                    startup.firstPaint(SystemClock.uptimeMillis(), url)
+                }
                 // Earliest point after the /auth -> /dashboard redirect: persist the new session cookie before the
                 // page finishes loading, so a force-stop ~1 s after login keeps the user signed in.
                 CookieManager.getInstance().flush()
@@ -100,6 +117,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                frameErrors.started(url)
                 if (url != null && url.startsWith("https://")) showLoading(true)
             }
 
@@ -109,7 +127,14 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError,
             ) {
                 super.onReceivedError(view, request, error)
-                if (request.isForMainFrame) showConnectionError(request.url?.toString())
+                if (!request.isForMainFrame) return
+                val failed = request.url?.toString()
+                if (frameErrors.holdNetworkError(failed, readingOldPrivacy)) {
+                    Log.i(StartupGate.TAG, "main-frame error held (${error.errorCode})")
+                    view.postDelayed({ decideHeldError(null) }, MainFrameErrors.DECIDE_AFTER_MS)
+                } else {
+                    showConnectionError(failed)
+                }
             }
 
             override fun onReceivedHttpError(
@@ -123,7 +148,12 @@ class MainActivity : AppCompatActivity() {
                 val path = request.url?.path.orEmpty().trimEnd('/')
                 // 5xx = server down / deploying; 404 on /dashboard = not our server.
                 if (status >= 500 || (status == 404 && path == "/dashboard")) {
-                    showConnectionError(request.url?.toString())
+                    val failed = request.url?.toString()
+                    if (frameErrors.holdHttpError(failed, readingOldPrivacy)) {
+                        view.postDelayed({ decideHeldError(null) }, MainFrameErrors.DECIDE_AFTER_MS)
+                    } else {
+                        showConnectionError(failed)
+                    }
                 }
             }
 
@@ -139,34 +169,11 @@ class MainActivity : AppCompatActivity() {
                 // Persist the session cookie right after each page (e.g. the /auth -> /dashboard login), not only
                 // in onPause: a process kill without onPause (force-stop, OOM) otherwise logs the user out.
                 CookieManager.getInstance().flush()
-                if (readingOldPrivacy) {
-                    if (url.startsWith(ServerAddress.OLD_DEFAULT)) {
-                        view.evaluateJavascript(
-                            "(function(){try{return localStorage.getItem('privacy-portfolio')}catch(e){return 'err'}})()",
-                        ) { r -> finishMove(r) }
-                    }
+                if (frameErrors.isPendingFor(url)) {
+                    decideHeldError { finishPage(view, url) }
                     return
                 }
-                if (url.startsWith("https://")) {
-                    applyPendingHide(url)
-                    checkNewHostPage(url)
-                }
-                if (url.startsWith("file:")) {
-                    errorPending = false
-                    showLoading(false)
-                    UpdateNotifier.hideQuietly()
-                    return
-                }
-                if (errorPending) return // the error screen is on its way
-                showLoading(false)
-                if (url.startsWith("https://")) {
-                    if (clearHistoryOnSuccess) {
-                        clearHistoryOnSuccess = false
-                        view.clearHistory()
-                    }
-                    PushRegistrar.registerFcmToken(this@MainActivity)
-                }
-                UpdateNotifier.onPageLoaded(this@MainActivity, url, savedBaseUrl())
+                finishPage(view, url)
             }
         }
 
@@ -403,6 +410,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Never leave Android's "Webpage not available" page up: show our Persian error screen. */
+    private fun finishPage(view: WebView, url: String) {
+        if (readingOldPrivacy) {
+            if (url.startsWith(ServerAddress.OLD_DEFAULT)) {
+                view.evaluateJavascript(
+                    "(function(){try{return localStorage.getItem('privacy-portfolio')}catch(e){return 'err'}})()",
+                ) { r -> finishMove(r) }
+            }
+            return
+        }
+        if (url.startsWith("https://")) {
+            applyPendingHide(url)
+            checkNewHostPage(url)
+        }
+        if (url.startsWith("file:")) {
+            errorPending = false
+            showLoading(false)
+            startup.firstPaint(SystemClock.uptimeMillis(), url)
+            UpdateNotifier.hideQuietly()
+            return
+        }
+        if (errorPending) return // the error screen is on its way
+        showLoading(false)
+        startup.firstPaint(SystemClock.uptimeMillis(), url)
+        Log.i(StartupGate.TAG, "pageFinished +${SystemClock.uptimeMillis() - startup.createdAt}ms")
+        if (url.startsWith("https://")) {
+            if (clearHistoryOnSuccess) {
+                clearHistoryOnSuccess = false
+                view.clearHistory()
+            }
+            PushRegistrar.registerFcmToken(this@MainActivity)
+        }
+        UpdateNotifier.onPageLoaded(this@MainActivity, url, savedBaseUrl())
+    }
+
+    /** Decide a held main-frame error: served page = ignore and [onServed]; else the error screen. */
+    private fun decideHeldError(onServed: (() -> Unit)?) {
+        val url = frameErrors.pending ?: return
+        web.evaluateJavascript(MainFrameErrors.SERVED_JS) { r ->
+            if (!frameErrors.isPendingFor(url)) return@evaluateJavascript
+            if (frameErrors.resolve(r)) {
+                Log.i(StartupGate.TAG, "main-frame error ignored: page was served")
+                if (onServed != null) onServed() else if (!errorPending) { showLoading(false); startup.firstPaint(SystemClock.uptimeMillis(), url) }
+            } else {
+                showConnectionError(url)
+            }
+        }
+    }
+
     private fun showConnectionError(failedUrl: String?) {
         if (readingOldPrivacy) { finishMove(null); return } // old host unreachable: move anyway, hidden
         UpdateNotifier.hideQuietly()
@@ -453,6 +508,8 @@ class MainActivity : AppCompatActivity() {
         saveBaseUrl(normalized)
         val suffix = if (path.startsWith("/")) path else "/$path"
         showLoading(true)
+        Log.i(StartupGate.TAG, "loadUrl +${SystemClock.uptimeMillis() - startup.createdAt}ms")
+        startup.handOffToCover()
         web.loadUrl("$normalized$suffix")
     }
 

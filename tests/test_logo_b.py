@@ -32,7 +32,7 @@ def test_header_logo_has_no_glow_or_radius():
 
 def test_asset_version_bumped_and_precached():
     from app.config import STATIC_ASSET_VERSION
-    assert STATIC_ASSET_VERSION >= "20261028b"
+    assert STATIC_ASSET_VERSION >= "20261028d"
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
     for p in ["/static/favicon.ico", "/static/brand/daraiito-symbol-dark.svg", "/static/brand/daraiito-symbol-light.svg"]:
         assert f'"{p}"' in sw
@@ -42,3 +42,12 @@ def test_pages_link_favicon_and_theme_logos(client):
     html = client.get("/auth").text
     assert '/static/favicon.ico' in html and 'daraiito-symbol-light.svg' in html
     assert client.get("/static/favicon.ico").status_code == 200
+
+
+def test_png_favicons_linked_and_avatar_flat(client):
+    for path in ("/", "/auth"):
+        html = client.get(path).text
+        assert "/static/icons/favicon-16.png" in html and "/static/icons/favicon-32.png" in html
+    pub = (STATIC / "public.css").read_text(encoding="utf-8")
+    assert ".avatar{" in pub and "background:#3ee0b8}" in pub.split(".avatar{", 1)[1].split("\n", 1)[0]
+    assert "--avatar-bg: #3ee0b8;" in (STATIC / "style.css").read_text(encoding="utf-8")

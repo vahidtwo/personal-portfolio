@@ -34,12 +34,12 @@ def test_grey_spinner_overlay_removed():
 
 def test_cover_hidden_on_first_paint_not_load():
     commit = MAIN[MAIN.index("override fun onPageCommitVisible"):MAIN.index("override fun onPageStarted")]
-    assert "StartupGate.revealOnCommit(url, readingOldPrivacy, errorPending)" in commit and "showLoading(false)" in commit
+    assert "StartupGate.revealOnCommit(url, readingOldPrivacy, errorPending || frameErrors.pending != null)" in commit and "showLoading(false)" in commit
     assert "CookieManager.getInstance().flush()" in commit  # v10 flush kept
 
 
 def test_offline_marker_and_fallback_paths_kept():
-    finished = MAIN[MAIN.index("override fun onPageFinished"):MAIN.index("onBackPressedDispatcher")]
+    finished = MAIN[MAIN.index("private fun finishPage("):MAIN.index("private fun decideHeldError(")]
     assert "checkNewHostPage(url)" in finished and "applyPendingHide(url)" in finished
     assert "maybeFallBackToOldHost(url)" in MAIN and "probeNewHostThenStart" in MAIN
     assert "'privacy-portfolio'" in MAIN  # key never renamed
@@ -58,3 +58,14 @@ def test_native_splash_released_when_webview_starts_loading():
     assert "fun handOffToCover()" in GATE and "painted || handedOff" in GATE
     load = MAIN[MAIN.index("fun loadRemote("):]
     assert load.index("startup.handOffToCover()") < load.index("web.loadUrl(")
+
+
+def test_main_frame_error_ignored_only_when_page_was_served():
+    """Gorg #44 NO-GO: a SW-served page must not be replaced by «اتصال به سرور»; real failures still are."""
+    guard = (SRC / "java" / "app" / "myinventory" / "MainFrameErrors.kt").read_text(encoding="utf-8")
+    assert "committed && jsResult?.trim() == \"\\\"1\\\"\"" in guard and 'meta[name=\\"x-offline\\"]' in guard
+    err = MAIN[MAIN.index("override fun onReceivedError("):MAIN.index("override fun onReceivedHttpError(")]
+    assert "frameErrors.holdNetworkError(failed, readingOldPrivacy)" in err and "showConnectionError(failed)" in err
+    assert "frameErrors.committed(url)" in MAIN and "frameErrors.started(url)" in MAIN
+    fin = MAIN[MAIN.index("private fun finishPage("):]
+    assert fin.index("checkNewHostPage(url)") < fin.index("private fun decideHeldError(")  # R2/R2c marker check kept

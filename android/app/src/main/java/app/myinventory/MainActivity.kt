@@ -140,7 +140,10 @@ class MainActivity : AppCompatActivity() {
                     }
                     return
                 }
-                if (url.startsWith("https://")) applyPendingHide(url)
+                if (url.startsWith("https://")) {
+                    applyPendingHide(url)
+                    checkNewHostPage(url)
+                }
                 if (url.startsWith("file:")) {
                     errorPending = false
                     showLoading(false)
@@ -196,7 +199,15 @@ class MainActivity : AppCompatActivity() {
                 prefs.getInt(KEY_HOST_FALLBACK_COUNT, 0), moveTriedThisLaunch,
             )
         ) {
-            restoreOrSetup(savedInstanceState)
+            if (ServerAddress.shouldProbeOnLaunch(
+                    savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false),
+                    prefs.getBoolean(KEY_HOST_CONFIRMED, false), launchProbeDone,
+                )
+            ) {
+                probeNewHostThenStart(savedInstanceState)
+            } else {
+                restoreOrSetup(savedInstanceState)
+            }
             return
         }
         moveTriedThisLaunch = true
@@ -247,27 +258,61 @@ class MainActivity : AppCompatActivity() {
         ) { r -> if (r == "\"set\"") web.reload() }
     }
 
+    /** Native /health check before loading the unconfirmed new host; dead -> old host (if its /health is OK). */
+    private fun probeNewHostThenStart(savedInstanceState: Bundle?) {
+        launchProbeDone = true
+        showLoading(true)
+        thread {
+            val newOk = HealthProbe.isUp(ServerAddress.DEFAULT)
+            val fallBack = !newOk && fallbackAllowed("${ServerAddress.DEFAULT}/health") &&
+                HealthProbe.isUp(ServerAddress.OLD_DEFAULT)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (newOk) newHostOkThisLaunch = true
+                if (fallBack) doFallBack() else restoreOrSetup(savedInstanceState)
+            }
+        }
+    }
+
+    private fun fallbackAllowed(failedUrl: String?): Boolean {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        return ServerAddress.shouldFallBack(
+            savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false), fallbackThisLaunch, failedUrl,
+        )
+    }
+
     /** After the move, a failing new host sends the user back to the old one (once per launch). */
     private fun maybeFallBackToOldHost(failedUrl: String?) {
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (!ServerAddress.shouldFallBack(
-                savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false), fallbackThisLaunch, failedUrl,
-            )
-        ) return
+        if (!fallbackAllowed(failedUrl)) return
         fallbackThisLaunch = true
         thread {
             if (!HealthProbe.isUp(ServerAddress.OLD_DEFAULT)) return@thread
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                // host_migrated=false -> the move is tried again on a later cold launch (count caps it).
-                prefs.edit {
-                    putBoolean(KEY_HOST_MIGRATED, false)
-                    putBoolean(KEY_HOST_FALLBACK, true)
-                    putInt(KEY_HOST_FALLBACK_COUNT, prefs.getInt(KEY_HOST_FALLBACK_COUNT, 0) + 1)
-                }
-                lastFailedUrl = null
-                errorPending = false
-                loadRemote(ServerAddress.OLD_DEFAULT, "/dashboard")
+            runOnUiThread { if (!isFinishing && !isDestroyed) doFallBack() }
+        }
+    }
+
+    /** host_migrated=false -> the move is tried again on a later cold launch (count caps it at 3). */
+    private fun doFallBack() {
+        fallbackThisLaunch = true
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        prefs.edit {
+            putBoolean(KEY_HOST_MIGRATED, false)
+            putBoolean(KEY_HOST_FALLBACK, true)
+            putInt(KEY_HOST_FALLBACK_COUNT, prefs.getInt(KEY_HOST_FALLBACK_COUNT, 0) + 1)
+        }
+        lastFailedUrl = null
+        errorPending = false
+        loadRemote(ServerAddress.OLD_DEFAULT, "/dashboard")
+    }
+
+    /** SW-served offline page = a failed load; a real new-host page after an OK probe confirms the host. */
+    private fun checkNewHostPage(url: String) {
+        if (runCatching { Uri.parse(url).host }.getOrNull() != "daraiito.ir") return
+        web.evaluateJavascript(ServerAddress.OFFLINE_MARKER_JS) { r ->
+            if (ServerAddress.isOfflinePage(r)) {
+                maybeFallBackToOldHost(url)
+            } else if (newHostOkThisLaunch) {
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit { putBoolean(KEY_HOST_CONFIRMED, true) }
             }
         }
     }
@@ -434,6 +479,9 @@ class MainActivity : AppCompatActivity() {
         const val KEY_HOST_FALLBACK = "host_fallback_done"
         const val KEY_HOST_FALLBACK_COUNT = "host_fallback_count"
         const val KEY_PENDING_HIDE = "host_move_pending_hide"
+        const val KEY_HOST_CONFIRMED = "host_confirmed"
+        @Volatile private var launchProbeDone = false
+        @Volatile private var newHostOkThisLaunch = false
         private const val PRIVACY_READ_TIMEOUT_MS = 6000L
         /** Process-wide: reset on every cold launch. */
         @Volatile private var moveTriedThisLaunch = false

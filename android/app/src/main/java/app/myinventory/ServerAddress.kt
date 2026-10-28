@@ -152,4 +152,19 @@ object ServerAddress {
         code == 401 || code == 403 -> SmsOutcome.LOGIN_NEEDED
         else -> SmsOutcome.FAILED
     }
+
+    /**
+     * Cold launch on the moved-to new host that is not confirmed yet: probe /health natively
+     * first, because daraiito.ir's service worker answers a dead network with its cached offline
+     * page and the WebView then reports no error. Once per launch.
+     */
+    fun shouldProbeOnLaunch(savedBase: String?, migrated: Boolean, confirmed: Boolean, probedThisLaunch: Boolean): Boolean =
+        savedBase == DEFAULT && migrated && !confirmed && !probedThisLaunch
+
+    /** Marker in /offline.html (<meta name="x-offline" content="1">). */
+    const val OFFLINE_MARKER_JS =
+        "(function(){var m=document.querySelector('meta[name=\"x-offline\"]');return m&&m.content==='1'?'1':'0'})()"
+
+    /** evaluateJavascript result of [OFFLINE_MARKER_JS]: only an exact "1" is the offline page. */
+    fun isOfflinePage(jsResult: String?): Boolean = jsResult?.trim() == "\"1\""
 }

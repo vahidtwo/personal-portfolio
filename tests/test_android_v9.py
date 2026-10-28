@@ -38,7 +38,7 @@ def test_storage_keys_unchanged_and_new_flags_added():
 
 def test_health_probe_no_redirects_and_short_timeouts():
     src = (SRC / "HealthProbe.kt").read_text(encoding="utf-8")
-    assert "instanceFollowRedirects = false" in src and re.search(r"connectTimeout = 5000", src)
+    assert "instanceFollowRedirects = false" in src and "connectTimeout = timeoutMs" in src and "TIMEOUT_MS = 3500" in src
 
 
 def test_sms_uses_cookie_fallback():
@@ -116,3 +116,25 @@ def test_auth_page_serves_hide_handoff():
     from app.main import app
     html = TestClient(app, base_url="https://daraiito.ir").get("/auth").text
     assert 'location.hash!=="#hide=1"' in html and 'localStorage.setItem("privacy-portfolio","1")' in html
+
+
+def test_offline_page_has_marker_and_is_precached():
+    """The SW serves /offline.html from its cache when the network is dead; the app detects this marker."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.config import STATIC_ASSET_VERSION
+    c = TestClient(app, base_url="https://daraiito.ir")
+    html = c.get("/offline.html").text
+    assert '<meta name="x-offline" content="1">' in html
+    sw = c.get("/sw.js")
+    assert sw.status_code == 200 and '"/offline.html"' in sw.text and STATIC_ASSET_VERSION in sw.text
+    assert STATIC_ASSET_VERSION >= "20261028e"
+    src = (SRC / "ServerAddress.kt").read_text(encoding="utf-8")
+    assert "meta[name=\\\"x-offline\\\"]" in src and "m.content==='1'" in src
+
+
+def test_launch_probe_and_offline_marker_wired():
+    main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
+    assert "probeNewHostThenStart(savedInstanceState)" in main
+    assert "ServerAddress.isOfflinePage(r)" in main and "KEY_HOST_CONFIRMED" in main
+    assert "TIMEOUT_MS = 3500" in (SRC / "HealthProbe.kt").read_text(encoding="utf-8")

@@ -5,11 +5,13 @@ import java.net.URL
 
 /** GET {base}/health, expects 200 {"ok":true}. Short timeouts, no redirects. Call off the UI thread. */
 object HealthProbe {
-    fun isUp(base: String): Boolean = runCatching {
+    const val TIMEOUT_MS = 3500
+
+    fun isUp(base: String, timeoutMs: Int = TIMEOUT_MS): Boolean = runCatching {
         val c = URL("$base/health").openConnection() as HttpURLConnection
         c.instanceFollowRedirects = false
-        c.connectTimeout = 5000
-        c.readTimeout = 5000
+        c.connectTimeout = timeoutMs
+        c.readTimeout = timeoutMs
         try {
             val code = c.responseCode
             val body = if (code == 200) c.inputStream.bufferedReader().use { it.readText().take(200) } else null

@@ -38,4 +38,15 @@ class StartupGateTest {
         assertFalse(StartupGate.revealOnCommit("about:blank", false, false))
         assertFalse(StartupGate.revealOnCommit(null, false, false))
     }
+
+    @Test fun splashHandsOffToCoverWhenLoadStarts() {
+        val g = StartupGate()
+        g.created(0)
+        assertTrue(g.keepSplash(100))
+        g.handOffToCover()
+        assertFalse(g.keepSplash(101))
+        assertFalse(g.hasPainted)
+        g.created(500)
+        assertTrue(g.keepSplash(600))
+    }
 }

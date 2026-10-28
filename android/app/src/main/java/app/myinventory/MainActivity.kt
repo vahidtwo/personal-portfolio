@@ -471,6 +471,7 @@ class MainActivity : AppCompatActivity() {
         val suffix = if (path.startsWith("/")) path else "/$path"
         showLoading(true)
         Log.i(StartupGate.TAG, "loadUrl +${SystemClock.uptimeMillis() - startup.createdAt}ms")
+        startup.handOffToCover()
         web.loadUrl("$normalized$suffix")
     }
 

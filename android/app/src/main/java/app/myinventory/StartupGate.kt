@@ -12,13 +12,22 @@ class StartupGate {
     var createdAt = 0L
         private set
     private var painted = false
+    private var handedOff = false
 
     fun created(now: Long) {
         createdAt = now
         painted = false
+        handedOff = false
     }
 
-    fun keepSplash(now: Long): Boolean = shouldKeepSplash(painted, now - createdAt)
+    /**
+     * Late-paint fix (v11): while the native splash is kept, the activity cancels every draw, so the WebView
+     * cannot present its first frame (measured: commit +1.1 s but window first frame +2.3 s). The native splash is
+     * therefore released as soon as the WebView starts loading; the identical logo cover then stays until commit.
+     */
+    fun handOffToCover() { handedOff = true }
+
+    fun keepSplash(now: Long): Boolean = shouldKeepSplash(painted || handedOff, now - createdAt)
 
     fun firstPaint(now: Long, url: String?) {
         if (painted) return

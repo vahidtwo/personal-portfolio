@@ -51,3 +51,10 @@ def test_release_json_v11_notes_unapproved_and_same_cert():
     assert rel["versionCode"] == 11 and rel["versionName"] == "11.0"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
     assert rel["notes_approved"] is False and len(rel["notes"]) == 3
+
+
+def test_native_splash_released_when_webview_starts_loading():
+    """Late-paint fix: a kept splash cancels draws, so it must hand off to the logo cover at loadUrl."""
+    assert "fun handOffToCover()" in GATE and "painted || handedOff" in GATE
+    load = MAIN[MAIN.index("fun loadRemote("):]
+    assert load.index("startup.handOffToCover()") < load.index("web.loadUrl(")

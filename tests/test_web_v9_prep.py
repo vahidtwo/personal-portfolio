@@ -26,6 +26,10 @@ def test_auth_page_serves_hide_handoff():
     assert 'location.hash!=="#hide=1"' in html and 'localStorage.setItem("privacy-portfolio","1")' in html
 
 
-def test_does_not_publish_v9():
+def test_published_version_matches_android_sources():
+    """This web-only change must not publish a new APK: the served release stays the one the android/ sources build
+    (8 on main; only #37 moves both to 9)."""
+    import re
     rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
-    assert rel["versionCode"] < 9
+    gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+    assert rel["versionCode"] == int(re.search(r"\?\.toInt\(\) \?: (\d+)", gradle).group(1))

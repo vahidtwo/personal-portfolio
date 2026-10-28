@@ -30,7 +30,10 @@ svg.i-sm{width:18px;height:18px}
 .top{position:sticky;top:0;z-index:40;background:rgba(5,6,8,.78);backdrop-filter:blur(16px) saturate(1.2);border-bottom:1px solid var(--border-subtle)}
 .top-inner{width:min(1180px,calc(100% - 32px));margin:0 auto;height:56px;display:flex;align-items:center;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:700;font-size:16px;letter-spacing:-.02em}
-.brand img{width:32px;height:32px;border-radius:9px;box-shadow:0 8px 22px var(--accent-glow)}
+.brand img{width:32px;height:32px}
+.brand .logo-light{display:none}
+[data-theme=light] .brand .logo-dark{display:none}
+[data-theme=light] .brand .logo-light{display:block}
 .top-actions{margin-inline-start:auto;display:flex;align-items:center;gap:8px}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text-soft);display:grid;place-items:center}
 .avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;color:#04120e;background:linear-gradient(135deg,var(--accent),#5ad4f0 55%,var(--accent-violet))}
@@ -427,7 +430,7 @@ details.more .body ul{margin:0;padding-inline-start:18px}
 .foot{margin-top:36px;padding:22px 0 28px;border-top:1px solid var(--border-subtle);color:var(--text-muted);font-size:13px}
 .foot .lp{display:grid;gap:12px}
 .foot .brand{font-size:15px}
-.foot .brand img{width:26px;height:26px;border-radius:7px}
+.foot .brand img{width:26px;height:26px}
 .foot nav{display:flex;flex-wrap:wrap;gap:12px}
 .foot nav a{display:inline-flex;align-items:center;min-height:44px;color:var(--text-soft)}
 .foot p{margin:0;line-height:1.8}
@@ -533,7 +536,6 @@ body{min-height:100vh}
 [data-theme=light] body{background-color:#eef1f8}
 [data-theme=light] .top{background:rgba(238,241,248,.92)}
 [data-theme=light] .user-chip{background:#f4f6fb}
-[data-theme=light] .brand img{box-shadow:none}
 .btn-primary,.btn-primary:hover{background:var(--accent);color:var(--accent-ink);box-shadow:none}
 .btn-ghost{border-color:var(--inp-border);color:var(--text)}
 .back-link,.brand{min-height:44px;display:inline-flex;align-items:center;gap:8px;color:var(--text)}

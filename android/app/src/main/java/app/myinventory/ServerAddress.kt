@@ -69,12 +69,22 @@ object ServerAddress {
         return h == savedHost
     }
 
+    /** After this many fallbacks the move stops retrying (new host keeps failing in the WebView). */
+    const val MAX_FALLBACKS = 3
+
     /**
-     * One-time v9 move: only a saved address that is exactly the old default host
-     * (any case, http, trailing slash or path) is moved. Custom addresses are never touched.
+     * v9 move: only a saved address that is exactly the old default host (any case, http,
+     * trailing slash or path) is moved. Custom addresses are never touched. At most one try per
+     * cold launch; after a fallback it is tried again on a later launch, up to [MAX_FALLBACKS].
      */
-    fun shouldMigrate(savedRaw: String?, alreadyMigrated: Boolean): Boolean =
-        !alreadyMigrated && !savedRaw.isNullOrBlank() && normalize(savedRaw) == OLD_DEFAULT
+    fun shouldMigrate(
+        savedRaw: String?,
+        alreadyMigrated: Boolean,
+        fallbackCount: Int = 0,
+        triedThisLaunch: Boolean = false,
+    ): Boolean =
+        !alreadyMigrated && !triedThisLaunch && fallbackCount < MAX_FALLBACKS &&
+            !savedRaw.isNullOrBlank() && normalize(savedRaw) == OLD_DEFAULT
 
     /** /health must answer 200 {"ok":true} before we move anyone. */
     fun isHealthOk(code: Int, body: String?): Boolean =
@@ -82,25 +92,64 @@ object ServerAddress {
 
     /**
      * After the move, if the new host fails to load (connection / SSL) we go back to the old
-     * host once, only when the old /health is OK. The flag stops a loop.
+     * host, at most once per launch. The fallback clears host_migrated so a later launch retries.
      */
-    fun shouldFallBack(savedBase: String?, migrated: Boolean, fallbackDone: Boolean, failedUrl: String?): Boolean {
-        if (!migrated || fallbackDone) return false
+    fun shouldFallBack(savedBase: String?, migrated: Boolean, fallbackThisLaunch: Boolean, failedUrl: String?): Boolean {
+        if (!migrated || fallbackThisLaunch) return false
         if (savedBase != DEFAULT) return false
         val failedHost = runCatching { URI(failedUrl ?: return false).host?.lowercase() }.getOrNull()
         return failedHost == "daraiito.ir"
     }
 
     /**
-     * Where an SMS spend is posted: the saved host if it has a session cookie; else the old
-     * host when the saved one is the new default and the old host still has a cookie
-     * (same backend); else null (don't post, ask the user to log in).
+     * Result of `localStorage.getItem("privacy-portfolio")` on the old origin, as WebView's
+     * evaluateJavascript returns it (JSON: "\"1\"", "\"0\"", "null"). Hide unless we know for sure
+     * amounts were shown: an unreadable result (null callback, timeout, error) hides.
+     */
+    fun hideAfterMove(jsResult: String?): Boolean = when (jsResult?.trim()) {
+        "null", "\"0\"" -> false
+        else -> true
+    }
+
+    /** First new-host URL after the move; #hide=1 is the #36 hide-only handoff. */
+    fun moveTarget(hide: Boolean): String = if (hide) "$DEFAULT/dashboard#hide=1" else "$DEFAULT/dashboard"
+
+    const val SESSION_COOKIE = "inventory_session"
+    const val SIGNED_IN_COOKIE = "inventory_signed_in"
+
+    /**
+     * A signed-in session, not an anonymous one. The server sets inventory_session for anyone
+     * (e.g. the CSRF token on /auth); only signed-in responses also carry inventory_signed_in=1.
+     */
+    fun hasSignedInSession(cookieHeader: String?): Boolean {
+        if (cookieHeader.isNullOrBlank()) return false
+        val pairs = cookieHeader.split(';').mapNotNull {
+            val i = it.indexOf('=')
+            if (i <= 0) null else it.substring(0, i).trim() to it.substring(i + 1).trim()
+        }.toMap()
+        return pairs[SIGNED_IN_COOKIE] == "1" && !pairs[SESSION_COOKIE].isNullOrEmpty()
+    }
+
+    /**
+     * Where an SMS spend is posted: the saved host if it has a signed-in session; else the old
+     * host when the saved one is the new default and the old host still has one (same backend);
+     * else null (don't post, ask the user to log in).
      */
     fun smsTarget(savedBase: String, cookieFor: (String) -> String?): Pair<String, String>? {
-        cookieFor(savedBase)?.takeIf { it.isNotBlank() }?.let { return savedBase to it }
+        cookieFor(savedBase)?.takeIf { hasSignedInSession(it) }?.let { return savedBase to it }
         if (savedBase == DEFAULT) {
-            cookieFor(OLD_DEFAULT)?.takeIf { it.isNotBlank() }?.let { return OLD_DEFAULT to it }
+            cookieFor(OLD_DEFAULT)?.takeIf { hasSignedInSession(it) }?.let { return OLD_DEFAULT to it }
         }
         return null
+    }
+
+    enum class SmsOutcome { SAVED, LOGIN_NEEDED, FAILED }
+
+    /** HTTP code (null = network error / exception) -> what we tell the user. */
+    fun smsOutcome(code: Int?): SmsOutcome = when {
+        code == null -> SmsOutcome.FAILED
+        code in 200..299 -> SmsOutcome.SAVED
+        code == 401 || code == 403 -> SmsOutcome.LOGIN_NEEDED
+        else -> SmsOutcome.FAILED
     }
 }

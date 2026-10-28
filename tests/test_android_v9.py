@@ -58,3 +58,61 @@ def test_health_and_app_version_and_apk_ok_on_both_hosts():
         assert not v.json()["url"].startswith("http")  # relative: each host serves its own APK
         a = c.get("/download/my-inventory.apk", follow_redirects=False)
         assert a.status_code == 200
+
+
+def test_release_notes_v9_final():
+    rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
+    assert rel["notes"][2] == "اطلاعات و پنهان‌بودن مبلغ‌ها بعد از به‌روزرسانی می‌ماند"
+    assert rel["notes"][0].startswith("نشانی برنامه daraiito.ir شد")
+
+
+def test_move_carries_privacy_flag_and_never_renames_key():
+    main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
+    assert "localStorage.getItem('privacy-portfolio')" in main
+    assert "localStorage.setItem('privacy-portfolio','1')" in main
+    assert "ServerAddress.moveTarget(hide)" in main
+    # the #36 handoff the app relies on is still on the pages the move lands on
+    for t in ("base.html", "auth.html", "landing.html"):
+        assert "hide_handoff" in (ROOT / "app/templates" / t).read_text(encoding="utf-8")
+    h = (ROOT / "app/templates/partials/hide_handoff.html").read_text(encoding="utf-8")
+    assert 'location.hash!=="#hide=1"' in h and 'setItem("privacy-portfolio","1")' in h
+
+
+def test_fallback_clears_migrated_so_move_retries():
+    main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
+    assert "putBoolean(KEY_HOST_MIGRATED, false)" in main and "KEY_HOST_FALLBACK_COUNT" in main
+    assert "moveTriedThisLaunch" in main and "fallbackThisLaunch" in main
+
+
+def test_sms_session_cookie_names_match_server():
+    from app.config import SESSION_COOKIE_NAME
+    from app.session_marker import MARKER_COOKIE
+    src = (SRC / "ServerAddress.kt").read_text(encoding="utf-8")
+    assert f'SESSION_COOKIE = "{SESSION_COOKIE_NAME}"' in src
+    assert f'SIGNED_IN_COOKIE = "{MARKER_COOKIE}"' in src
+
+
+def test_anonymous_auth_visit_sets_session_cookie_but_no_marker():
+    """Why fix 3 needs the marker: /auth alone already sets inventory_session (CSRF)."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app, base_url="https://daraiito.ir")
+    r = c.get("/auth")
+    assert r.status_code == 200
+    assert "inventory_signed_in" not in c.cookies
+
+
+def test_sms_no_session_never_silent():
+    src = (SRC / "SmsReceiver.kt").read_text(encoding="utf-8")
+    assert "catch (t: Throwable)" in src and "KEY_LOGIN_NEEDED" in src
+    assert "instanceFollowRedirects = false" in src
+    main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
+    assert "showSmsLoginPromptIfNeeded()" in main
+
+
+def test_auth_page_serves_hide_handoff():
+    """After the move the app lands on /auth (no session on the new host yet); #hide=1 must work there."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    html = TestClient(app, base_url="https://daraiito.ir").get("/auth").text
+    assert 'location.hash!=="#hide=1"' in html and 'localStorage.setItem("privacy-portfolio","1")' in html

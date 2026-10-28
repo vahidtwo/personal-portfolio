@@ -34,3 +34,18 @@ def test_base_amount_css_and_version():
     assert ".acard .nm .acard-qty { white-space: nowrap; }" in CSS
     assert ".acard .nm .acard-qty[data-mask]::after {" in CSS
     assert STATIC_ASSET_VERSION > "20261028e"
+
+
+def test_row_toman_values_masked_mobile_and_desktop(client, no_network):
+    html, cards = _cards(client)
+    # mobile: every card value sits inside a portfolio mask
+    assert cards.count('class="acard"') == cards.count('<div class="row-val" data-mask="portfolio" data-row-value><b>') == 3
+    table = html[html.index('id="portfolio-table"'):html.index("</table>")]
+    tbody = table[table.index("<tbody>"):table.index("</tbody>")]
+    assert tbody.count("<tr") == tbody.count('<span class="row-val" data-mask="portfolio" data-row-value><b>') == 3
+    tpl = (Path(__file__).resolve().parents[1] / "app" / "templates" / "dashboard.html").read_text(encoding="utf-8")
+    assert '<div class="usd-equiv row-val" data-mask="portfolio">' in tpl  # crypto ≈ USD line in the table
+    tfoot = table[table.index("<tfoot>"):]
+    assert '<td class="num n num-strong"><span class="row-val" data-mask="portfolio" data-row-value>' in tfoot
+    assert ".row-val[data-mask]::after { font-size: 15px;" in CSS
+    assert 'html:not([data-show-portfolio="1"]) .row-val[data-mask="portfolio"] > * { display: none; }' in CSS

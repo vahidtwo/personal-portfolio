@@ -157,7 +157,7 @@
       <div class="r1">
         <span class="logo"><img src="/static/logos/{{ row.key }}.svg" alt="" width="24" height="24"></span>
         <div class="nm"><b>{{ row.name_fa }}{% if row.sanjeh %} <span class="badge badge-sanjeh">سنجه</span>{% endif %}</b><span class="acard-base">{% if row.key == "cash" %}وجه نقد{% else %}<span class="acard-qty" data-mask="portfolio" data-base-amount><bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}</span>{% endif %}{% if row.usd_equiv_label %} · <span class="acard-qty" data-mask="portfolio">≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار</span>{% endif %}</span></div>
-        <div class="vl"><div><b>{{ row.value_label }}</b> <small>تومان</small></div></div>
+        <div class="vl"><div class="row-val" data-mask="portfolio" data-row-value><b>{{ row.value_label }}</b> <small>تومان</small></div></div>
       </div>
       <div class="r2">{% if row.spark_mob %}{{ spark(row.spark_mob) }}{% endif %}<div class="sub2"><span>{{ row.share_label }}٪ سهم</span><span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></div></div>
       <div class="line" aria-hidden="true"><i style="width:{{ row.share_width }}%;background:{{ row.color }}"></i></div>
@@ -195,7 +195,7 @@
           </td>
           <td class="muted"><bdi dir="ltr">{{ row.quantity_label }}</bdi> {{ row.unit_fa }}</td>
           <td class="num muted">{{ row.unit_price_label }}</td>
-          <td class="num n"><b>{{ row.value_label }}</b>{% if row.usd_equiv_label %}<div class="usd-equiv">≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار</div>{% endif %}</td>
+          <td class="num n"><span class="row-val" data-mask="portfolio" data-row-value><b>{{ row.value_label }}</b></span>{% if row.usd_equiv_label %}<div class="usd-equiv row-val" data-mask="portfolio">≈ <bdi dir="ltr">{{ row.usd_equiv_label }}</bdi> دلار</div>{% endif %}</td>
           <td class="share-cell"><span class="share-pct">{{ row.share_label }}٪</span><span class="share-bar" aria-hidden="true"><i style="width:{{ row.share_width }}%;background:{{ row.color }}"></i></span></td>
           <td class="n mc-cell">{% if row.spark_desk %}{{ spark(row.spark_desk) }}{% endif %}<span class="chg {{ row.week_chip.kind }}">{{ row.week_chip.label }}</span></td>
         </tr>
@@ -204,7 +204,7 @@
       <tfoot>
         <tr>
           <th scope="row" colspan="3">جمع</th>
-          <td class="num n num-strong">{{ total_label }}</td>
+          <td class="num n num-strong"><span class="row-val" data-mask="portfolio" data-row-value>{{ total_label }}</span></td>
           <td class="num">۱۰۰٪</td>
           <td class="n"><span class="chg {{ total_week_chip.kind }}">{{ total_week_chip.label }}</span></td>
         </tr>

@@ -2256,6 +2256,12 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 /* mobile base amount (quantity + unit): muted, never split; masked by hide-amounts like other amounts */
 .acard .nm .acard-qty { white-space: nowrap; }
 .acard .nm .acard-qty[data-mask]::after { font-size: 12.5px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; }
+/* row toman values (mobile cards + desktop table) masked like other amounts; mask sized to the row text */
+.row-val[data-mask]::after { font-size: 15px; letter-spacing: 0.06em; }
+.usd-equiv.row-val[data-mask]::after { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.usd-equiv.row-val[data-mask] { display: block; }
+/* children with their own font-size (.acard .vl b/small) would escape the font-size:0 mask */
+html:not([data-show-portfolio="1"]) .row-val[data-mask="portfolio"] > * { display: none; }
 .acard .vl { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: left; white-space: nowrap; }
 .acard .vl b { font-size: 15.5px; font-weight: 700; }
 .acard .vl small { font-size: 12px; color: var(--text-muted); }

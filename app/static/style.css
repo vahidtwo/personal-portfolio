@@ -2264,6 +2264,12 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 html:not([data-show-portfolio="1"]) .row-val[data-mask="portfolio"] > * { display: none; }
 /* share % masked with the other row amounts */
 .share-val[data-mask]::after { font-size: 12px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.06em; }
+/* hide-amounts: no proportions either. CSS-only, so the existing toggle restores everything without a reload.
+   Share bars become empty tracks; the donut canvas is hidden behind a plain neutral ring (no slices, no tooltip). */
+html:not([data-show-portfolio="1"]) .share-bar i,
+html:not([data-show-portfolio="1"]) .acard .line i { visibility: hidden; }
+html:not([data-show-portfolio="1"]) .donut-wrap canvas { visibility: hidden; }
+html:not([data-show-portfolio="1"]) .donut-wrap::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 25px solid var(--border-subtle); }
 .acard .vl { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: left; white-space: nowrap; }
 .acard .vl b { font-size: 15.5px; font-weight: 700; }
 .acard .vl small { font-size: 12px; color: var(--text-muted); }

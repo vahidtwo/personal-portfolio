@@ -60,3 +60,16 @@ def test_share_percent_masked_unit_price_not(client, no_network):
     # «قیمت واحد» stays visible: its cell has no mask
     assert re.search(r'<td class="num muted">[^<]+</td>', tbody)
     assert ".share-val[data-mask]::after {" in CSS
+
+
+def test_allocation_legend_bars_and_donut_neutral_when_hidden(client, no_network):
+    html, _ = _cards(client)
+    legend = html[html.index('class="donut-legend"'):]
+    legend = legend[:legend.index("</ul>")]
+    assert legend.count("<li>") == legend.count('<span class="muted share-val" data-mask="portfolio" data-share>') == 3
+    hid = 'html:not([data-show-portfolio="1"])'
+    assert f"{hid} .share-bar i,\n{hid} .acard .line i {{ visibility: hidden; }}" in CSS
+    assert f"{hid} .donut-wrap canvas {{ visibility: hidden; }}" in CSS
+    assert f"{hid} .donut-wrap::before {{" in CSS
+    # restored by the same attribute the toggle flips, no reload: nothing masked in JS
+    assert "data-show-portfolio" not in (Path(__file__).resolve().parents[1] / "app" / "static" / "dashboard.js").read_text(encoding="utf-8")

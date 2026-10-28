@@ -251,7 +251,7 @@
   </div>
   <ul class="donut-legend">
     {% for sl in pie_slices %}
-    <li><span><span class="sw" style="background:{{ sl.color }}"></span>{{ sl.label }}</span><span class="muted">{{ sl.share_label }}٪</span></li>
+    <li><span><span class="sw" style="background:{{ sl.color }}"></span>{{ sl.label }}</span><span class="muted share-val" data-mask="portfolio" data-share>{{ sl.share_label }}٪</span></li>
     {% endfor %}
   </ul>
   {% else %}

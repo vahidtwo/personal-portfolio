@@ -57,11 +57,17 @@ const sandbox = {
 };
 sandbox.self.caches = caches;
 // Fake cookieStore: the readable signed-in marker (scenario.marker / step.marker toggles it).
-// marker: true = default user id, a string = that user id, false = signed out, "1" = old v10 marker.
+// marker: true = default user id, a string = that user id, false = signed out,
+// "1" = old (pre-v11) server: inventory_signed_in=1 but no inventory_page_key.
 let marker = scenario.marker === undefined ? true : scenario.marker;
 const markerValue = () => (marker === true ? DEFAULT_ID : marker);
 if (scenario.cookieStore !== false) {
-  sandbox.self.cookieStore = { async get(name) { return name === "inventory_signed_in" && marker ? { name, value: markerValue() } : null; } };
+  sandbox.self.cookieStore = { async get(name) {
+    if (!marker) return null;
+    if (name === "inventory_signed_in") return { name, value: "1" };
+    if (name === "inventory_page_key" && marker !== "1") return { name, value: markerValue() };
+    return null;
+  } };
 }
 let src = fs.readFileSync(swPath, "utf8")
   .replace(/__STATIC_ASSET_VERSION__/g, "test")

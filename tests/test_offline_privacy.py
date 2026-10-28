@@ -62,9 +62,10 @@ def test_server_sets_and_clears_signed_in_marker(client, no_network):
     _register(client)
     r = client.get("/dashboard")
     m = _marker(r)
-    assert m and m[0].startswith("inventory_signed_in=u") and f"Max-Age={SESSION_MAX_AGE_SECONDS}" in m[0]
+    assert m and m[0].startswith("inventory_signed_in=1;") and f"Max-Age={SESSION_MAX_AGE_SECONDS}" in m[0]
     assert "HttpOnly" not in m[0] and "SameSite=Lax" in m[0]
-    assert __import__("re").fullmatch(r"u[A-Za-z0-9_-]{22}", client.cookies.get("inventory_signed_in"))
+    assert client.cookies.get("inventory_signed_in") == "1"
+    assert __import__("re").fullmatch(r"u[A-Za-z0-9_-]{22}", client.cookies.get("inventory_page_key"))
     assert not _marker(client.get("/static/style.css"))  # static files untouched
     csrf = client.cookies.get("inventory_signed_in") and __import__("re").search(
         r'name="csrf" value="([^"]+)"', client.get("/dashboard").text).group(1)
@@ -73,3 +74,4 @@ def test_server_sets_and_clears_signed_in_marker(client, no_network):
     m = _marker(out)
     assert m and "Max-Age=0" in m[0]
     assert client.cookies.get("inventory_signed_in") is None
+    assert client.cookies.get("inventory_page_key") is None

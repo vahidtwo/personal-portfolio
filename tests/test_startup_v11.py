@@ -95,10 +95,10 @@ def test_pwa_soft_refresh_is_guarded():
 
 def test_server_marker_is_per_user_and_not_the_user_id(client, no_network):
     _register(client, "alice")
-    a = client.cookies.get("inventory_signed_in")
+    a = client.cookies.get("inventory_page_key")
     client.cookies.clear()
     _register(client, "bob")
-    b = client.cookies.get("inventory_signed_in")
+    b = client.cookies.get("inventory_page_key")
     assert re.fullmatch(r"u[A-Za-z0-9_-]{22}", a) and re.fullmatch(r"u[A-Za-z0-9_-]{22}", b) and a != b
     from app.session_marker import marker_value
     assert marker_value("k", 1) == marker_value("k", 1) != marker_value("k", 2) and "1" != marker_value("k", 1)[1:]

@@ -8,10 +8,12 @@ const PAGES_MARK = "-pages-";
 const SESSION_MAX_AGE_MS = Number("__SESSION_MAX_AGE_MS__") || 30 * 24 * 60 * 60 * 1000;
 const CACHED_AT_HEADER = "x-inventory-cached-at";
 // Readable marker the server keeps next to the HttpOnly session cookie (app/session_marker.py): same
-// lifetime, removed on logout/expiry. Its value is a non-secret per-user id ("u" + signed hash of the
-// user id), so a cached page is only ever served to the account that stored it.
+// lifetime, removed on logout/expiry. It stays "1" (the Android SMS sender needs that); v11 adds
+// inventory_page_key, a non-secret per-user id ("u" + signed hash of the user id), so a cached page is
+// only ever served to the account that stored it. Both must be present to use any cached page.
 // No marker (or no way to read it) = no valid session = no cached private page.
 const SESSION_MARKER_COOKIE = "inventory_signed_in";
+const PAGE_KEY_COOKIE = "inventory_page_key";
 const MARKER_ID_RE = /^u[A-Za-z0-9_-]{8,64}$/;
 // A cached dashboard is shown first (fast start) while a fresh copy is fetched in the background.
 // Older than this = too stale to show first: wait for the network (still used as the offline copy).
@@ -20,7 +22,9 @@ const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 async function sessionId() {
   try {
     if (!self.cookieStore || typeof self.cookieStore.get !== "function") return null;
-    const c = await self.cookieStore.get(SESSION_MARKER_COOKIE);
+    const m = await self.cookieStore.get(SESSION_MARKER_COOKIE);
+    if (!m || m.value !== "1") return null;
+    const c = await self.cookieStore.get(PAGE_KEY_COOKIE);
     const v = c && c.value;
     return typeof v === "string" && MARKER_ID_RE.test(v) ? v : null;
   } catch (e) {

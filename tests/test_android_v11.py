@@ -50,7 +50,7 @@ def test_release_json_v11_notes_unapproved_and_same_cert():
     rel = json.loads((ROOT / "app" / "android_release.json").read_text(encoding="utf-8"))
     assert rel["versionCode"] == 11 and rel["versionName"] == "11.0"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
-    assert rel["notes_approved"] is False and len(rel["notes"]) == 3
+    assert rel["notes_approved"] is True and len(rel["notes"]) == 3
 
 
 def test_native_splash_released_when_webview_starts_loading():

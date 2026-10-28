@@ -1,4 +1,4 @@
-"""A readable "signed in" marker (v11: a per-user id) next to the HttpOnly session cookie (batch 1, offline privacy).
+"""A readable "signed in" marker (always «1»; v11 adds a per-user page key cookie) next to the HttpOnly session cookie (batch 1, offline privacy).
 
 The service worker cannot see the HttpOnly session cookie, so offline it could not tell whether a
 session still exists. This marker holds no secret (just «1»), has the same lifetime as the session
@@ -14,6 +14,9 @@ from http.cookies import SimpleCookie
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 MARKER_COOKIE = "inventory_signed_in"
+# v11: separate readable per-user page-cache key. inventory_signed_in stays exactly "1": the installed
+# v10/v11 Android SMS sender (ServerAddress.hasSignedInSession) requires that value.
+PAGE_KEY_COOKIE = "inventory_page_key"
 
 
 def marker_value(secret: str, user_id) -> str:
@@ -45,7 +48,7 @@ class SessionMarkerMiddleware:
             return
         had_marker = False
         for name, value in scope.get("headers", []):
-            if name == b"cookie" and MARKER_COOKIE.encode() in value:
+            if name == b"cookie" and (MARKER_COOKIE.encode() in value or PAGE_KEY_COOKIE.encode() in value):
                 had_marker = True
 
         async def send_wrapper(message: Message) -> None:
@@ -54,21 +57,25 @@ class SessionMarkerMiddleware:
                 user_id = session.get("user_id")
                 cookie = SimpleCookie()
                 if user_id:
-                    cookie[MARKER_COOKIE] = marker_value(self.secret_key, user_id)
-                    cookie[MARKER_COOKIE]["max-age"] = self.max_age
+                    cookie[MARKER_COOKIE] = "1"
+                    cookie[PAGE_KEY_COOKIE] = marker_value(self.secret_key, user_id)
+                    for name in (MARKER_COOKIE, PAGE_KEY_COOKIE):
+                        cookie[name]["max-age"] = self.max_age
                 elif had_marker:
-                    cookie[MARKER_COOKIE] = ""
-                    cookie[MARKER_COOKIE]["max-age"] = 0
-                    cookie[MARKER_COOKIE]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
-                if MARKER_COOKIE in cookie:
-                    morsel = cookie[MARKER_COOKIE]
-                    morsel["path"] = "/"
-                    morsel["samesite"] = "Lax"
-                    if self.https_only:
-                        morsel["secure"] = True
-                    headers = list(message.get("headers", []))
-                    headers.append((b"set-cookie", morsel.OutputString().encode("latin-1")))
-                    message["headers"] = headers
+                    for name in (MARKER_COOKIE, PAGE_KEY_COOKIE):
+                        cookie[name] = ""
+                        cookie[name]["max-age"] = 0
+                        cookie[name]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
+                headers = list(message.get("headers", []))
+                for name in (MARKER_COOKIE, PAGE_KEY_COOKIE):
+                    if name in cookie:
+                        morsel = cookie[name]
+                        morsel["path"] = "/"
+                        morsel["samesite"] = "Lax"
+                        if self.https_only:
+                            morsel["secure"] = True
+                        headers.append((b"set-cookie", morsel.OutputString().encode("latin-1")))
+                message["headers"] = headers
             await send(message)
 
         await self.app(scope, receive, send_wrapper)

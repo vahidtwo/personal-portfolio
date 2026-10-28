@@ -1909,7 +1909,7 @@ input:focus {
   --main-nav-desk-border: var(--border-subtle);
   --avatar-size: 36px;
   --avatar-fg: #04120e;
-  --avatar-bg: linear-gradient(135deg, var(--accent), #5ad4f0 55%, var(--accent-violet));
+  --avatar-bg: #3ee0b8; /* logo B: flat teal, ink text 11.44:1; retired violet/cyan gradient */
   --main-nav-desk-shift: -49px;
   --page-extra-bottom: 0px; /* a future sticky bar (e.g. unsaved changes on assets) adds its height here */
 }

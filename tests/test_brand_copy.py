@@ -73,7 +73,11 @@ def test_protected_items_unchanged():
     assert 'portfolio: "privacy-portfolio"' in (ROOT / "app/static/privacy.js").read_text(encoding="utf-8")
     assert 'getItem("privacy-portfolio")' in (ROOT / "app/templates/base.html").read_text(encoding="utf-8")
     # Android: host + package id; APK file name / URL
-    assert 'DEFAULT = "https://portfolio.vahidtwo.ir"' in (
+    # v9 moved the default to daraiito.ir on purpose; the old host stays known (migration + allowed set)
+    assert 'DEFAULT = "https://daraiito.ir"' in (
+        ROOT / "android/app/src/main/java/app/myinventory/ServerAddress.kt"
+    ).read_text(encoding="utf-8")
+    assert 'OLD_DEFAULT = "https://portfolio.vahidtwo.ir"' in (
         ROOT / "android/app/src/main/java/app/myinventory/ServerAddress.kt"
     ).read_text(encoding="utf-8")
     gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")

@@ -35,12 +35,13 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         thread {
             try {
                 val note = SmsKeywords.cleanNote(body)
-                val cookie = readCookie(base)
-                if (cookie.isNullOrBlank()) {
+                // v9: new host cookie first; else the old host's cookie (same backend) until the user logs in again.
+                val target = ServerAddress.smsTarget(base) { readCookie(it) }
+                if (target == null) {
                     notifyError(context, "وارد نشده‌اید — در اپ لاگین کنید")
                     return@thread
                 }
-                val ok = postSpend(base, cookie, amount, note, idem)
+                val ok = postSpend(target.first, target.second, amount, note, idem)
                 if (ok) notifySaved(context, amount) else notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
             } finally {
                 pending.finish()

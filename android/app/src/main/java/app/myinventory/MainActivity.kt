@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
 import androidx.core.view.WindowCompat
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
@@ -163,7 +164,58 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action == ACTION_OPEN_SETUP) {
             openAdvancedSetup()
         } else {
+            startWithHostMove(savedInstanceState)
+        }
+    }
+
+    /**
+     * v9 one-time move: a saved old default host becomes https://daraiito.ir after a quick
+     * /health check. Probe fails -> keep the old host, try again next launch. Custom hosts and
+     * fresh installs skip this. Old-host cookies are kept (rollback + SMS fallback).
+     */
+    private fun startWithHostMove(savedInstanceState: Bundle?) {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val raw = prefs.getString(KEY_URL, "")
+        if (!ServerAddress.shouldMigrate(raw, prefs.getBoolean(KEY_HOST_MIGRATED, false))) {
             restoreOrSetup(savedInstanceState)
+            return
+        }
+        showLoading(true)
+        thread {
+            val ok = HealthProbe.isUp(ServerAddress.DEFAULT)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (ok) {
+                    prefs.edit {
+                        putString(KEY_URL, ServerAddress.DEFAULT)
+                        putBoolean(KEY_HOST_MIGRATED, true)
+                    }
+                    // A restored WebView would reopen the old-host page; start fresh on the new host.
+                    restoreOrSetup(null)
+                } else {
+                    restoreOrSetup(savedInstanceState)
+                }
+            }
+        }
+    }
+
+    /** After the move, a failing new host sends the user back to the old one, once. */
+    private fun maybeFallBackToOldHost(failedUrl: String?) {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        if (!ServerAddress.shouldFallBack(
+                savedBaseUrl(), prefs.getBoolean(KEY_HOST_MIGRATED, false),
+                prefs.getBoolean(KEY_HOST_FALLBACK, false), failedUrl,
+            )
+        ) return
+        thread {
+            if (!HealthProbe.isUp(ServerAddress.OLD_DEFAULT)) return@thread
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                prefs.edit { putBoolean(KEY_HOST_FALLBACK, true) }
+                lastFailedUrl = null
+                errorPending = false
+                loadRemote(ServerAddress.OLD_DEFAULT, "/dashboard")
+            }
         }
     }
 
@@ -240,6 +292,7 @@ class MainActivity : AppCompatActivity() {
         // The saved address is kept on purpose: being offline never wipes it.
         web.stopLoading()
         web.loadUrl(SETUP_ERROR_ASSET)
+        maybeFallBackToOldHost(failedUrl)
     }
 
     private fun retryLast() {
@@ -294,12 +347,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isAllowedRemoteUrl(uri: Uri): Boolean {
-        if (uri.scheme != "https") return false
-        val base = savedBaseUrl() ?: return true
-        val baseHost = runCatching { Uri.parse(base).host }.getOrNull() ?: return false
-        return uri.host == baseHost
-    }
+    private fun isAllowedRemoteUrl(uri: Uri): Boolean =
+        ServerAddress.isAllowedRemote(uri.scheme, uri.host, savedBaseUrl())
 
     /** SMS permission is asked only from SMS settings, when the user turns the switch on. */
     private fun askNotificationPermission() {
@@ -318,6 +367,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val PREFS = "app.myinventory"
         const val KEY_URL = "base_url"
+        const val KEY_HOST_MIGRATED = "host_migrated"
+        const val KEY_HOST_FALLBACK = "host_fallback_done"
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"

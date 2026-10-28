@@ -1,22 +1,39 @@
 const VERSION = "inventory-v__STATIC_ASSET_VERSION__";
 const STATIC_CACHE = VERSION + "-static";
-const PAGE_CACHE = VERSION + "-pages-v2"; // v2: offline copy needs the signed-in marker (batch 1)
+// v3 (v11): one page cache per signed-in user, named by the marker's per-user id (never shared).
+const PAGE_CACHE_PREFIX = VERSION + "-pages-v3-";
+const PAGES_MARK = "-pages-";
 // The offline copy of the dashboard is private data: it must not outlive the session cookie.
 // Each stored copy carries the time it was stored (CACHED_AT_HEADER); older than this = deleted, not served.
 const SESSION_MAX_AGE_MS = Number("__SESSION_MAX_AGE_MS__") || 30 * 24 * 60 * 60 * 1000;
 const CACHED_AT_HEADER = "x-inventory-cached-at";
 // Readable marker the server keeps next to the HttpOnly session cookie (app/session_marker.py): same
-// lifetime, removed on logout/expiry. No marker (or no way to read it) = no valid session = no offline copy.
+// lifetime, removed on logout/expiry. Its value is a non-secret per-user id ("u" + signed hash of the
+// user id), so a cached page is only ever served to the account that stored it.
+// No marker (or no way to read it) = no valid session = no cached private page.
 const SESSION_MARKER_COOKIE = "inventory_signed_in";
+const MARKER_ID_RE = /^u[A-Za-z0-9_-]{8,64}$/;
+// A cached dashboard is shown first (fast start) while a fresh copy is fetched in the background.
+// Older than this = too stale to show first: wait for the network (still used as the offline copy).
+const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+async function sessionId() {
+  try {
+    if (!self.cookieStore || typeof self.cookieStore.get !== "function") return null;
+    const c = await self.cookieStore.get(SESSION_MARKER_COOKIE);
+    const v = c && c.value;
+    return typeof v === "string" && MARKER_ID_RE.test(v) ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 async function hasSessionMarker() {
-  try {
-    if (!self.cookieStore || typeof self.cookieStore.get !== "function") return false;
-    const c = await self.cookieStore.get(SESSION_MARKER_COOKIE);
-    return Boolean(c && c.value === "1");
-  } catch (e) {
-    return false;
-  }
+  return Boolean(await sessionId());
+}
+
+function pageCacheName(id) {
+  return PAGE_CACHE_PREFIX + id;
 }
 
 const PRECACHE = [
@@ -109,9 +126,26 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(keys.filter((key) => !key.startsWith(VERSION)).map((key) => caches.delete(key)))
       )
+      .then(() => enableNavigationPreload())
       .then(() => self.clients.claim())
   );
 });
+
+// Navigation preload: the /dashboard request starts while this worker is still booting (v11 startup).
+async function enableNavigationPreload() {
+  try {
+    if (self.registration && self.registration.navigationPreload) await self.registration.navigationPreload.enable();
+  } catch (e) {}
+}
+
+// The preloaded response if the browser made one, else a normal fetch.
+async function navigationResponse(event) {
+  try {
+    const pre = await event.preloadResponse;
+    if (pre) return pre;
+  } catch (e) {}
+  return fetch(event.request);
+}
 
 function isDashboard(url) {
   if (url.origin !== self.location.origin || url.pathname !== "/dashboard") return false;
@@ -141,8 +175,24 @@ async function networkFirstStatic(request) {
   }
 }
 
-function clearPrivatePages() {
-  return caches.delete(PAGE_CACHE);
+// Every user's cached private pages (logout, 401/403, redirect to login, no session).
+async function clearPrivatePages() {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k.includes(PAGES_MARK)).map((k) => caches.delete(k)));
+}
+
+// Account switch: only the signed-in user's page cache may exist.
+async function dropOtherUsersPages(id) {
+  const keep = pageCacheName(id);
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k.includes(PAGES_MARK) && k !== keep).map((k) => caches.delete(k)));
+}
+
+async function tellClient(clientId, message) {
+  try {
+    const client = clientId && (await self.clients.get(clientId));
+    if (client) client.postMessage(message);
+  } catch (e) {}
 }
 
 // The session is over (or never was): 401/403, or the server sent us to the login page.
@@ -183,22 +233,67 @@ async function freshCachedPage(cache, key, now) {
   return null;
 }
 
-async function networkFirstDashboard(request) {
-  const cache = await caches.open(PAGE_CACHE);
-  let response;
-  try {
-    response = await fetch(request);
-  } catch (err) {
-    if (!(await hasSessionMarker())) {
-      // Offline and no valid session: the private copy is deleted, never shown.
-      await clearPrivatePages();
+function cachedAt(response) {
+  return Number(response.headers.get(CACHED_AT_HEADER)) || 0;
+}
+
+// Stores a good signed-in dashboard response for this user; ends every private copy when the session is over.
+// Returns "stored" | "ended" | "skip".
+async function storeDashboard(request, response, id) {
+  if (isSessionEnd(response) || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    await clearPrivatePages();
+    return "ended";
+  }
+  const type = response.headers.get("content-type") || "";
+  // The account may have changed while the request was in flight: store only under the current id.
+  if (response.ok && type.includes("text/html") && id && (await sessionId()) === id) {
+    const cache = await caches.open(pageCacheName(id));
+    await cache.put(request, await withCachedAt(response, Date.now()));
+    return "stored";
+  }
+  return "skip";
+}
+
+// v11: stale-while-revalidate for the signed-in dashboard. A fresh-enough copy of THIS user's page is shown at
+// once; the network copy (navigation preload) replaces it in the cache, and the page is told so it can refresh
+// quietly (pwa.js) or show it on the next open. No marker = no cache at all (network only, copies deleted).
+async function dashboardNavigation(event) {
+  const request = event.request;
+  const id = await sessionId();
+  if (!id) {
+    await clearPrivatePages();
+    try {
+      return await navigationResponse(event);
+    } catch (err) {
       const offline = await caches.match("/offline.html");
       if (offline) return offline;
       throw err;
     }
-    const now = Date.now();
+  }
+  await dropOtherUsersPages(id);
+  const cache = await caches.open(pageCacheName(id));
+  const now = Date.now();
+  const network = navigationResponse(event);
+  const cached = await freshCachedPage(cache, request, now);
+  if (cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
+    const clientId = event.resultingClientId || event.clientId;
+    event.waitUntil(
+      network
+        .then(async (response) => {
+          const r = await storeDashboard(request, response, id);
+          if (r === "ended") await tellClient(clientId, { type: "inventory-session-ended" });
+          else if (r === "stored") await tellClient(clientId, { type: "inventory-dashboard-refreshed", age: now - cachedAt(cached) });
+        })
+        .catch(() => {})
+    );
+    return cached;
+  }
+  let response;
+  try {
+    response = await network;
+  } catch (err) {
     const page =
-      (await freshCachedPage(cache, request, now)) ||
+      cached ||
       (await freshCachedPage(cache, "/dashboard", now)) ||
       (await freshCachedPage(cache, "/dashboard?tab=daily", now));
     if (page) return page;
@@ -206,16 +301,7 @@ async function networkFirstDashboard(request) {
     if (offline) return offline;
     throw err;
   }
-  // /dashboard only redirects when there is no valid session (to /login). A navigation fetch does not
-  // follow redirects ("opaqueredirect"), so any redirect here also ends the offline copy.
-  if (isSessionEnd(response) || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-    await clearPrivatePages();
-    return response;
-  }
-  const type = response.headers.get("content-type") || "";
-  if (response.ok && type.includes("text/html") && (await hasSessionMarker())) {
-    await cache.put(request, await withCachedAt(response, Date.now()));
-  }
+  await storeDashboard(request, response, id);
   return response;
 }
 
@@ -254,7 +340,7 @@ self.addEventListener("fetch", (event) => {
 
   // Reaching the login page means there is no session (logged out, expired or never logged in).
   if (request.mode === "navigate" && isLoginUrl(url)) {
-    event.respondWith(clearPrivatePages().then(() => fetch(request)).catch(async () => {
+    event.respondWith(clearPrivatePages().then(() => navigationResponse(event)).catch(async () => {
       const offline = await caches.match("/offline.html");
       return offline || Response.error();
     }));
@@ -271,13 +357,13 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate" && isDashboard(url)) {
-    event.respondWith(networkFirstDashboard(request));
+    event.respondWith(dashboardNavigation(event));
     return;
   }
 
   if (request.mode === "navigate" || url.pathname === "/offline.html") {
     event.respondWith(
-      fetch(request)
+      (request.mode === "navigate" ? navigationResponse(event) : fetch(request))
         .then(async (response) => {
           if (isSessionEnd(response)) await clearPrivatePages();
           return response;

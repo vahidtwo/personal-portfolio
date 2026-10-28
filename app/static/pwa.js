@@ -11,6 +11,28 @@
       .catch(function () {});
     // A new version took over. Never reload an open page on its own (it could drop what the user is
     // typing): offer a small refresh button; the next navigation picks the new version up anyway.
+    // v11: the dashboard may be shown from this account's cache first (sw.js). When the fresh copy arrives:
+    // - session over on the server -> go to the login page (the cached copy is already deleted);
+    // - newer copy stored -> reload once, quietly, only if the user has not touched the page yet and the shown
+    //   copy was more than a minute old; otherwise the fresh data shows on the next open.
+    var touched = false;
+    ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (t) {
+      window.addEventListener(t, function () { touched = true; }, { once: true, passive: true, capture: true });
+    });
+    navigator.serviceWorker.addEventListener("message", function (event) {
+      var data = event.data || {};
+      if (data.type === "inventory-session-ended") {
+        window.location.replace("/login");
+        return;
+      }
+      if (data.type !== "inventory-dashboard-refreshed") return;
+      if (touched || !(data.age > 60000) || document.visibilityState !== "visible") return;
+      var last = 0;
+      try { last = Number(sessionStorage.getItem("inventory-soft-refresh")) || 0; } catch (e) {}
+      if (Date.now() - last < 120000) return;
+      try { sessionStorage.setItem("inventory-soft-refresh", String(Date.now())); } catch (e) {}
+      window.location.reload();
+    });
     navigator.serviceWorker.addEventListener("controllerchange", function () {
       if (!hadController) return; // first install, nothing changed on screen
       if (document.getElementById("pwa-update")) return;

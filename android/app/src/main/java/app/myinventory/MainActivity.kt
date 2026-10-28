@@ -10,6 +10,8 @@ import android.net.http.SslError
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
@@ -24,6 +26,7 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import kotlin.concurrent.thread
 
@@ -38,8 +41,13 @@ class MainActivity : AppCompatActivity() {
     /** After a successful retry, drop the error screen from the back stack. */
     private var clearHistoryOnSuccess = false
 
+    /** v11: the launch splash stays until the first page paints (or [StartupGate.SPLASH_MAX_MS]). */
+    private val startup = StartupGate()
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        startup.created(SystemClock.uptimeMillis())
+        installSplashScreen().setKeepOnScreenCondition { startup.keepSplash(SystemClock.uptimeMillis()) }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = Color.parseColor("#050608")
@@ -93,6 +101,12 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageCommitVisible(view: WebView, url: String?) {
                 super.onPageCommitVisible(view, url)
+                // v11: first paint of the new page -> drop the splash/cover now, not at onPageFinished (load).
+                // Not while the hidden old-host /health page is read, and not for a failed page (error screen next).
+                if (StartupGate.revealOnCommit(url, readingOldPrivacy, errorPending)) {
+                    showLoading(false)
+                    startup.firstPaint(SystemClock.uptimeMillis(), url)
+                }
                 // Earliest point after the /auth -> /dashboard redirect: persist the new session cookie before the
                 // page finishes loading, so a force-stop ~1 s after login keeps the user signed in.
                 CookieManager.getInstance().flush()
@@ -154,11 +168,14 @@ class MainActivity : AppCompatActivity() {
                 if (url.startsWith("file:")) {
                     errorPending = false
                     showLoading(false)
+                    startup.firstPaint(SystemClock.uptimeMillis(), url)
                     UpdateNotifier.hideQuietly()
                     return
                 }
                 if (errorPending) return // the error screen is on its way
                 showLoading(false)
+                startup.firstPaint(SystemClock.uptimeMillis(), url)
+                Log.i(StartupGate.TAG, "pageFinished +${SystemClock.uptimeMillis() - startup.createdAt}ms")
                 if (url.startsWith("https://")) {
                     if (clearHistoryOnSuccess) {
                         clearHistoryOnSuccess = false
@@ -453,6 +470,7 @@ class MainActivity : AppCompatActivity() {
         saveBaseUrl(normalized)
         val suffix = if (path.startsWith("/")) path else "/$path"
         showLoading(true)
+        Log.i(StartupGate.TAG, "loadUrl +${SystemClock.uptimeMillis() - startup.createdAt}ms")
         web.loadUrl("$normalized$suffix")
     }
 

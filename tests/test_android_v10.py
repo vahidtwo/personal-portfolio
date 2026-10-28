@@ -10,10 +10,10 @@ MAIN = ROOT / "android/app/src/main/java/app/myinventory/MainActivity.kt"
 
 def test_version_10():
     gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
-    assert "?.toInt() ?: 10" in gradle and '?: "10.0"' in gradle
+    assert __import__("re").search(r'\?\.toInt\(\) \?: 1\d\b', gradle)  # v10 or later (v11)
     assert 'applicationId = "app.myinventory"' in gradle
     rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
-    assert rel["versionCode"] == 10 and rel["versionName"] == "10.0"
+    assert rel["versionCode"] >= 10
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
     assert rel["notes"] and all(isinstance(n, str) and n for n in rel["notes"])
 

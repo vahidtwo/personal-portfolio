@@ -18,7 +18,7 @@ function makeCaches() {
         async match(k) { const r = m.get(keyOf(k)); return r ? r.clone() : undefined; },
         async put(k, r) { m.set(keyOf(k), r.clone()); },
         async delete(k) { return m.delete(keyOf(k)); },
-        async add() {},
+        async add() { adding++; maxAdding = Math.max(maxAdding, adding); await new Promise((r) => setTimeout(r, 1)); adding--; added++; },
         _keys: () => [...m.keys()],
       });
     }
@@ -36,7 +36,11 @@ function makeCaches() {
 
 const listeners = {};
 const messages = [];
-let preloadCalls = 0; // must stay 0: the SW must never touch navigationPreload
+let preloadCalls = 0; // enable/setHeaderValue/getState: must stay 0
+let preloadDisables = 0;
+let adding = 0;
+let maxAdding = 0;
+let added = 0;
 const DEFAULT_ID = "uTESTUSERaaaa0001";
 let clock = scenario.start || 1_000_000;
 let network = null; // function(request) -> Response | throws
@@ -47,7 +51,7 @@ const sandbox = {
     addEventListener: (t, f) => (listeners[t] = f),
     skipWaiting() {},
     clients: { claim() {}, async get(id) { return { postMessage: (m) => messages.push({ to: id, ...m }) }; } },
-    registration: { navigationPreload: { async enable() { preloadCalls++; }, async disable() { preloadCalls++; }, async setHeaderValue() { preloadCalls++; }, async getState() { preloadCalls++; return {}; } } },
+    registration: { navigationPreload: { async enable() { preloadCalls++; }, async disable() { preloadDisables++; }, async setHeaderValue() { preloadCalls++; }, async getState() { preloadCalls++; return {}; } } },
   },
   caches,
   fetch: async (req) => { if (!network) throw new TypeError("offline"); return network(req); },
@@ -114,6 +118,7 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
     if (step.online === "redirect-login") network = () => html("<p>login</p>", 200, { redirected: true, url: "https://app.test/login" });
     if (step.online === "opaqueredirect") network = () => { const r = new Response(null, { status: 200 }); Object.defineProperty(r, "type", { value: "opaqueredirect" }); Object.defineProperty(r, "status", { value: 0 }); return r; };
     if (step.online === "login-page") network = () => html("<p>login</p>");
+    if (step.install) { let ip; listeners.install({ waitUntil: (p) => (ip = p) }); await ip; }
     if (step.activate) { let ap; listeners.activate({ waitUntil: (p) => (ap = p) }); await ap; }
     if (step.offline_html) await (await caches.open("inventory-vtest-static")).put("/offline.html", html("<p>offline page</p>"));
     if (step.go) {
@@ -121,6 +126,6 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
       out.push({ go: step.go, ...r, pages: await pageKeys(), stores: pageStores(), messages: messages.splice(0) });
     }
   }
-  out.push({ preloadCalls });
+  out.push({ preloadCalls, preloadDisables, maxAdding, added });
   console.log(JSON.stringify(out));
 })();

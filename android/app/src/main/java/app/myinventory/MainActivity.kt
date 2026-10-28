@@ -91,6 +91,13 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
+            override fun onPageCommitVisible(view: WebView, url: String?) {
+                super.onPageCommitVisible(view, url)
+                // Earliest point after the /auth -> /dashboard redirect: persist the new session cookie before the
+                // page finishes loading, so a force-stop ~1 s after login keeps the user signed in.
+                CookieManager.getInstance().flush()
+            }
+
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 if (url != null && url.startsWith("https://")) showLoading(true)
@@ -368,6 +375,11 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         // Persist the login cookie so reopening the app keeps the session.
+        CookieManager.getInstance().flush()
+    }
+
+    override fun onStop() {
+        super.onStop()
         CookieManager.getInstance().flush()
     }
 

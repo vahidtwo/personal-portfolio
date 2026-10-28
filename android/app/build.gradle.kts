@@ -23,8 +23,8 @@ android {
         minSdk = 26
         targetSdk = 34
         // QA-only overrides (e.g. the throwaway v7 test APK): -PversionCodeOverride=7 -PversionNameOverride=7.0-test
-        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 9
-        versionName = (project.findProperty("versionNameOverride") as String?) ?: "9.0"
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 10
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "10.0"
         // Release: the update check uses the saved server address, https only.
         buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
         buildConfigField("String", "UPDATE_HTTP_HOST", "\"\"")
@@ -104,6 +104,11 @@ tasks.register("syncWebAssets") {
         style.copyTo(assetWwwDir.resolve("style.css"), overwrite = true)
         theme.copyTo(assetWwwDir.resolve("theme.js"), overwrite = true)
         logo.copyTo(assetWwwDir.resolve("logo.svg"), overwrite = true)
+        // Brand symbol for setup.html (same files as the web header)
+        assetWwwDir.resolve("brand").mkdirs()
+        listOf("daraiito-symbol-dark.svg", "daraiito-symbol-light.svg").forEach { n ->
+            webStaticDir.resolve("brand/$n").copyTo(assetWwwDir.resolve("brand/$n"), overwrite = true)
+        }
         val fonts = webStaticDir.resolve("fonts")
         if (fonts.isDirectory) {
             fonts.listFiles()?.filter { it.isFile }?.forEach { font ->

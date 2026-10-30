@@ -29,7 +29,6 @@ object WebNav {
     const val PILL_H_DP = 32
     const val ICON_DP = 22
     const val LABEL_LINE_SP = 14.4f
-    const val LABEL_LIFT_DP = 1.8f
     const val LABEL_SP = 12f
     const val GAP_DP = 3
 
@@ -91,4 +90,8 @@ object WebNav {
             canvas.restore()
         }
     }
+
+    /** Native bar (94%) composited over the page background: what the web bar shows in the inset area. */
+    fun systemBarColor(dark: Boolean): Int = if (dark) 0xFF080A0F.toInt() else 0xFFFEFEFF.toInt()
 }
+

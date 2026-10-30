@@ -17,15 +17,19 @@ import javax.crypto.spec.GCMParameterSpec
 
 /**
  * SMS spends that arrived while signed out. Kept in app-private storage, encrypted with an
- * AndroidKeyStore AES-GCM key, until a login succeeds; then sent to whichever account is signed in.
- * Only amount, masked note, idempotency key and time are stored (the raw SMS stays in SmsLog).
+ * AndroidKeyStore AES-GCM key. Each entry is bound to the username that was signed in last; after a login
+ * only that user's entries are sent, others stay queued for their owner. Entries expire after [MAX_AGE_DAYS].
+ * Logout does not clear the queue (spends that arrive after logout are the point).
+ * Only amount, masked note, idempotency key, time and username are stored (the raw SMS stays in SmsLog).
  */
 object SmsQueue {
-    data class Entry(val amountToman: String, val note: String, val idem: String, val at: Long)
+    data class Entry(val amountToman: String, val note: String, val idem: String, val at: Long, val user: String)
 
     enum class Result { DONE, KEEP_AND_STOP, KEEP, DROP }
 
     const val MAX_ENTRIES = 500
+    const val MAX_AGE_DAYS = 7
+    private const val DAY_MS = 24L * 60 * 60 * 1000
     private const val TAG = "SmsQueue"
     private const val FILE = "sms-queue.bin"
     private const val KEY_ALIAS = "sms-queue-key"
@@ -34,18 +38,30 @@ object SmsQueue {
     // ---- pure logic (unit-tested) ----
 
     fun encode(entries: List<Entry>): String = JSONArray().apply {
-        entries.forEach { put(JSONObject().put("a", it.amountToman).put("n", it.note).put("k", it.idem).put("t", it.at)) }
+        entries.forEach { put(JSONObject().put("a", it.amountToman).put("n", it.note).put("k", it.idem).put("t", it.at).put("u", it.user)) }
     }.toString()
 
     fun decode(text: String): List<Entry> = runCatching {
         val arr = JSONArray(text)
         (0 until arr.length()).map { arr.getJSONObject(it) }
-            .map { Entry(it.getString("a"), it.optString("n"), it.getString("k"), it.getLong("t")) }
+            .map { Entry(it.getString("a"), it.optString("n"), it.getString("k"), it.getLong("t"), it.optString("u")) }
     }.getOrDefault(emptyList())
 
     /** Adds an entry unless its key is already queued; oldest entries fall off past [MAX_ENTRIES]. */
     fun added(entries: List<Entry>, e: Entry): List<Entry> =
         if (entries.any { it.idem == e.idem }) entries else (entries + e).takeLast(MAX_ENTRIES)
+
+    fun normalizeUser(name: String?): String = name.orEmpty().trim().lowercase()
+
+    fun expired(e: Entry, now: Long): Boolean = now - e.at > MAX_AGE_DAYS * DAY_MS
+
+    /** Entries to send for [user] now, and the ones to keep (other users, not yet expired). Expired ones are dropped. */
+    fun split(entries: List<Entry>, user: String, now: Long): Pair<List<Entry>, List<Entry>> {
+        val live = entries.filterNot { expired(it, now) }
+        val u = normalizeUser(user)
+        val mine = if (u.isEmpty()) emptyList() else live.filter { normalizeUser(it.user) == u }
+        return mine to live.filterNot { it in mine }
+    }
 
     /** 2xx saved (or duplicate), 401/403 still signed out, 4xx bad entry, else retry later. */
     fun classify(code: Int?): Result = when {
@@ -120,11 +136,12 @@ object SmsQueue {
      * Sends queued entries with the signed-in session; call off the main thread.
      * Returns how many were saved. Same idempotency key as the live path, so the server dedupes.
      */
-    fun flush(context: Context, base: String, cookie: String): Int = synchronized(lock) {
-        var left = load(context)
-        if (left.isEmpty()) return 0
+    fun flush(context: Context, base: String, cookie: String, user: String, now: Long = System.currentTimeMillis()): Int = synchronized(lock) {
+        val all = load(context)
+        if (all.isEmpty()) return 0
+        val (left, others) = split(all, user, now)
         var saved = 0
-        val keep = mutableListOf<Entry>()
+        val keep = others.toMutableList()
         for ((i, e) in left.withIndex()) {
             val code = runCatching { post(base, cookie, payload(e)) }.getOrNull()
             when (classify(code)) {
@@ -134,8 +151,7 @@ object SmsQueue {
                 Result.KEEP_AND_STOP -> { keep += left.subList(i, left.size); break }
             }
         }
-        left = keep
-        runCatching { save(context, left) }.onFailure { Log.w(TAG, "save failed", it) }
+        runCatching { save(context, keep) }.onFailure { Log.w(TAG, "save failed", it) }
         saved
     }
 }

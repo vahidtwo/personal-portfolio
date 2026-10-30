@@ -453,7 +453,7 @@ async def profile_delete_spend(
     return RedirectResponse(target, status_code=303)
 
 
-SMS_QUEUE_MAX_AGE_DAYS = 30
+SMS_QUEUE_MAX_AGE_DAYS = 7
 
 
 def sms_spent_on(sms_at, today):

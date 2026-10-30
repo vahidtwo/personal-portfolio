@@ -426,6 +426,7 @@ class HomeActivity : AppCompatActivity() {
             "ok" -> {
                 step = "a"
                 getSystemService(android.view.autofill.AutofillManager::class.java)?.commit()
+                SmsReceiver.rememberUser(this, res.optString("username"))
                 showHome()
                 SmsReceiver.flushQueued(this)
             }
@@ -705,7 +706,10 @@ class HomeActivity : AppCompatActivity() {
         for (item in WebNav.ITEMS) {
             val active = item.key == "home"
             val col = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                // Same stack as the web: pill + gap + a 14.4sp line box, centred in the 56dp item.
+                setPadding(0, ((dp(WebNav.HEIGHT_DP) - dp(WebNav.PILL_H_DP) - dp(WebNav.GAP_DP) - labelLinePx()) / 2), 0, 0)
+                clipChildren = false
                 minimumHeight = dp(44); isClickable = true; isFocusable = true
                 contentDescription = item.full; isSelected = active
                 if (active) ViewCompat.setStateDescription(this, "صفحهٔ فعلی")
@@ -726,15 +730,25 @@ class HomeActivity : AppCompatActivity() {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 includeFontPadding = false
                 typeface = if (active) bold else (medium ?: regular)
-                // Vazirmatn sits lower in a TextView than in the browser line box; lift to the web baseline.
-                translationY = -WebNav.LABEL_LIFT_DP * resources.displayMetrics.density
-                gravity = Gravity.CENTER
-            }, LinearLayout.LayoutParams(-2, TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, WebNav.LABEL_LINE_SP, resources.displayMetrics).toInt())
-                .apply { topMargin = dp(WebNav.GAP_DP) })
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = labelTopMargin() })
             bar.addView(col, LinearLayout.LayoutParams(0, dp(WebNav.HEIGHT_DP), 1f))
         }
+        bar.clipChildren = false
         bar.setPadding(dp(4), 0, dp(4), 0)
         return bar
+    }
+
+    private fun labelLinePx(): Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, WebNav.LABEL_LINE_SP, resources.displayMetrics).toInt()
+
+    /** The label wraps its glyphs (no clipping); centre them on the web 14.4sp line box below the 3dp gap. */
+    private fun labelTopMargin(): Int {
+        val p = android.graphics.Paint().apply {
+            typeface = medium ?: regular
+            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, WebNav.LABEL_SP, resources.displayMetrics)
+        }
+        val fm = p.fontMetrics
+        return dp(WebNav.GAP_DP) + ((labelLinePx() - (fm.descent - fm.ascent)) / 2).toInt()
     }
 
     private fun openWeb(path: String) {

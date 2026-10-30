@@ -33,7 +33,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         val note = spend.note
         val pending = goAsync()
         val idem = sha256("$sender|$body")
-        val entry = SmsQueue.Entry(amount, note, idem, System.currentTimeMillis())
+        val entry = SmsQueue.Entry(amount, note, idem, System.currentTimeMillis(), prefs.getString(KEY_LAST_USER, "") ?: "")
         thread {
             try {
                 runCatching { SmsLog.append(context, SmsLog.Entry(System.currentTimeMillis(), sender, body)) }
@@ -73,6 +73,25 @@ class SmsReceiver : android.content.BroadcastReceiver() {
     companion object {
         private const val TAG = "SmsReceiver"
         const val KEY_LOGIN_NEEDED = "sms_login_needed"
+        /** Username signed in last; queued SMS spends are bound to it. Kept across logout on purpose. */
+        const val KEY_LAST_USER = "sms_last_user"
+
+        fun rememberUser(context: Context, username: String?) {
+            val u = SmsQueue.normalizeUser(username)
+            if (u.isNotEmpty()) context.applicationContext.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_USER, u).apply()
+        }
+
+        /** Username of the session behind [cookie] (GET /api/auth/session), or null if unknown. */
+        private fun sessionUser(base: String, cookie: String): String? = runCatching {
+            val c = (java.net.URL("$base/api/auth/session").openConnection() as java.net.HttpURLConnection)
+            c.instanceFollowRedirects = false; c.connectTimeout = 15000; c.readTimeout = 15000
+            c.setRequestProperty("Cookie", cookie)
+            try {
+                if (c.responseCode != 200) null
+                else org.json.JSONObject(c.inputStream.bufferedReader().readText()).optString("username").takeIf { it.isNotBlank() }
+            } finally { c.disconnect() }
+        }.getOrNull()
         const val LOGIN_MESSAGE = "وارد نشده‌اید — خرج بعد از ورود ذخیره می‌شود"
 
         /** Sends spends queued while signed out, if a session exists now. Safe to call often. */
@@ -85,7 +104,9 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                     val base = (prefs.getString(MainActivity.KEY_URL, "") ?: "").trimEnd('/')
                     if (base.isEmpty()) return@thread
                     val target = ServerAddress.smsTarget(base) { readCookieOnMain(it) } ?: return@thread
-                    val saved = SmsQueue.flush(app, target.first, target.second)
+                    val user = sessionUser(target.first, target.second) ?: return@thread
+                    rememberUser(app, user)
+                    val saved = SmsQueue.flush(app, target.first, target.second, user)
                     Log.i(TAG, "sms: flushed $saved")
                     if (saved > 0) {
                         prefs.edit().putBoolean(KEY_LOGIN_NEEDED, false).apply()

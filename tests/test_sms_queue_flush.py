@@ -56,7 +56,8 @@ def test_sms_spent_on_bounds():
     assert sms_spent_on("junk", today) == today
     assert sms_spent_on(noon(date(2026, 10, 28)), today) == date(2026, 10, 28)
     assert sms_spent_on(noon(date(2026, 11, 2)), today) == today  # future
-    assert sms_spent_on(noon(date(2026, 9, 1)), today) == today  # older than 30 days
+    assert sms_spent_on(noon(date(2026, 10, 22)), today) == today  # older than 7 days
+    assert sms_spent_on(noon(date(2026, 10, 23)), today) == date(2026, 10, 23)  # 7 days kept
 
 
 def test_android_queue_is_private_and_flushed_after_login():
@@ -71,3 +72,17 @@ def test_android_queue_is_private_and_flushed_after_login():
     home = (src / "HomeActivity.kt").read_text(encoding="utf-8")
     assert home.count("SmsReceiver.flushQueued(this)") >= 2
     assert "SmsReceiver.flushQueued(this)" in (src / "MainActivity.kt").read_text(encoding="utf-8")
+
+
+def test_android_queue_bound_to_last_user_and_not_cleared_on_logout():
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "android/app/src/main/java/app/myinventory"
+    q = (src / "SmsQueue.kt").read_text(encoding="utf-8")
+    assert "MAX_AGE_DAYS = 7" in q and "fun split(" in q
+    r = (src / "SmsReceiver.kt").read_text(encoding="utf-8")
+    assert "KEY_LAST_USER" in r and "/api/auth/session" in r and "SmsQueue.flush(app, target.first, target.second, user)" in r
+    home = (src / "HomeActivity.kt").read_text(encoding="utf-8")
+    sign_out = home[home.index("private fun signOutLocal("):]
+    sign_out = sign_out[: sign_out.index("\n    }\n")]
+    assert "SmsQueue" not in sign_out and "KEY_LAST_USER" not in sign_out

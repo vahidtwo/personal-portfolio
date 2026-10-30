@@ -12,9 +12,6 @@ import android.webkit.CookieManager
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 import kotlin.concurrent.thread
 
@@ -36,6 +33,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         val note = spend.note
         val pending = goAsync()
         val idem = sha256("$sender|$body")
+        val entry = SmsQueue.Entry(amount, note, idem, System.currentTimeMillis())
         thread {
             try {
                 runCatching { SmsLog.append(context, SmsLog.Entry(System.currentTimeMillis(), sender, body)) }
@@ -46,7 +44,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                     Log.i(TAG, "sms: no signed-in session")
                     ServerAddress.SmsOutcome.LOGIN_NEEDED
                 } else {
-                    val code = runCatching { postSpend(target.first, target.second, amount, note, idem) }
+                    val code = runCatching { SmsQueue.post(target.first, target.second, SmsQueue.payload(entry)) }
                         .onFailure { Log.w(TAG, "sms: post failed", it) }.getOrNull()
                     Log.i(TAG, "sms: post code=$code")
                     ServerAddress.smsOutcome(code)
@@ -54,9 +52,11 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                 when (outcome) {
                     ServerAddress.SmsOutcome.SAVED -> notifySaved(context, amount)
                     ServerAddress.SmsOutcome.LOGIN_NEEDED -> {
+                        // Kept (encrypted, app-private) until a login succeeds, then sent with the same key.
+                        runCatching { SmsQueue.add(context, entry) }.onFailure { Log.w(TAG, "sms: queue failed", it) }
                         // Shown in the app on next open too, in case notifications are off.
                         prefs.edit().putBoolean(KEY_LOGIN_NEEDED, true).apply()
-                        notifyError(context, LOGIN_MESSAGE)
+                        notify(context, "خرج پیامک", LOGIN_MESSAGE, HomeActivity::class.java)
                     }
                     ServerAddress.SmsOutcome.FAILED -> notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
                 }
@@ -73,7 +73,62 @@ class SmsReceiver : android.content.BroadcastReceiver() {
     companion object {
         private const val TAG = "SmsReceiver"
         const val KEY_LOGIN_NEEDED = "sms_login_needed"
-        const val LOGIN_MESSAGE = "وارد نشده‌اید — در اپ لاگین کنید"
+        const val LOGIN_MESSAGE = "وارد نشده‌اید — خرج بعد از ورود ذخیره می‌شود"
+
+        /** Sends spends queued while signed out, if a session exists now. Safe to call often. */
+        fun flushQueued(context: Context) {
+            val app = context.applicationContext
+            thread {
+                runCatching {
+                    if (SmsQueue.size(app) == 0) return@thread
+                    val prefs = app.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                    val base = (prefs.getString(MainActivity.KEY_URL, "") ?: "").trimEnd('/')
+                    if (base.isEmpty()) return@thread
+                    val target = ServerAddress.smsTarget(base) { readCookieOnMain(it) } ?: return@thread
+                    val saved = SmsQueue.flush(app, target.first, target.second)
+                    Log.i(TAG, "sms: flushed $saved")
+                    if (saved > 0) {
+                        prefs.edit().putBoolean(KEY_LOGIN_NEEDED, false).apply()
+                        notify(app, "خرج‌های پیامکی ذخیره شد", "$saved خرج بعد از ورود ذخیره شد", null)
+                    }
+                }.onFailure { Log.w(TAG, "sms: flush failed", it) }
+            }
+        }
+
+        private fun readCookieOnMain(base: String): String? {
+            if (Looper.myLooper() == Looper.getMainLooper()) return CookieManager.getInstance().getCookie(base)
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var cookie: String? = null
+            Handler(Looper.getMainLooper()).post {
+                cookie = CookieManager.getInstance().getCookie(base)
+                latch.countDown()
+            }
+            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            return cookie
+        }
+
+        internal fun notify(context: Context, title: String, text: String, tap: Class<*>?) {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) return
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= 26) {
+                manager.createNotificationChannel(
+                    NotificationChannel("sms-spend", "خرج پیامک", NotificationManager.IMPORTANCE_DEFAULT)
+                )
+            }
+            val b = NotificationCompat.Builder(context, "sms-spend")
+                .setSmallIcon(android.R.drawable.stat_notify_more)
+                .setContentTitle(title).setContentText(text).setAutoCancel(true)
+            if (tap != null) {
+                val pi = android.app.PendingIntent.getActivity(context, 0,
+                    android.content.Intent(context, tap).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+                b.setContentIntent(pi)
+            }
+            manager.notify(text.hashCode(), b.build())
+        }
     }
 
     private fun readCookie(base: String): String? {
@@ -92,25 +147,6 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-
-    private fun postSpend(base: String, cookie: String, amount: String, note: String, idem: String): Int {
-        val connection = (URL("$base/api/sms-spend").openConnection() as HttpURLConnection)
-        connection.requestMethod = "POST"
-        connection.instanceFollowRedirects = false
-        connection.doOutput = true
-        connection.connectTimeout = 15000
-        connection.readTimeout = 15000
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Cookie", cookie)
-        val payload = JSONObject()
-        payload.put("amount_toman", amount)
-        payload.put("note", note)
-        payload.put("idempotency_key", idem)
-        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-        val code = connection.responseCode
-        connection.disconnect()
-        return code
-    }
 
     private fun notifySaved(context: Context, amount: String) {
         if (Build.VERSION.SDK_INT >= 33 &&

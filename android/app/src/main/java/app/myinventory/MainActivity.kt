@@ -352,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (!prefs.getBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false)) return
         prefs.edit { putBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false) }
-        Toast.makeText(this, "پیامک خرج ثبت نشد، چون وارد نشده‌اید. لطفاً دوباره وارد شوید.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "پیامک خرج رسید ولی وارد نشده‌اید؛ بعد از ورود خودکار ذخیره می‌شود.", Toast.LENGTH_LONG).show()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -372,6 +372,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         showSmsLoginPromptIfNeeded()
+        SmsReceiver.flushQueued(this)
         UpdateNotifier.onResume(this)
     }
 

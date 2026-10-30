@@ -43,7 +43,7 @@ import kotlin.concurrent.thread
 
 /**
  * Phase 4 launcher: native login (step a/b) and native home with a 5-item bottom nav. The other tabs open
- * MainActivity (WebView) on the same cookie session. Login and home use FLAG_SECURE.
+ * MainActivity (WebView) on the same cookie session. Screenshots are allowed (no FLAG_SECURE since 12.0.1).
  */
 class HomeActivity : AppCompatActivity() {
     private val main = Handler(Looper.getMainLooper())
@@ -55,6 +55,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var cache: HomeCache
     private var regular: Typeface? = null
     private var bold: Typeface? = null
+    private var medium: Typeface? = null
     private var createdAt = 0L
     private var screen = Screen.LOGIN
     private var step = "a"
@@ -93,7 +94,6 @@ class HomeActivity : AppCompatActivity() {
             step = it.getString("step", "a")
             lockEndAt = it.getLong("lock_end_at", 0L)
         }
-        if (BuildConfig.SECURE_SCREENS) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
@@ -109,6 +109,7 @@ class HomeActivity : AppCompatActivity() {
             0xFF4F5869.toInt(), 0xFF08735A.toInt(), 0xFFFFFFFF.toInt(), 0xFFB42318.toInt(), 0xFF8A4A05.toInt(), false)
         regular = runCatching { resources.getFont(R.font.vazirmatn) }.getOrNull()
         bold = runCatching { resources.getFont(R.font.vazirmatn_bold) }.getOrNull()
+        medium = runCatching { resources.getFont(R.font.vazirmatn_medium) }.getOrNull()
         cache = HomeCache(this)
         getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit { putString(MainActivity.KEY_URL, NativeSession.BASE) }
 
@@ -123,8 +124,8 @@ class HomeActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            nav.setPadding(0, dp(4), 0, bars.bottom)
-            val bottom = if (screen == Screen.HOME) nav.height.coerceAtLeast(dp(72)) + bars.bottom else maxOf(ime.bottom, bars.bottom)
+            nav.setPadding(maxOf(dp(4), bars.left), 0, maxOf(dp(4), bars.right), bars.bottom)
+            val bottom = if (screen == Screen.HOME) dp(WebNav.HEIGHT_DP) + bars.bottom else maxOf(ime.bottom, bars.bottom)
             scroll.setPadding(0, bars.top, 0, bottom)
             imeOpen = ime.bottom > 0
             scroll.post { keepSubmitVisible() }
@@ -151,6 +152,7 @@ class HomeActivity : AppCompatActivity() {
         super.onResume()
         // A web logout (settings tab) clears the shared cookies: drop the native copy too.
         if (screen == Screen.HOME && !NativeSession.signedIn()) signOutLocal()
+        else if (NativeSession.signedIn()) SmsReceiver.flushQueued(this)
     }
 
     override fun onDestroy() {
@@ -425,6 +427,7 @@ class HomeActivity : AppCompatActivity() {
                 step = "a"
                 getSystemService(android.view.autofill.AutofillManager::class.java)?.commit()
                 showHome()
+                SmsReceiver.flushQueued(this)
             }
             "stepb" -> { step = "b"; showLogin() }
             "expired", "taken" -> { step = "a"; typedUsername = res.optString("username", typedUsername); showLogin(res) }
@@ -688,26 +691,49 @@ class HomeActivity : AppCompatActivity() {
     }
 
     // ---------- bottom nav ----------
+    /** Same bar as the web pages below 900px (see WebNav); «خانه» is active and stays on the native home. */
     private fun buildNav(): LinearLayout {
+        val nc = WebNav.colors(c.dark)
         val bar = LinearLayout(this).apply {
-            setBackgroundColor(c.surface); visibility = View.GONE; layoutDirection = View.LAYOUT_DIRECTION_RTL
+            visibility = View.GONE; layoutDirection = View.LAYOUT_DIRECTION_RTL
+            background = android.graphics.drawable.LayerDrawable(arrayOf(
+                android.graphics.drawable.ColorDrawable(nc.bg),
+                android.graphics.drawable.ColorDrawable(nc.border),
+            )).apply { setLayerGravity(1, Gravity.TOP or Gravity.FILL_HORIZONTAL); setLayerHeight(1, dp(1)) }
+            contentDescription = "بخش‌های اصلی"
         }
-        val items = listOf(
-            Triple("خانه", null as String?, "خانه"),
-            Triple("دارایی‌ها", "/assets", "دارایی‌ها"),
-            Triple("خرج‌ها", "/dashboard?tab=daily", "خرج‌ها"),
-            Triple("بدهی‌ها", "/profile?tab=debts", "بدهی‌ها و هزینهٔ ماهانه"),
-            Triple("تنظیمات", "/profile", "تنظیمات"),
-        )
-        for ((label, path, a11y) in items) {
-            val active = path == null
-            val b = text(label, 12f, if (active) c.accent else c.muted, active).apply {
-                gravity = Gravity.CENTER; minHeight = dp(64); contentDescription = a11y
-                if (active) { background = bg(c.surface2, 999); isSelected = true }
-                setOnClickListener { if (path != null) openWeb(path) }
+        for (item in WebNav.ITEMS) {
+            val active = item.key == "home"
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                minimumHeight = dp(44); isClickable = true; isFocusable = true
+                contentDescription = item.full; isSelected = active
+                if (active) ViewCompat.setStateDescription(this, "صفحهٔ فعلی")
+                setOnClickListener { if (active) scroll.smoothScrollTo(0, 0) else openWeb(item.href) }
+                foreground = android.graphics.drawable.StateListDrawable().apply {
+                    addState(intArrayOf(android.R.attr.state_focused),
+                        android.graphics.drawable.InsetDrawable(bg(0, 12).apply { setStroke(dp(2), nc.activeIcon) }, dp(2)))
+                }
             }
-            bar.addView(b, LinearLayout.LayoutParams(0, dp(64), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+            val pill = FrameLayout(this).apply {
+                if (active) background = bg(nc.activeBg, 16).apply { setStroke(dp(1), nc.activeRing) }
+            }
+            pill.addView(WebNav.IconView(this, item.key).apply { color = if (active) nc.activeIcon else nc.fg },
+                FrameLayout.LayoutParams(dp(WebNav.ICON_DP), dp(WebNav.ICON_DP), Gravity.CENTER))
+            col.addView(pill, LinearLayout.LayoutParams(dp(WebNav.PILL_W_DP), dp(WebNav.PILL_H_DP)))
+            col.addView(text(item.label, WebNav.LABEL_SP, if (active) nc.activeFg else nc.fg, active).apply {
+                gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                includeFontPadding = false
+                typeface = if (active) bold else (medium ?: regular)
+                // Vazirmatn sits lower in a TextView than in the browser line box; lift to the web baseline.
+                translationY = -WebNav.LABEL_LIFT_DP * resources.displayMetrics.density
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(-2, TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, WebNav.LABEL_LINE_SP, resources.displayMetrics).toInt())
+                .apply { topMargin = dp(WebNav.GAP_DP) })
+            bar.addView(col, LinearLayout.LayoutParams(0, dp(WebNav.HEIGHT_DP), 1f))
         }
+        bar.setPadding(dp(4), 0, dp(4), 0)
         return bar
     }
 

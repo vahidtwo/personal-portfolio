@@ -1,0 +1,72 @@
+"""Android 12.0.0 (13), Phase 4: native login and home, static checks on the app source."""
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+APP = ROOT / "android" / "app"
+SRC = APP / "src" / "main"
+KT = SRC / "java" / "app" / "myinventory"
+
+
+def _read(p: Path) -> str:
+    return p.read_text(encoding="utf-8")
+
+
+def test_version_13_and_draft_notes():
+    g = _read(APP / "build.gradle.kts")
+    assert "?.toInt() ?: 13" in g and '?: "12.0.0"' in g
+    rel = json.loads(_read(ROOT / "app" / "android_release.json"))
+    assert rel["versionCode"] == 13 and rel["versionName"] == "12.0.0"
+    assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
+    assert rel["notes_approved"] is False and rel["notes"]
+
+
+def test_fixed_origin_and_flags():
+    g = _read(APP / "build.gradle.kts")
+    assert 'buildConfigField("String", "APP_BASE", "\\"https://daraiito.ir\\"")' in g
+    assert 'buildConfigField("boolean", "BIOMETRIC_UNLOCK", "false")' in g
+    assert 'buildConfigField("boolean", "SECURE_SCREENS", "true")' in g
+    assert "val BASE: String = BuildConfig.APP_BASE" in _read(KT / "NativeSession.kt")
+
+
+def test_secure_window_on_login_and_home():
+    home = _read(KT / "HomeActivity.kt")
+    assert "if (BuildConfig.SECURE_SCREENS) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE" in home
+    assert home.index("FLAG_SECURE") < home.index("setContentView(")
+
+
+def test_launcher_is_native_and_setup_is_gone():
+    manifest = _read(SRC / "AndroidManifest.xml")
+    launcher = manifest[: manifest.index("android.intent.category.LAUNCHER")]
+    assert launcher.rindex('android:name=".HomeActivity"') > launcher.rfind('android:name=".MainActivity"')
+    assert 'android:name=".MainActivity"\n            android:exported="false"' in manifest
+    assert "connection_settings" not in _read(SRC / "res" / "xml" / "shortcuts.xml")
+
+
+def test_native_session_shares_webview_cookies():
+    s = _read(KT / "NativeSession.kt")
+    assert "CookieManager.getInstance()" in s
+    assert "X-CSRF-Token" in s
+
+
+def test_logout_clears_native_and_web():
+    home = _read(KT / "HomeActivity.kt")
+    sign_out = home[home.index("private fun signOutLocal("):]
+    sign_out = sign_out[: sign_out.index("\n    }\n")]
+    assert "cache.clear()" in sign_out and "WebPrewarm.stop()" in sign_out
+    assert "NativeSession.clearLocal()" in sign_out
+
+
+def test_prewarm_waits_for_the_home_frame():
+    home = _read(KT / "HomeActivity.kt")
+    assert "WebPrewarm.start(this) }, PREWARM_DELAY_MS)" in home
+
+
+def test_full_vazirmatn_with_license():
+    assert (SRC / "res" / "font" / "vazirmatn.ttf").stat().st_size > 100_000
+    assert (SRC / "res" / "font" / "vazirmatn_bold.ttf").stat().st_size > 100_000
+    assert "SIL OPEN FONT LICENSE" in _read(SRC / "assets" / "licenses" / "vazirmatn-OFL.txt").upper()
+
+
+def test_google_services_json_not_committed():
+    assert not (APP / "google-services.json").exists()

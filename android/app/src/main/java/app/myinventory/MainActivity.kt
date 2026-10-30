@@ -97,6 +97,7 @@ class MainActivity : AppCompatActivity() {
                 if (!request.isForMainFrame) return false
                 val target = request.url ?: return false
                 if (target.scheme == "file") return false
+                if (handOffToNative(target)) return true
                 if (isAllowedRemoteUrl(target)) return false
                 return true
             }
@@ -117,6 +118,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (url != null && handOffToNative(Uri.parse(url))) { view.stopLoading(); return }
                 frameErrors.started(url)
                 if (url != null && url.startsWith("https://")) showLoading(true)
             }
@@ -188,8 +190,9 @@ class MainActivity : AppCompatActivity() {
 
         SmsPrefs.ensureMigrated(this)
         askNotificationPermission()
-        if (intent?.action == ACTION_OPEN_SETUP) {
-            openAdvancedSetup()
+        val tabPath = intent?.getStringExtra(EXTRA_PATH)
+        if (tabPath != null && savedInstanceState == null) {
+            loadRemote(NativeSession.BASE, tabPath)
         } else {
             startWithHostMove(savedInstanceState)
         }
@@ -342,7 +345,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ACTION_OPEN_SETUP) openAdvancedSetup()
     }
 
     /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */
@@ -474,7 +476,7 @@ class MainActivity : AppCompatActivity() {
         val target = lastFailedUrl
             ?: savedBaseUrl()?.let { "$it/dashboard" }
         if (target == null) {
-            web.loadUrl(SETUP_ASSET)
+            loadRemote(NativeSession.BASE, "/dashboard")
             return
         }
         clearHistoryOnSuccess = true
@@ -492,15 +494,29 @@ class MainActivity : AppCompatActivity() {
             if (saved != null && (restoredUrl == null || restoredUrl.startsWith(SETUP_ASSET))) {
                 loadRemote(saved, "/dashboard")
             } else if (restoredUrl == null) {
-                web.loadUrl(SETUP_ASSET)
+                loadRemote(NativeSession.BASE, "/dashboard")
             }
             return
         }
-        if (saved != null) {
-            loadRemote(saved, "/dashboard")
-        } else {
-            web.loadUrl(SETUP_ASSET)
+        loadRemote(saved ?: NativeSession.BASE, "/dashboard")
+    }
+
+    /**
+     * Phase 4: home and login are native. A WebView tab that navigates to the plain home (/dashboard) or to the
+     * sign-in page (after a web logout or an expired session) closes and hands back to [HomeActivity].
+     */
+    private fun handOffToNative(uri: Uri): Boolean {
+        if (uri.host != Uri.parse(NativeSession.BASE).host) return false
+        val path = uri.path.orEmpty().trimEnd('/')
+        val toAuth = path == "/auth" || path == "/login"
+        val toHome = path == "/dashboard" && uri.getQueryParameter("tab") == null
+        if (!toAuth && !toHome) return false
+        if (isFinishing) return true
+        if (toAuth) {
+            startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+        finish()
+        return true
     }
 
     fun loadRemote(base: String, path: String) {
@@ -562,5 +578,6 @@ class MainActivity : AppCompatActivity() {
         private const val SETUP_ADVANCED_ASSET = "$SETUP_ASSET?advanced=1"
         private const val STATE_FAILED_URL = "last_failed_url"
         const val ACTION_OPEN_SETUP = "app.myinventory.OPEN_SETUP"
+        const val EXTRA_PATH = "app.myinventory.PATH"
     }
 }

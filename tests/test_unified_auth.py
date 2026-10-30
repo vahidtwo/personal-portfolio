@@ -66,7 +66,7 @@ def test_password_never_in_url_or_page(client):
 
 def test_existing_user_login_and_generic_error(client):
     assert _signup(client).status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     wrong = _continue(client, "newuser", "wrongpass1")
     assert wrong.status_code == 200 and "نام کاربری یا رمز درست نیست." in wrong.text
     assert 'value="newuser"' in wrong.text and "حساب تازه بسازیم؟" not in wrong.text
@@ -77,7 +77,7 @@ def test_existing_user_login_and_generic_error(client):
 def test_rate_limit_message(client):
     from app import rate_limit
     assert _signup(client).status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     for _ in range(rate_limit.LOGIN_FAILS_PER_USER):
         _continue(client, "newuser", "wrongpass1")
     r = _continue(client, "newuser", "password123")
@@ -87,7 +87,7 @@ def test_rate_limit_message(client):
 def test_unknown_user_takes_bcrypt_time_too(client):
     """Equal timing: an unknown username runs bcrypt like a wrong password (no fast path)."""
     assert _signup(client, "timer1").status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     t = time.perf_counter(); _continue(client, "timer1", "wrongpass1"); known = time.perf_counter() - t
     t = time.perf_counter(); _continue(client, "nobody99", "wrongpass1"); unknown = time.perf_counter() - t
     assert unknown > known * 0.5  # both pay at least one bcrypt (unknown pays dummy + new hash)
@@ -104,5 +104,5 @@ def test_pending_signup_expires(client, monkeypatch):
 
 def test_logout_goes_to_auth(client):
     assert _signup(client).status_code == 303
-    out = client.post("/logout", data={"csrf": _csrf(client, "/dashboard")}, follow_redirects=False)
+    out = client.post("/logout", data={"csrf": _csrf(client, "/profile")}, follow_redirects=False)
     assert out.headers["location"] == "/auth"

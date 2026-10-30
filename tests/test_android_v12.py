@@ -102,3 +102,20 @@ def test_review_fixes_in_home_activity():
     assert 'optString("color")' not in home and "MaskRules.trendColor" in home
     assert "AutofillManager::class.java)?.commit()" in home
     assert "onSaveInstanceState" in home and "announceForAccessibility" in home
+
+
+def test_error_page_fonts_are_bundled_at_build():
+    """error.html loads static/fonts/*.woff2; Gradle copies app/static/fonts into assets/www/static/fonts."""
+    page = _read(SRC / "assets" / "www" / "error.html")
+    gradle = _read(APP / "build.gradle.kts")
+    assert 'resolve("fonts")' in gradle
+    for name in ("vazirmatn-arabic.woff2", "vazirmatn-latin.woff2"):
+        assert f"static/fonts/{name}" in page
+        assert (ROOT / "app" / "static" / "fonts" / name).is_file()
+
+
+def test_locked_button_has_no_alpha():
+    home = _read(KT / "HomeActivity.kt")
+    assert "alpha = 0.6f" not in home
+    assert "bg(c.surface2, 12); button.setTextColor(c.muted)" in home
+    assert "defaultFocusHighlightEnabled = false" in home

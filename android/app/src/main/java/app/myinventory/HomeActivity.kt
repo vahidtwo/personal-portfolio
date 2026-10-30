@@ -198,6 +198,7 @@ class HomeActivity : AppCompatActivity() {
             background = bg(c.surface, 12, col); setPadding(dp(14), dp(12), dp(14), dp(12))
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
             isFocusable = true
+            defaultFocusHighlightEnabled = false
             addView(text(title, 15f, col, true))
             if (sub.isNotEmpty()) addView(text(sub, 14f, c.text), lp(4))
         }
@@ -354,12 +355,16 @@ class HomeActivity : AppCompatActivity() {
 
     private fun startLock(button: Button, seconds: Int) {
         lockEndAt = SystemClock.elapsedRealtime() + seconds * 1000L
+        val label = if (button.isEnabled) button.text.toString() else "ادامه"
         button.isEnabled = false
-        button.alpha = 0.6f
+        // Disabled look without alpha: muted text on surface2 keeps the countdown at 4.5:1 or better.
+        button.background = bg(c.surface2, 12); button.setTextColor(c.muted)
         button.text = Fa.lockedButton(seconds)
         lock = object : CountDownTimer(seconds * 1000L, 1000L) {
             override fun onTick(left: Long) { button.text = Fa.lockedButton((left / 1000).toInt()) }
-            override fun onFinish() { button.isEnabled = true; button.alpha = 1f; button.text = "ادامه" }
+            override fun onFinish() {
+                button.isEnabled = true; button.background = bg(c.accent, 12); button.setTextColor(c.onAccent); button.text = label
+            }
         }.start()
     }
 
@@ -713,7 +718,7 @@ class HomeActivity : AppCompatActivity() {
     companion object {
         private const val PREWARM_DELAY_MS = 1500L
         const val KEY_MASK = "native_mask_net"
-        /** Like web: amounts start hidden until the user taps «نمایش». */
+        /** Amounts start hidden until the user taps «نمایش». Stricter than web, where amounts are shown by default. */
         const val MASK_DEFAULT = true
     }
 }

@@ -39,6 +39,7 @@
         <img class="brand-logo brand-logo-light" src="/static/brand/daraiito-symbol-light.svg" width="36" height="36" alt="">
         <span class="brand-name">دارایی‌تو</span>
       </a>
+      {% if not user %}{% include "partials/theme_button.html" %}{% endif %}
     </div>
   </header>
   <div class="pwa-offline-bar" id="pwa-offline" hidden role="status">

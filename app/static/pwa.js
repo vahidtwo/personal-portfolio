@@ -47,7 +47,6 @@
   }
 
   const installBtn = document.getElementById("pwa-install");
-  const installLanding = document.getElementById("pwa-install-landing");
   const iosHint = document.getElementById("pwa-ios");
   const offlineBanner = document.getElementById("pwa-offline");
   const retryBtn = document.getElementById("pwa-retry");
@@ -58,7 +57,6 @@
 
   function showInstallButtons(show) {
     if (installBtn) installBtn.hidden = !show;
-    if (installLanding) installLanding.hidden = !show;
   }
 
   window.addEventListener("beforeinstallprompt", function (event) {
@@ -78,7 +76,6 @@
   }
 
   if (installBtn) installBtn.addEventListener("click", promptInstall);
-  if (installLanding) installLanding.addEventListener("click", promptInstall);
 
   window.addEventListener("appinstalled", function () {
     deferredPrompt = null;

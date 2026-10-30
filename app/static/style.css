@@ -219,7 +219,6 @@ a:hover { color: var(--accent-hover); }
   text-decoration: none;
   transition: color 0.15s, background 0.15s;
 }
-.install-btn { cursor: pointer; background: transparent; border: 0; font: inherit; color: var(--accent); }
 .pwa-offline-bar {
   position: sticky;
   top: calc(env(safe-area-inset-top) + 56px);
@@ -278,7 +277,7 @@ a:hover { color: var(--accent-hover); }
 .nav-link:focus-visible,
 .chart-tool-btn:focus-visible,
 .privacy-btn:focus-visible,
-.theme-toggle:focus-visible,
+.theme-btn:focus-visible,
 .th-sort:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1495,6 +1494,9 @@ html[data-show-salary="1"] [data-mask="salary"]::after {
 }
 .btn-icon:hover { background: var(--surface-hover); }
 
+.top-inner > .theme-btn { margin-inline-start: auto; }
+.theme-btn { width: 44px; height: 44px; flex-shrink: 0; }
+.settings-row[hidden] { display: none; }
 [data-theme="dark"] .theme-icon-light { display: none; }
 [data-theme="light"] .theme-icon-dark { display: none; }
 

@@ -137,6 +137,7 @@
     <h2 id="v2-app">اپ و اتصال‌ها</h2>
     <div class="v2-rows">
       {% with cls="settings-row v2-row" %}{% include "partials/apk_download.html" %}{% endwith %}
+      <button type="button" class="settings-row v2-row" id="pwa-install" hidden>{{ nav_icon('download') }}<span class="settings-row-label">نصب اپ</span>{{ nav_icon('chev', size='sm') }}</button>
       {% if is_admin %}
       <a class="settings-row v2-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
       {% endif %}

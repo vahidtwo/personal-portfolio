@@ -18,7 +18,8 @@ def test_version_11_and_splash_dependency():
 
 def test_native_splash_theme_with_logo_b():
     manifest = (SRC / "AndroidManifest.xml").read_text(encoding="utf-8")
-    assert 'android:name=".MainActivity"\n            android:exported="true"\n            android:theme="@style/Theme.MyInventory.Starting"' in manifest
+    # Phase 4: the native HomeActivity is the launcher and keeps the same splash theme.
+    assert 'android:name=".HomeActivity"\n            android:exported="true"\n            android:windowSoftInputMode="adjustResize"\n            android:theme="@style/Theme.MyInventory.Starting"' in manifest
     themes = (SRC / "res" / "values" / "themes.xml").read_text(encoding="utf-8")
     assert 'parent="Theme.SplashScreen.IconBackground"' in themes
     assert "@drawable/ic_launcher_foreground" in themes and "@style/Theme.MyInventory</item>" in themes

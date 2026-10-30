@@ -49,7 +49,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         startup.created(SystemClock.uptimeMillis())
-        installSplashScreen().setKeepOnScreenCondition { startup.keepSplash(SystemClock.uptimeMillis()) }
+        // A tab opened from the native home shows the skeleton cover at once instead of holding the window
+        // blank behind the splash condition; the cover still hides at the first paint.
+        val tabLaunch = intent?.getStringExtra(EXTRA_PATH) != null
+        installSplashScreen().setKeepOnScreenCondition { !tabLaunch && startup.keepSplash(SystemClock.uptimeMillis()) }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = Color.parseColor("#050608")
@@ -57,7 +60,17 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         web = findViewById(R.id.web)
         loading = findViewById(R.id.loading)
-        web.setBackgroundColor(Color.parseColor("#050608"))
+        val bgColor = if (isNight()) Color.parseColor("#050608") else Color.parseColor("#EEF1F8")
+        web.setBackgroundColor(bgColor)
+        if (tabLaunch) {
+            window.statusBarColor = bgColor; window.navigationBarColor = bgColor
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !isNight(); isAppearanceLightNavigationBars = !isNight()
+            }
+            findViewById<View>(android.R.id.content).setBackgroundColor(bgColor)
+            LoadingSkeleton.install(loading as android.widget.FrameLayout, isNight())
+            showLoading(true)
+        }
 
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -97,6 +110,7 @@ class MainActivity : AppCompatActivity() {
                 if (!request.isForMainFrame) return false
                 val target = request.url ?: return false
                 if (target.scheme == "file") return false
+                if (handOffToNative(target)) return true
                 if (isAllowedRemoteUrl(target)) return false
                 return true
             }
@@ -117,6 +131,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (url != null && handOffToNative(Uri.parse(url))) { view.stopLoading(); return }
                 frameErrors.started(url)
                 if (url != null && url.startsWith("https://")) showLoading(true)
             }
@@ -188,8 +203,9 @@ class MainActivity : AppCompatActivity() {
 
         SmsPrefs.ensureMigrated(this)
         askNotificationPermission()
-        if (intent?.action == ACTION_OPEN_SETUP) {
-            openAdvancedSetup()
+        val tabPath = intent?.getStringExtra(EXTRA_PATH)
+        if (tabPath != null && savedInstanceState == null) {
+            loadRemote(NativeSession.BASE, tabPath)
         } else {
             startWithHostMove(savedInstanceState)
         }
@@ -342,7 +358,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ACTION_OPEN_SETUP) openAdvancedSetup()
     }
 
     /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */
@@ -405,6 +420,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isNight(): Boolean =
+        (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
     private fun showLoading(show: Boolean) {
         loading.visibility = if (show) View.VISIBLE else View.GONE
     }
@@ -466,19 +485,13 @@ class MainActivity : AppCompatActivity() {
         showLoading(true)
         // The saved address is kept on purpose: being offline never wipes it.
         web.stopLoading()
-        web.loadUrl(SETUP_ERROR_ASSET)
+        web.loadUrl(ERROR_ASSET + "?theme=" + (if (isNight()) "dark" else "light"))
         maybeFallBackToOldHost(failedUrl)
     }
 
     private fun retryLast() {
-        val target = lastFailedUrl
-            ?: savedBaseUrl()?.let { "$it/dashboard" }
-        if (target == null) {
-            web.loadUrl(SETUP_ASSET)
-            return
-        }
         clearHistoryOnSuccess = true
-        web.loadUrl(target)
+        web.loadUrl(retryTarget(lastFailedUrl, NativeSession.BASE))
     }
 
     private fun restoreOrSetup(savedInstanceState: Bundle?) {
@@ -492,15 +505,29 @@ class MainActivity : AppCompatActivity() {
             if (saved != null && (restoredUrl == null || restoredUrl.startsWith(SETUP_ASSET))) {
                 loadRemote(saved, "/dashboard")
             } else if (restoredUrl == null) {
-                web.loadUrl(SETUP_ASSET)
+                loadRemote(NativeSession.BASE, "/dashboard")
             }
             return
         }
-        if (saved != null) {
-            loadRemote(saved, "/dashboard")
-        } else {
-            web.loadUrl(SETUP_ASSET)
+        loadRemote(saved ?: NativeSession.BASE, "/dashboard")
+    }
+
+    /**
+     * Phase 4: home and login are native. A WebView tab that navigates to the plain home (/dashboard) or to the
+     * sign-in page (after a web logout or an expired session) closes and hands back to [HomeActivity].
+     */
+    private fun handOffToNative(uri: Uri): Boolean {
+        if (uri.host != Uri.parse(NativeSession.BASE).host) return false
+        val path = uri.path.orEmpty().trimEnd('/')
+        val toAuth = path == "/auth" || path == "/login"
+        val toHome = path == "/dashboard" && uri.getQueryParameter("tab") == null
+        if (!toAuth && !toHome) return false
+        if (isFinishing) return true
+        if (toAuth) {
+            startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+        finish()
+        return true
     }
 
     fun loadRemote(base: String, path: String) {
@@ -558,9 +585,20 @@ class MainActivity : AppCompatActivity() {
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
-        private const val SETUP_ERROR_ASSET = "$SETUP_ASSET?error=connect"
+        /** Phase 4: retry-only error page (no setup link). */
+        private const val ERROR_ASSET = "file:///android_asset/www/error.html"
         private const val SETUP_ADVANCED_ASSET = "$SETUP_ASSET?advanced=1"
         private const val STATE_FAILED_URL = "last_failed_url"
         const val ACTION_OPEN_SETUP = "app.myinventory.OPEN_SETUP"
+        const val EXTRA_PATH = "app.myinventory.PATH"
+
+        /** «تلاش دوباره» reloads the failed page only when it is on the app's own origin; else the home. */
+        fun retryTarget(failed: String?, base: String): String {
+            val host = runCatching { java.net.URI(base).host }.getOrNull()
+            val ok = failed != null && runCatching { java.net.URI(failed) }.getOrNull()?.let {
+                it.scheme == java.net.URI(base).scheme && it.host == host
+            } == true
+            return if (ok) failed!! else "$base/dashboard"
+        }
     }
 }

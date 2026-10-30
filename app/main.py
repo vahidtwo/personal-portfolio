@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.session_marker import SessionMarkerMiddleware
+from app.native_api import router as native_api_router
 from app.static_gzip import StaticGZipMiddleware
 
 from app.admin_users import router as admin_users_router
@@ -127,6 +128,7 @@ app.include_router(pwa_router)
 app.include_router(push_router)
 app.include_router(auth_router)
 app.include_router(unified_auth_router)
+app.include_router(native_api_router)
 app.include_router(dashboard_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)

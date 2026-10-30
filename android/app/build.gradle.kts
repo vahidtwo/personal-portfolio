@@ -23,11 +23,16 @@ android {
         minSdk = 26
         targetSdk = 34
         // QA-only overrides (e.g. the throwaway v7 test APK): -PversionCodeOverride=7 -PversionNameOverride=7.0-test
-        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 12
-        versionName = (project.findProperty("versionNameOverride") as String?) ?: "11.1.0"
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 13
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "12.0.0"
         // Release: the update check uses the saved server address, https only.
         buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
         buildConfigField("String", "UPDATE_HTTP_HOST", "\"\"")
+        // Biometric unlock (Phase 4 hypothesis) ships later; off until then.
+        buildConfigField("boolean", "BIOMETRIC_UNLOCK", "false")
+        // Native login/home talk to this origin only (no setup screen, no server-settings sheet).
+        buildConfigField("String", "APP_BASE", "\"https://daraiito.ir\"")
+        buildConfigField("boolean", "SECURE_SCREENS", "true")
     }
 
     buildFeatures {
@@ -67,6 +72,11 @@ android {
             val qaBase = (project.findProperty("qaUpdateBaseUrl") as String?) ?: "http://10.0.2.2:8765"
             buildConfigField("String", "UPDATE_BASE_URL", "\"$qaBase\"")
             buildConfigField("String", "UPDATE_HTTP_HOST", "\"10.0.2.2\"")
+            // Local fake server for native login/home QA (never prod).
+            val qaApp = (project.findProperty("qaAppBase") as String?) ?: "http://10.0.2.2:8810"
+            buildConfigField("String", "APP_BASE", "\"$qaApp\"")
+            // Review screenshots only: -PqaScreens=1 turns FLAG_SECURE off in the QA build.
+            if (project.findProperty("qaScreens") == "1") buildConfigField("boolean", "SECURE_SCREENS", "false")
         }
     }
 

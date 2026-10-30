@@ -64,9 +64,12 @@ object SmsParser {
     /** SMS number to toman: as is when labeled «تومان», otherwise rial / 10. */
     fun amountToman(body: String, value: Long): Long = if (labeledToman(body)) value else toToman(value)
 
-    private val OTP = Regex("""رمز|otp|کد""", RegexOption.IGNORE_CASE)
+    private val OTP = Regex(
+        """رمز|otp|verification|کد[\s\u200c]*ت(?:أی|اٴی|ائ|ای)ید|کد[\s\u200c]*فعال[\s\u200c]*سازی""",
+        RegexOption.IGNORE_CASE,
+    )
 
-    /** One-time-password and code messages are never spends. */
+    /** Password, OTP, confirmation and activation messages are never spends; a bare «کد» is not enough. */
     fun isOtp(body: String): Boolean = OTP.containsMatchIn(normalize(body))
 
     fun hasBalanceLine(body: String): Boolean = normalize(body).contains("مانده")

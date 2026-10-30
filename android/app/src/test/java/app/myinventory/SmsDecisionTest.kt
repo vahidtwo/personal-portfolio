@@ -87,4 +87,31 @@ class SmsDecisionTest {
         assertEquals(kept, SmsLog.fromJson(SmsLog.toJson(kept)))
         assertEquals(emptyList<SmsLog.Entry>(), SmsLog.fromJson("{"))
     }
+
+    @Test
+    fun purchaseWithTrackingCodeIsSaved() {
+        val body = "خرید\n-1,250,000\nکد پیگیری 778812\nمانده 9,000,000"
+        val s = d.decide(body, "BANK", kw)!!
+        assertEquals("125000", s.amountToman)
+        assertEquals(SmsDecision.Path.AUTO, s.path)
+    }
+
+    @Test
+    fun eachSkipPhraseIsSkipped() {
+        val phrases = listOf(
+            "رمز", "رمز پویا", "OTP", "otp", "کد تایید", "کد تأیید", "کد تائید", "كد تاييد", "کدتایید",
+            "کد فعالسازی", "کد فعال‌سازی", "کد فعال سازی", "کد‌فعالسازی", "Verification", "VERIFICATION code",
+        )
+        for (p in phrases) {
+            val body = "$p 4821\n-1,250,000\nمانده 9,000,000"
+            assertTrue(p, SmsParser.isOtp(body))
+            assertNull(p, d.decide(body, "BANK", kw))
+        }
+    }
+
+    @Test
+    fun bareCodeDoesNotSkip() {
+        assertFalse(SmsParser.isOtp("کد پیگیری 778812"))
+        assertFalse(SmsParser.isOtp("کد شعبه 12"))
+    }
 }

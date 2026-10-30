@@ -23,8 +23,8 @@ android {
         minSdk = 26
         targetSdk = 34
         // QA-only overrides (e.g. the throwaway v7 test APK): -PversionCodeOverride=7 -PversionNameOverride=7.0-test
-        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 11
-        versionName = (project.findProperty("versionNameOverride") as String?) ?: "11.0"
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 12
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "11.1.0"
         // Release: the update check uses the saved server address, https only.
         buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
         buildConfigField("String", "UPDATE_HTTP_HOST", "\"\"")

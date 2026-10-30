@@ -68,15 +68,21 @@ object SmsKeywords {
     fun spendAmount(body: String, keywords: List<String>): String? =
         if (matchesAny(body, keywords)) parseAmount(body) else null
 
-    fun parseAmount(body: String): String? {
+    private val AMOUNT_PATTERNS = listOf(
+        Regex("""(?:مبلغ|برداشت|withdraw)[^\d]{0,20}(\d[\d,٬]*)""", RegexOption.IGNORE_CASE),
+        Regex("""(\d[\d,٬]{3,})\s*(?:ریال|تومان|Rial|Toman)""", RegexOption.IGNORE_CASE),
+    )
+
+    /** The amount number as written in the SMS (no unit applied), or null. */
+    fun rawAmount(body: String): Long? {
         val normalized = toLatinDigits(body)
-        val patterns = listOf(
-            Regex("""(?:مبلغ|برداشت|withdraw)[^\d]{0,20}(\d[\d,٬]*)""", RegexOption.IGNORE_CASE),
-            Regex("""(\d[\d,٬]{3,})\s*(?:ریال|تومان|Rial|Toman)""", RegexOption.IGNORE_CASE),
-        )
-        val raw = patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1) } ?: return null
+        val raw = AMOUNT_PATTERNS.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1) } ?: return null
         val value = raw.replace(",", "").replace("٬", "").toLongOrNull() ?: return null
-        if (value <= 0) return null
+        return if (value > 0) value else null
+    }
+
+    fun parseAmount(body: String): String? {
+        val value = rawAmount(body) ?: return null
         val lower = body.lowercase()
         val rial = (lower.contains("ریال") || lower.contains("rial")) && !lower.contains("تومان") && !lower.contains("toman")
         val toman = if (rial) value / 10 else value

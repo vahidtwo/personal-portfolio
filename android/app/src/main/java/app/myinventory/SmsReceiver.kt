@@ -26,16 +26,20 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         if (!base.startsWith("https://")) return
         if (!SmsPrefs.isActive(context)) return
         val keywords = SmsPrefs.keywords(context)
+        val templates = SmsPrefs.templates(context)
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val body = messages.joinToString("") { it.displayMessageBody ?: "" }
         val sender = messages.firstOrNull()?.originatingAddress ?: ""
-        // One SMS → at most one spend, however many keywords it contains.
-        val amount = SmsKeywords.spendAmount(body, keywords) ?: return
+        // One SMS → at most one spend.
+        val spend = SmsDecision.decide(body, sender, keywords, templates) ?: return
+        val amount = spend.amountToman
+        val note = spend.note
         val pending = goAsync()
         val idem = sha256("$sender|$body")
         thread {
             try {
-                val note = SmsKeywords.cleanNote(body)
+                runCatching { SmsLog.append(context, SmsLog.Entry(System.currentTimeMillis(), sender, body)) }
+                    .onFailure { Log.w(TAG, "sms: local log failed", it) }
                 // v9: signed-in session on the saved host first; else the old host's (same backend).
                 val target = ServerAddress.smsTarget(base) { readCookie(it) }
                 val outcome = if (target == null) {

@@ -13,6 +13,7 @@ object SmsPrefs {
     const val KEY_ENABLED = "sms_enabled"
     const val KEY_UPGRADE_NOTE = "sms_upgrade_note_pending"
     const val KEY_ASKED = "sms_permission_asked"
+    const val KEY_TEMPLATES = "sms_templates"
 
     private fun prefs(c: Context): SharedPreferences =
         c.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
@@ -43,6 +44,10 @@ object SmsPrefs {
         ensureMigrated(c)
         return SmsKeywords.fromJson(prefs(c).getString(KEY_KEYWORDS, null)).ifEmpty { listOf(SmsKeywords.DEFAULT) }
     }
+
+    /** The user's bank SMS templates (none until the template screen ships). */
+    fun templates(c: Context): List<SmsParser.Template> =
+        SmsDecision.templatesFromJson(prefs(c).getString(KEY_TEMPLATES, null))
 
     /** Storage-level guard: never writes an empty list. */
     fun saveKeywords(c: Context, list: List<String>) {

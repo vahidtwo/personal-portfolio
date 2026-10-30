@@ -55,6 +55,22 @@ object SmsParser {
 
     fun toToman(rial: Long): Long = rial / 10
 
+    /** True when the SMS labels its amounts «تومان» (or "toman"); every other SMS amount is rial. */
+    fun labeledToman(body: String): Boolean {
+        val t = normalize(body).lowercase()
+        return t.contains("تومان") || t.contains("toman")
+    }
+
+    /** SMS number to toman: as is when labeled «تومان», otherwise rial / 10. */
+    fun amountToman(body: String, value: Long): Long = if (labeledToman(body)) value else toToman(value)
+
+    private val OTP = Regex("""رمز|otp|کد""", RegexOption.IGNORE_CASE)
+
+    /** One-time-password and code messages are never spends. */
+    fun isOtp(body: String): Boolean = OTP.containsMatchIn(normalize(body))
+
+    fun hasBalanceLine(body: String): Boolean = normalize(body).contains("مانده")
+
     /** Balance in toman from the number after «مانده»/«موجودی», or null. */
     fun balanceToman(body: String): Long? =
         BALANCE.find(normalize(body))?.groupValues?.get(1)?.toLongOrNull()?.let { toToman(it) }
@@ -76,12 +92,12 @@ object SmsParser {
     fun autoDetect(body: String): Result? {
         val c = minusCandidates(body)
         if (c.size != 1) return null
-        val toman = toToman(c[0])
+        val toman = amountToman(body, c[0])
         if (toman <= 0) return null
         return Result(-toman, balanceToman(body), Source.AUTO)
     }
 
-    /** Regex for a template: digit runs become `\d+`, the marked amount a group, other text literal. */
+    /** Regex for a template: unmarked numbers match `[\d,/.:_-]+`, the marked amount is a group, other text is literal. */
     fun templateRegex(t: Template): Regex? {
         if (t.amountStart < 0 || t.amountEnd > t.sample.length || t.amountStart >= t.amountEnd) return null
         val before = normalize(t.sample.substring(0, t.amountStart))
@@ -93,11 +109,11 @@ object SmsParser {
 
     private fun literal(s: String): String {
         val out = StringBuilder()
-        val parts = Regex("""\d+|\s+""")
+        val parts = Regex("""\d[\d,/.:_-]*|\s+""")
         var last = 0
         for (m in parts.findAll(s)) {
             if (m.range.first > last) out.append(Regex.escape(s.substring(last, m.range.first)))
-            out.append(if (m.value[0].isDigit()) "\\d+" else "\\s+")
+            out.append(if (m.value[0].isDigit()) "[\\d,/.:_-]+" else "\\s+")
             last = m.range.last + 1
         }
         if (last < s.length) out.append(Regex.escape(s.substring(last)))
@@ -124,7 +140,7 @@ object SmsParser {
                 else -> t.out
             }
             if (out != true) return null
-            val toman = toToman(rial)
+            val toman = amountToman(body, rial)
             if (toman <= 0) return null
             return Result(-toman, balanceToman(body), Source.TEMPLATE)
         }

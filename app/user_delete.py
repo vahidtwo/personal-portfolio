@@ -1,6 +1,6 @@
 """Admin batch delete of users with data (Vahid, Oct 13 2026).
 
-Safeguards (Gorg/Boz/Arab spec):
+Safeguards:
 - the whole delete runs under ONE SQLite write lock (BEGIN IMMEDIATE): recount ->
   online backup (sqlite3 backup API, from the locking connection) -> delete -> audit row -> COMMIT
 - no backup (error or not enough free disk) -> nothing is deleted

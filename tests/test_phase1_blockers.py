@@ -1,4 +1,4 @@
-"""Phase 1 assets: Gorg's blocker, accessibility and minor fixes (Matin's QA round at f30677e)."""
+"""Phase 1 assets: blocker, accessibility and minor fixes."""
 import json
 import re
 import shutil

@@ -1,4 +1,4 @@
-"""Mobile side menu: opaque panel, 60% black backdrop that closes the menu on tap (Arabi spec)."""
+"""Mobile side menu: opaque panel, 60% black backdrop that closes the menu on tap."""
 import re
 from pathlib import Path
 

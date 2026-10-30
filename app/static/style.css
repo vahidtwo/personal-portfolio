@@ -175,7 +175,7 @@ a:hover { color: var(--accent-hover); }
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.6); /* Arabi spec: dim the page at 60%; tap closes the menu */
+  background: rgba(0, 0, 0, 0.6); /* Dim the page at 60%; tap closes the menu */
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -2250,7 +2250,7 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 .acard .r1 { display: flex; align-items: center; gap: 12px; }
 .acard .nm { flex: 1; min-width: 0; }
 .acard .nm b { display: block; font-size: 15px; font-weight: 700; line-height: 1.35; }
-/* Quantity line wraps instead of «…» (Arabi spec: name and quantity never truncated); each number stays whole. */
+/* Quantity line wraps instead of «…» (name and quantity never truncated); each number stays whole. */
 .acard .nm > span { display: block; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
 .acard .nm > span bdi { white-space: nowrap; }
 .acard .vl { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: left; white-space: nowrap; }
@@ -2545,7 +2545,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .nav-link.apk-download { display: flex; gap: 10px; }
 .nav-link.apk-download .main-nav-icon { width: 20px; height: 20px; flex: none; }
 
-/* Batch 1 (Arabi review): every tap target at least 44×44 (box size, not font size). */
+/* Every tap target at least 44×44 (box size, not font size). */
 .brand { min-height: 44px; display: inline-flex; align-items: center; }
 .menu-toggle, .has-main-nav .menu-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
 #chart-range [data-range] { min-height: 44px; min-width: 44px; }

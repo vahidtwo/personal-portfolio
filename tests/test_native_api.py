@@ -79,3 +79,13 @@ def test_home_requires_login_and_has_no_salary(client):
         assert key in data
     text = r.text.lower()
     assert "salary" not in text and "مانده" not in text and "income" not in text
+
+
+def test_home_rows_have_no_asset_colour():
+    """Mini charts are coloured by trend in the app, so /api/home rows carry no `color`."""
+    import inspect
+
+    from app import native_api
+
+    src = inspect.getsource(native_api)
+    assert '"color":' not in src and "ASSET_SPARKLINE_COLORS" not in src

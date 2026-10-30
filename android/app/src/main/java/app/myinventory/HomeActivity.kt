@@ -60,6 +60,17 @@ class HomeActivity : AppCompatActivity() {
     private var step = "a"
     private var typedUsername = ""
     private var lock: CountDownTimer? = null
+    private var lockEndAt = 0L
+    private var submitView: View? = null
+    private var imeOpen = false
+
+    /** With the keyboard open on login, keep «ادامه» plus 16dp in view above it. */
+    private fun keepSubmitVisible() {
+        val sub = submitView ?: return
+        if (screen != Screen.LOGIN || !imeOpen || !sub.isAttachedToWindow) return
+        val y = KeyboardScroll.target(scroll.paddingTop + sub.bottom, dp(16), scroll.height, scroll.paddingBottom)
+        if (y > scroll.scrollY) scroll.smoothScrollTo(0, y)
+    }
     private var busy = false
     private var lastHome: JSONObject? = null
     private var lastSavedAt = 0L
@@ -77,6 +88,11 @@ class HomeActivity : AppCompatActivity() {
         createdAt = SystemClock.uptimeMillis()
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        savedInstanceState?.let {
+            typedUsername = it.getString("typed_username", "")
+            step = it.getString("step", "a")
+            lockEndAt = it.getLong("lock_end_at", 0L)
+        }
         if (BuildConfig.SECURE_SCREENS) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
@@ -110,8 +126,14 @@ class HomeActivity : AppCompatActivity() {
             nav.setPadding(0, dp(4), 0, bars.bottom)
             val bottom = if (screen == Screen.HOME) nav.height.coerceAtLeast(dp(72)) + bars.bottom else maxOf(ime.bottom, bars.bottom)
             scroll.setPadding(0, bars.top, 0, bottom)
+            imeOpen = ime.bottom > 0
+            scroll.post { keepSubmitVisible() }
+            scroll.postDelayed({ keepSubmitVisible() }, 250)
             insets
         }
+
+        // The padding change above re-lays out the scroll view; scroll after that layout, not before it.
+        scroll.addOnLayoutChangeListener { _, _, t, _, b, _, ot, _, ob -> if (b - t != ob - ot) keepSubmitVisible() }
 
         onBackPressedDispatcher.addCallback(this) {
             if (screen == Screen.LOGIN && step == "b") {
@@ -271,6 +293,7 @@ class HomeActivity : AppCompatActivity() {
             }
         })
         val submit = primary("ادامه")
+        submitView = submit
         content.addView(submit, lp(20))
         val spinner = ProgressBar(this).apply { visibility = View.GONE }
         content.addView(spinner, LinearLayout.LayoutParams(dp(28), dp(28)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(8) })
@@ -307,16 +330,30 @@ class HomeActivity : AppCompatActivity() {
                 else -> false
             }
         }
+        val lockLeft = ((lockEndAt - SystemClock.elapsedRealtime()) / 1000).toInt()
         if (result == "locked") startLock(submit, error!!.optInt("retry_after"))
+        else if (lockLeft > 0) startLock(submit, lockLeft)
         when {
+            result == "wrong" && alertView != null -> {
+                // Announce the alert first, then put focus in the cleared password field.
+                alertView.announceForAccessibility(error!!.optString("message") + " " + error.optString("sub"))
+                pass.post { pass.requestFocus() }
+            }
             alertView != null -> alertView.post { alertView.requestFocus(); alertView.sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED) }
             result == "badname" || typedUsername.isEmpty() -> user.requestFocus()
             else -> pass.requestFocus()
         }
-        if (result == "wrong") pass.post { pass.requestFocus() }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("typed_username", typedUsername)
+        outState.putString("step", step)
+        outState.putLong("lock_end_at", lockEndAt)
     }
 
     private fun startLock(button: Button, seconds: Int) {
+        lockEndAt = SystemClock.elapsedRealtime() + seconds * 1000L
         button.isEnabled = false
         button.alpha = 0.6f
         button.text = Fa.lockedButton(seconds)
@@ -379,7 +416,11 @@ class HomeActivity : AppCompatActivity() {
         if (r == null) { showLogin(offline = true); return }
         val res = r.json
         when (res.optString("result")) {
-            "ok" -> { step = "a"; showHome() }
+            "ok" -> {
+                step = "a"
+                getSystemService(android.view.autofill.AutofillManager::class.java)?.commit()
+                showHome()
+            }
             "stepb" -> { step = "b"; showLogin() }
             "expired", "taken" -> { step = "a"; typedUsername = res.optString("username", typedUsername); showLogin(res) }
             "" -> showLogin(offline = true)
@@ -438,7 +479,7 @@ class HomeActivity : AppCompatActivity() {
         showLogin()
     }
 
-    private fun masked(): Boolean = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getBoolean(KEY_MASK, false)
+    private fun masked(): Boolean = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getBoolean(KEY_MASK, MASK_DEFAULT)
 
     private fun topBar(withToggle: Boolean): LinearLayout {
         val bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(56) }
@@ -508,8 +549,10 @@ class HomeActivity : AppCompatActivity() {
         hero.addView(text("دارایی منهای بدهی", 13f, c.muted))
         val net = d.optJSONObject("net")?.optJSONObject("big")
         val netRow = LinearLayout(this).apply { gravity = Gravity.BOTTOM }
-        netRow.addView(value(net?.optString("label").orEmpty(), 30f))
-        netRow.addView(text(" " + (net?.optString("unit") ?: "تومان"), 14f, c.muted))
+        netRow.addView(value(net?.optString("label").orEmpty(), 30f).apply {
+            if (!m) contentDescription = d.optJSONObject("net")?.optString("label").orEmpty() + " تومان"
+        })
+        netRow.addView(text(" " + MaskRules.netUnit(m, net?.optString("unit")), 14f, c.muted))
         hero.addView(netRow, lp(8))
         val chips = LinearLayout(this)
         val changes = d.optJSONArray("changes") ?: JSONArray()
@@ -540,25 +583,43 @@ class HomeActivity : AppCompatActivity() {
         // price line
         val price = d.optJSONObject("price")
         val age = price?.optString("age")?.takeIf { it.isNotEmpty() && it != "null" }
-        val priceText = when (price?.optString("state")) {
-            "error" -> "قیمت تازه نرسید؛ آخرین قیمت‌ها نشان داده می‌شوند"
-            "stale" -> if (age != null) "قیمت‌ها $age پیش به‌روز شد (قدیمی)" else "قیمتی ثبت نشده"
+        val state = price?.optString("state")
+        val priceText = when (state) {
+            "error" -> "قیمت تازه از چنده نرسید — ارزش‌ها با آخرین قیمت (${age ?: "—"} پیش) حساب شده‌اند."
+            "stale" -> if (age != null) "قیمت‌ها $age است به‌روز نشده‌اند" else "قیمتی ثبت نشده"
             else -> if (age != null) "قیمت‌ها $age پیش به‌روز شد" else ""
         }
-        if (priceText.isNotEmpty()) content.addView(text(priceText, 13f, if (price?.optString("state") == "fresh") c.muted else c.warn), lp(10))
+        if (priceText.isNotEmpty()) {
+            val pl = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            pl.addView(text(priceText, 13f, if (state == "fresh") c.muted else c.warn), LinearLayout.LayoutParams(0, -2, 1f))
+            pl.addView(Button(this).apply {
+                text = if (state == "error") "تلاش دوباره" else "به‌روزرسانی"
+                isAllCaps = false; textSize = 13f; setTextColor(c.accent); typeface = bold
+                background = bg(c.surface2, 999); minHeight = dp(48); minimumHeight = dp(48); setPadding(dp(14), 0, dp(14), 0)
+                setOnClickListener { fetchHome() }
+            }, LinearLayout.LayoutParams(-2, dp(48)).apply { marginStart = dp(8) })
+            content.addView(pl, lp(10))
+        }
         // tiles
         val tiles = LinearLayout(this)
-        fun tile(title: String, main: String, sub: String) {
+        fun tile(title: String, main: String, sub: String, path: String, extra: View? = null) {
             val t = card()
+            t.isClickable = true; t.isFocusable = true; t.setOnClickListener { openWeb(path) }
             t.addView(text(title, 13f, c.muted, true))
             t.addView(value(main, 15f), lp(4))
             if (sub.isNotEmpty()) t.addView(text(sub, 12f, c.muted), lp(2))
+            extra?.let { t.addView(it, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) }) }
             tiles.addView(t, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(4); marginEnd = dp(4) })
         }
         val ni = d.optJSONObject("next_instalment")
-        tile("قسط بعدی", ni?.optString("amount_label")?.let { "$it تومان" } ?: "قسطی ثبت نشده", ni?.optString("date_label").orEmpty())
+        tile("قسط بعدی", ni?.optString("amount_label")?.let { "$it تومان" } ?: "قسطی ثبت نشده",
+            ni?.let { "${it.optString("title")}، ${it.optString("date_label")}" }.orEmpty(), "/profile?tab=debts",
+            ni?.optString("chip")?.takeIf { it.isNotEmpty() }?.let { chip ->
+                val soon = ni.optInt("days", 99) <= 3
+                text(chip, 12f, if (soon) c.warn else c.muted, true).apply { background = bg(c.surface2, 999); setPadding(dp(10), dp(4), dp(10), dp(4)) }
+            })
         val ms = d.optJSONObject("month_spend")
-        tile("خرج این ماه", "${ms?.optString("month_label")} تومان", "امروز: ${ms?.optString("today_label")} تومان")
+        tile("خرج این ماه", "${ms?.optString("month_label")} تومان", MaskRules.todayLine(m, ms?.optString("today_label").orEmpty()), "/dashboard?tab=daily")
         content.addView(tiles, lp(12))
         // assets
         val rows = d.optJSONArray("rows") ?: JSONArray()
@@ -574,7 +635,7 @@ class HomeActivity : AppCompatActivity() {
             row.addView(left, LinearLayout.LayoutParams(0, -2, 1f))
             val spark = r.optJSONObject("spark")
             if (spark != null && !m) {
-                val col = runCatching { Color.parseColor(r.optString("color")) }.getOrDefault(c.accent)
+                val col = MaskRules.trendColor(spark.optString("kind"), c.dark)
                 row.addView(Sparkline(this, points(spark.optJSONArray("points")), col).apply { contentDescription = spark.optString("label") },
                     LinearLayout.LayoutParams(dp(72), dp(24)).apply { marginEnd = dp(8) })
             }
@@ -597,15 +658,24 @@ class HomeActivity : AppCompatActivity() {
         val w = card()
         w.addView(text("خوش آمدید! بیایید شروع کنیم", 20f, c.text, true))
         w.addView(text("اول دارایی‌هایتان را وارد کنید؛ ارزش امروزشان را همین‌جا با قیمت بازار می‌بینید.", 14f, c.muted), lp(6))
+        data class Step(val n: String, val title: String, val small: String, val link: String?, val path: String?)
         val steps = listOf(
-            "۱" to "دارایی‌ها را وارد کنید\nطلا، سکه، دلار، ارز دیجیتال یا نقد",
-            "۲" to "بدهی یا قسط دارید؟\nاختیاری؛ تا خالص دارایی درست حساب شود",
-            "۳" to "خرج‌ها خودکار ثبت شوند\nاختیاری؛ با اپ اندروید و پیامک",
+            Step("۱", "دارایی‌ها را وارد کنید", "طلا، سکه، دلار، ارز دیجیتال یا نقد", null, null),
+            Step("۲", "بدهی یا قسط دارید؟", "اختیاری؛ تا خالص دارایی درست حساب شود", "افزودن", "/profile?tab=debts"),
+            Step("۳", "خرج‌ها خودکار ثبت شوند", "اختیاری؛ با اپ اندروید و پیامک", "تنظیم", "/profile"),
         )
-        for ((n, t) in steps) {
+        for (st in steps) {
             val r = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
-            r.addView(text(n, 14f, c.onAccent, true).apply { gravity = Gravity.CENTER; background = bg(c.accent, 999) }, LinearLayout.LayoutParams(dp(28), dp(28)))
-            r.addView(text(t, 14f, c.text).apply { setPadding(dp(10), 0, dp(10), 0) })
+            r.addView(text(st.n, 14f, c.onAccent, true).apply { gravity = Gravity.CENTER; background = bg(c.accent, 999) }, LinearLayout.LayoutParams(dp(28), dp(28)))
+            val tc = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, dp(10), 0) }
+            tc.addView(text(st.title, 14f, c.text, true))
+            tc.addView(text(st.small, 12f, c.muted))
+            r.addView(tc, LinearLayout.LayoutParams(0, -2, 1f))
+            if (st.link != null) r.addView(Button(this).apply {
+                text = st.link; isAllCaps = false; textSize = 13f; setTextColor(c.accent); typeface = bold
+                background = bg(c.surface2, 999); minHeight = dp(48); minimumHeight = dp(48); setPadding(dp(14), 0, dp(14), 0)
+                setOnClickListener { openWeb(st.path!!) }
+            }, LinearLayout.LayoutParams(-2, dp(48)))
             w.addView(r)
         }
         w.addView(primary("افزودن دارایی").apply { setOnClickListener { openWeb("/assets") } }, lp(12))
@@ -643,5 +713,7 @@ class HomeActivity : AppCompatActivity() {
     companion object {
         private const val PREWARM_DELAY_MS = 1500L
         const val KEY_MASK = "native_mask_net"
+        /** Like web: amounts start hidden until the user taps «نمایش». */
+        const val MASK_DEFAULT = true
     }
 }

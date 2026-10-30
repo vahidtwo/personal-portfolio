@@ -70,3 +70,35 @@ def test_full_vazirmatn_with_license():
 
 def test_google_services_json_not_committed():
     assert not (APP / "google-services.json").exists()
+
+
+def test_native_hide_amounts_defaults_hidden():
+    home = _read(KT / "HomeActivity.kt")
+    assert "const val MASK_DEFAULT = true" in home
+    assert "getBoolean(KEY_MASK, MASK_DEFAULT)" in home
+    assert "getBoolean(KEY_MASK, false)" not in home
+
+
+def test_webview_error_page_is_retry_only():
+    page = _read(SRC / "assets" / "www" / "error.html")
+    assert "تلاش دوباره" in page and "AndroidBridge.retry" in page
+
+    assert "تنظیمات پیشرفته" not in page and "setup.html" not in page
+    main = _read(KT / "MainActivity.kt")
+    assert "?error=connect" not in main and "error.html" in main
+    assert "MainFrameErrors" in main
+
+
+def test_tab_launch_shows_skeleton_not_blank():
+    main = _read(KT / "MainActivity.kt")
+    assert "LoadingSkeleton.install" in main
+    assert "!tabLaunch && startup.keepSplash" in main
+
+
+def test_review_fixes_in_home_activity():
+    home = _read(KT / "HomeActivity.kt")
+    assert "smoothScrollTo" in home and "KeyboardScroll.target" in home
+    assert "MaskRules.netUnit(m," in home and "MaskRules.todayLine(m," in home
+    assert 'optString("color")' not in home and "MaskRules.trendColor" in home
+    assert "AutofillManager::class.java)?.commit()" in home
+    assert "onSaveInstanceState" in home and "announceForAccessibility" in home

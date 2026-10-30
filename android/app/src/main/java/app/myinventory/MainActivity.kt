@@ -49,7 +49,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         startup.created(SystemClock.uptimeMillis())
-        installSplashScreen().setKeepOnScreenCondition { startup.keepSplash(SystemClock.uptimeMillis()) }
+        // A tab opened from the native home shows the skeleton cover at once instead of holding the window
+        // blank behind the splash condition; the cover still hides at the first paint.
+        val tabLaunch = intent?.getStringExtra(EXTRA_PATH) != null
+        installSplashScreen().setKeepOnScreenCondition { !tabLaunch && startup.keepSplash(SystemClock.uptimeMillis()) }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = Color.parseColor("#050608")
@@ -57,7 +60,17 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         web = findViewById(R.id.web)
         loading = findViewById(R.id.loading)
-        web.setBackgroundColor(Color.parseColor("#050608"))
+        val bgColor = if (isNight()) Color.parseColor("#050608") else Color.parseColor("#EEF1F8")
+        web.setBackgroundColor(bgColor)
+        if (tabLaunch) {
+            window.statusBarColor = bgColor; window.navigationBarColor = bgColor
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !isNight(); isAppearanceLightNavigationBars = !isNight()
+            }
+            findViewById<View>(android.R.id.content).setBackgroundColor(bgColor)
+            LoadingSkeleton.install(loading as android.widget.FrameLayout, isNight())
+            showLoading(true)
+        }
 
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -407,6 +420,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isNight(): Boolean =
+        (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
     private fun showLoading(show: Boolean) {
         loading.visibility = if (show) View.VISIBLE else View.GONE
     }
@@ -468,19 +485,13 @@ class MainActivity : AppCompatActivity() {
         showLoading(true)
         // The saved address is kept on purpose: being offline never wipes it.
         web.stopLoading()
-        web.loadUrl(SETUP_ERROR_ASSET)
+        web.loadUrl(ERROR_ASSET + "?theme=" + (if (isNight()) "dark" else "light"))
         maybeFallBackToOldHost(failedUrl)
     }
 
     private fun retryLast() {
-        val target = lastFailedUrl
-            ?: savedBaseUrl()?.let { "$it/dashboard" }
-        if (target == null) {
-            loadRemote(NativeSession.BASE, "/dashboard")
-            return
-        }
         clearHistoryOnSuccess = true
-        web.loadUrl(target)
+        web.loadUrl(retryTarget(lastFailedUrl, NativeSession.BASE))
     }
 
     private fun restoreOrSetup(savedInstanceState: Bundle?) {
@@ -574,10 +585,20 @@ class MainActivity : AppCompatActivity() {
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
-        private const val SETUP_ERROR_ASSET = "$SETUP_ASSET?error=connect"
+        /** Phase 4: retry-only error page (no setup link). */
+        private const val ERROR_ASSET = "file:///android_asset/www/error.html"
         private const val SETUP_ADVANCED_ASSET = "$SETUP_ASSET?advanced=1"
         private const val STATE_FAILED_URL = "last_failed_url"
         const val ACTION_OPEN_SETUP = "app.myinventory.OPEN_SETUP"
         const val EXTRA_PATH = "app.myinventory.PATH"
+
+        /** «تلاش دوباره» reloads the failed page only when it is on the app's own origin; else the home. */
+        fun retryTarget(failed: String?, base: String): String {
+            val host = runCatching { java.net.URI(base).host }.getOrNull()
+            val ok = failed != null && runCatching { java.net.URI(failed) }.getOrNull()?.let {
+                it.scheme == java.net.URI(base).scheme && it.host == host
+            } == true
+            return if (ok) failed!! else "$base/dashboard"
+        }
     }
 }

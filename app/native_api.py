@@ -206,7 +206,7 @@ async def api_home(request: Request, db: Session = Depends(get_db)):
                else format_qty(row.quantity, places if row.key not in ("car", "cash") else 0))
         spark = dash.sparkline(row.key, row.name_fa, trends.get(row.key, []), chip, 72)
         rows.append({
-            "key": row.key, "name_fa": row.name_fa, "color": dash.ASSET_SPARKLINE_COLORS.get(row.key, "#9aa3b2"),
+            "key": row.key, "name_fa": row.name_fa,
             "quantity_label": qty, "unit_fa": "دلار" if row.key == "usd" else row.unit_fa,
             "value_label": format_toman(row.value_toman), "share_label": format_share_label(share),
             "share": float(share), "chip": chip, "has_price": row.unit_price is not None,

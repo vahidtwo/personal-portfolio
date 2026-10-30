@@ -166,111 +166,6 @@ a:hover { color: var(--accent-hover); }
   gap: 12px;
 }
 
-.menu-toggle {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-}
-
-.side-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.6); /* Arabi spec: dim the page at 60%; tap closes the menu */
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.28s ease, visibility 0.28s ease;
-}
-
-.side-backdrop.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.side-panel {
-  position: fixed;
-  z-index: 70;
-  top: 0;
-  bottom: 0;
-  inset-inline-start: 0;
-  width: min(320px, 88vw);
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
-  background: var(--bg); /* opaque page colour per theme; --surface is translucent and let the page show through */
-  border-inline-start: 1px solid var(--border-subtle);
-  box-shadow: var(--card-shadow);
-  overflow: auto;
-  transform: translate3d(100%, 0, 0);
-  visibility: hidden;
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.32s;
-}
-
-.side-panel.is-open {
-  transform: translate3d(0, 0, 0);
-  visibility: visible;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .side-backdrop,
-  .side-panel {
-    transition-duration: 0.01ms;
-  }
-}
-
-.side-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.side-nav .nav-link,
-.side-logout .btn,
-.side-nav .install-btn,
-.side-nav .theme-toggle {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: start;
-}
-
-.side-logout .btn,
-.side-nav .theme-toggle {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.side-logout .btn:hover,
-.side-nav .theme-toggle:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-
-.side-nav .theme-toggle {
-  height: auto;
-}
-
-.side-logout { margin: 0; }
-
-body.menu-open { overflow: hidden; }
-
 .brand {
   display: flex;
   align-items: center;
@@ -382,7 +277,6 @@ body.menu-open { overflow: hidden; }
 .tab:focus-visible,
 .nav-link:focus-visible,
 .chart-tool-btn:focus-visible,
-.menu-toggle:focus-visible,
 .privacy-btn:focus-visible,
 .theme-toggle:focus-visible,
 .th-sort:focus-visible {
@@ -907,10 +801,6 @@ p.total {
 }
 
 @media (max-width: 520px) {
-  .menu-toggle,
-  .side-panel-head .btn {
-    min-height: 44px;
-  }
   .debt-total {
     display: flex;
     flex-direction: column;
@@ -1883,7 +1773,7 @@ input:focus {
 .advanced-body > h2 { margin-top: 4px; }
 
 /* ---------- Main navigation (Phase 1, from /mockups/phase1) ----------
-   Five sections. >=900px: rounded pill container centered in the top bar, avatar on the left.
+   Five sections. >=900px: rounded pill container centered in the top bar.
    <900px: fixed bottom bar, icon over label, active = filled pill + bold label.
    Not approved yet: restyle only through these custom properties; icons live in partials/nav_icons.html. */
 :root,
@@ -1907,10 +1797,7 @@ input:focus {
   --main-nav-active-icon-fill: none;
   --main-nav-desk-bg: rgba(255, 255, 255, 0.04);
   --main-nav-desk-border: var(--border-subtle);
-  --avatar-size: 36px;
-  --avatar-fg: #04120e;
-  --avatar-bg: #3ee0b8; /* logo B: flat teal, ink text 11.44:1; retired violet/cyan gradient */
-  --main-nav-desk-shift: -49px;
+  --main-nav-desk-shift: -73px;
   --page-extra-bottom: 0px; /* a future sticky bar (e.g. unsaved changes on assets) adds its height here */
 }
 [data-theme="light"] {
@@ -1918,7 +1805,6 @@ input:focus {
   --main-nav-fg: var(--text-muted);
   --main-nav-active-ring: rgba(13, 159, 122, 0.25);
   --main-nav-desk-bg: rgba(255, 255, 255, 0.7);
-  --avatar-fg: #04120e; /* dark text on the teal in both themes (>=4.5:1); white was ~2.6:1 */
 }
 
 /* Secondary text / placeholders use the muted token (#8b93a8 in dark). */
@@ -1957,21 +1843,6 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 .main-nav-label-rest { display: none; }
 #account-settings { scroll-margin-top: calc(env(safe-area-inset-top) + 84px); }
 
-.menu-toggle .avatar { display: none; }
-.avatar-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.avatar {
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--avatar-fg);
-  background: var(--avatar-bg);
-}
-
 /* Settings rows (admin / logout) */
 .settings-rows { padding: 4px 0; overflow: hidden; }
 .settings-row-form { margin: 0; }
@@ -2005,7 +1876,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 
 @media (min-width: 900px) {
   /* The nav comes after <main> in the HTML (keyboard order); it is placed in the top bar here, centered
-     between the logo and the avatar like before: (avatar 36 + gap 12 − logo 134 − gap 12) / 2 = −49px. */
+     in the space beside the logo: (0 − logo 134 − gap 12) / 2 = −73px. */
   .has-main-nav .top-inner { min-height: 74px; } /* same height as when the nav sat inside it */
   .main-nav {
     position: fixed;
@@ -2034,9 +1905,6 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
   }
   .main-nav-icon { width: var(--main-nav-icon-desk); height: var(--main-nav-icon-desk); }
   .main-nav-label-rest { display: inline; }
-  .has-main-nav .menu-toggle { padding: 0; border: 0; background: transparent; min-height: 0; border-radius: 50%; }
-  .has-main-nav .menu-toggle .menu-toggle-text { display: none; }
-  .has-main-nav .menu-toggle .avatar { display: grid; }
 }
 @media (min-width: 900px) and (max-width: 1099px) {
   .main-nav-item { padding: 0 12px; }
@@ -2532,7 +2400,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
   box-shadow: var(--card-shadow);
 }
 
-/* «دانلود اپلیکیشن اندروید» rows (settings + avatar/side menu); never shown inside the Android app. */
+/* «دانلود اپلیکیشن اندروید» rows (settings); never shown inside the Android app. */
 .in-android-app [data-apk-download] { display: none !important; }
 .apk-download { align-items: center; }
 .apk-download-text { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; }
@@ -2547,7 +2415,6 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 
 /* Batch 1 (Arabi review): every tap target at least 44×44 (box size, not font size). */
 .brand { min-height: 44px; display: inline-flex; align-items: center; }
-.menu-toggle, .has-main-nav .menu-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
 #chart-range [data-range] { min-height: 44px; min-width: 44px; }
 .privacy-btn { min-height: 44px; min-width: 44px; }
 .dash a.btn-sm, .dash a.btn-text { min-height: 44px; display: inline-flex; align-items: center; }
@@ -3083,7 +2950,6 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 @media (min-width:600px){.v2-dlg{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;box-sizing:border-box}}
 .v2-dlg h2{margin:0;font-size:18px}.v2-dlg p{margin:0;line-height:1.8;font-size:14.5px}
 .v2-dlg .v2-actions{justify-content:flex-end}.v2-dlg .btn{min-height:44px}
-.side-nav .theme-toggle.theme-toggle-labelled{border:1px solid var(--border);border-radius:12px;color:var(--text)}
 @media (max-width:599px){.v2-grid{grid-template-columns:minmax(0,1fr)}.v2-card{padding:16px}#settings-v2 .v2-actions .btn{flex:1}.v2-dlg .v2-actions .btn{flex:1}}
 
 /* One-time «آدرس عوض می‌شود» notice (old host only; move-notice.js un-hides it). Never in the Android app. */

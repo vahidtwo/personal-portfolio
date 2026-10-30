@@ -39,39 +39,8 @@
         <img class="brand-logo brand-logo-light" src="/static/brand/daraiito-symbol-light.svg" width="36" height="36" alt="">
         <span class="brand-name">دارایی‌تو</span>
       </a>
-      <button type="button" class="btn btn-ghost btn-sm menu-toggle{% if user %} has-avatar{% endif %}" id="menu-toggle" aria-expanded="false" aria-controls="side-panel"{% if user %} aria-label="منو و حساب"{% endif %}><span class="menu-toggle-text">منو</span>{% if user %}<span class="avatar" aria-hidden="true">{% if user.full_name and user.full_name.strip() %}{{ user.full_name.strip()[:1] | upper }}{% else %}<svg class="avatar-icon" viewBox="0 0 24 24" width="20" height="20" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 19.5c1.2-3.4 4-5.2 7.2-5.2s6 1.8 7.2 5.2"/></svg>{% endif %}</span>{% endif %}</button>
     </div>
   </header>
-  <div class="side-backdrop" id="side-backdrop" aria-hidden="true"></div>
-  <aside class="side-panel" id="side-panel" aria-label="منوی کناری" aria-hidden="true" inert>
-    <div class="side-panel-head">
-      <strong>منو</strong>
-      <button type="button" class="btn btn-ghost btn-sm" id="menu-close">بستن</button>
-    </div>
-    <nav class="side-nav" aria-label="ناوبری">
-      {% if user %}
-      <a class="nav-link {% if request.url.path.startswith('/profile') %}is-active{% endif %}" href="/profile">تنظیمات</a>
-      {% with cls="nav-link" %}{% include "partials/apk_download.html" %}{% endwith %}
-      {% if is_admin %}<a class="nav-link {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">مدیریت</a>{% endif %}
-      <form method="post" action="/logout" class="side-logout" data-confirm="logout">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" class="btn btn-ghost">خروج از حساب</button>
-      </form>
-      {% else %}
-      {% block guest_nav %}
-      <a class="nav-link" href="/">معرفی</a>
-      <a class="nav-link" href="/login">ورود</a>
-      <a class="nav-link nav-link-accent" href="/register">ثبت‌نام</a>
-      {% endblock %}
-      {% endif %}
-      <button type="button" class="nav-link install-btn" id="pwa-install" hidden>نصب</button>
-      <button type="button" class="btn-icon theme-toggle theme-toggle-labelled" id="theme-toggle" aria-label="پوسته: تیره. تغییر به روشن">
-        <span class="theme-icon theme-icon-dark" aria-hidden="true">☀</span>
-        <span class="theme-icon theme-icon-light" aria-hidden="true">☾</span>
-        <span class="theme-toggle-label" aria-hidden="true">پوسته: تیره</span>
-      </button>
-    </nav>
-  </aside>
   <div class="pwa-offline-bar" id="pwa-offline" hidden role="status">
     <span class="pwa-offline-text"><strong>بدون اتصال.</strong> نسخه ذخیره‌شده — قیمت و ذخیره نیاز به شبکه دارند.</span>
     <button type="button" class="btn btn-ghost btn-sm" id="pwa-retry">تلاش مجدد</button>
@@ -108,41 +77,6 @@
   <script src="/static/push.js?v={{ static_v }}" defer></script>
   {% endif %}
   <script src="/static/pwa.js?v={{ static_v }}" defer></script>
-  <script>
-    (function () {
-      const panel = document.getElementById("side-panel");
-      const backdrop = document.getElementById("side-backdrop");
-      const openBtn = document.getElementById("menu-toggle");
-      const closeBtn = document.getElementById("menu-close");
-      function isOpen() {
-        return panel.classList.contains("is-open");
-      }
-      function setOpen(open) {
-        panel.classList.toggle("is-open", open);
-        backdrop.classList.toggle("is-visible", open);
-        panel.setAttribute("aria-hidden", open ? "false" : "true");
-        backdrop.setAttribute("aria-hidden", open ? "false" : "true");
-        panel.inert = !open;
-        openBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        document.body.classList.toggle("menu-open", open);
-        ["main", "top", "foot", "main-nav"].forEach(function (id) {
-          const el = document.getElementById(id) || document.querySelector("." + id);
-          if (el) el.inert = open;
-        });
-        if (open) closeBtn.focus();
-        else openBtn.focus();
-      }
-      openBtn.addEventListener("click", function () { setOpen(!isOpen()); });
-      closeBtn.addEventListener("click", function () { setOpen(false); });
-      backdrop.addEventListener("click", function () { setOpen(false); });
-      panel.querySelectorAll("a[href]").forEach(function (link) {
-        link.addEventListener("click", function () { setOpen(false); });
-      });
-      document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && isOpen()) setOpen(false);
-      });
-    })();
-  </script>
   {% if user %}
   <script>
     // App download rows: on a non-Android browser, say where to open the link.

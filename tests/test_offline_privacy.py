@@ -68,7 +68,7 @@ def test_server_sets_and_clears_signed_in_marker(client, no_network):
     assert __import__("re").fullmatch(r"u[A-Za-z0-9_-]{22}", client.cookies.get("inventory_page_key"))
     assert not _marker(client.get("/static/style.css"))  # static files untouched
     csrf = client.cookies.get("inventory_signed_in") and __import__("re").search(
-        r'name="csrf" value="([^"]+)"', client.get("/dashboard").text).group(1)
+        r'name="csrf" value="([^"]+)"', client.get("/profile").text).group(1)
     out = client.post("/logout", data={"csrf": csrf}, follow_redirects=False)
     assert out.status_code in (302, 303)
     m = _marker(out)

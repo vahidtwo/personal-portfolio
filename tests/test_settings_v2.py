@@ -50,7 +50,7 @@ def test_sections_and_copy(client, no_network):
     assert 'placeholder="0912' not in html and "اختیاری. مثلاً ۰۹۱۲۳۴۵۶۷۸۹" in html
     # «رمز فعلی» in «حساب» is hidden until the username changes
     assert re.search(r'class="v2-field span-2 v2-hide" id="v2-cpw"', html)
-    assert 'href="/profile">تنظیمات</a>' in html and "پروفایل" not in html
+    assert "پروفایل" not in html
     assert "چنده</a>" in html and "fm5.ir" in html and "به‌روزرسانی ساعتی" in html
     assert "/static/amount-input.js" in html and "/static/settings-page.js" in html
 
@@ -64,7 +64,6 @@ def test_theme_is_per_device_only(client, no_network):
     js = (STATIC / "theme.js").read_text(encoding="utf-8")
     assert 'localStorage.removeItem(STORAGE_KEY)' in js and 'addEventListener("change"' in js
     assert "prefers-color-scheme: light" in js
-    assert 'class="theme-toggle-label"' in html and 'aria-label="پوسته: تیره. تغییر به روشن"' in html
 
 
 def test_salary_masked_never_in_html_and_no_salary_state(client, no_network):
@@ -203,7 +202,7 @@ def test_logout_and_revoke_use_in_app_dialog(client, no_network):
     html = client.get("/profile").text
     assert "confirm(" not in html
     assert html.count('action="/logout" class="settings-row-form" data-confirm="logout"') == 1
-    assert 'class="side-logout" data-confirm="logout"' in html and 'data-confirm="revoke"' in html
+    assert 'class="settings-row-form" data-confirm="logout"' in html and 'data-confirm="revoke"' in html
     assert "/static/confirm-dialog.js" in client.get("/dashboard").text
     js = (STATIC / "confirm-dialog.js").read_text(encoding="utf-8")
     assert "confirm(" not in js.replace("data-confirm", "").replace("dataset.confirm", "")

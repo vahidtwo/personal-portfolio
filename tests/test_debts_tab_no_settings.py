@@ -1,4 +1,4 @@
-"""The debts tab must not render settings-only sections (settings APK row with version; the side-menu link is separate, push, MCP, logout row)."""
+"""The debts tab must not render settings-only sections (settings APK row with version, push, MCP, logout row)."""
 from tests.test_holdings import _register, no_network  # noqa: F401
 
 

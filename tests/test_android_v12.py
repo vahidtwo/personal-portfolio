@@ -12,11 +12,11 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def test_version_13_and_approved_notes():
+def test_version_14_and_approved_notes():
     g = _read(APP / "build.gradle.kts")
-    assert "?.toInt() ?: 13" in g and '?: "12.0.0"' in g
+    assert "?.toInt() ?: 14" in g and '?: "12.0.1"' in g
     rel = json.loads(_read(ROOT / "app" / "android_release.json"))
-    assert rel["versionCode"] == 13 and rel["versionName"] == "12.0.0"
+    assert rel["versionCode"] == 14 and rel["versionName"] == "12.0.1"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
     assert rel["notes_approved"] is True and rel["notes"]
 
@@ -25,14 +25,14 @@ def test_fixed_origin_and_flags():
     g = _read(APP / "build.gradle.kts")
     assert 'buildConfigField("String", "APP_BASE", "\\"https://daraiito.ir\\"")' in g
     assert 'buildConfigField("boolean", "BIOMETRIC_UNLOCK", "false")' in g
-    assert 'buildConfigField("boolean", "SECURE_SCREENS", "true")' in g
+    assert "SECURE_SCREENS" not in g
     assert "val BASE: String = BuildConfig.APP_BASE" in _read(KT / "NativeSession.kt")
 
 
-def test_secure_window_on_login_and_home():
-    home = _read(KT / "HomeActivity.kt")
-    assert "if (BuildConfig.SECURE_SCREENS) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE" in home
-    assert home.index("FLAG_SECURE") < home.index("setContentView(")
+def test_screenshots_allowed_no_flag_secure():
+    """12.0.1: FLAG_SECURE is removed everywhere (login, home and WebView tabs)."""
+    for f in KT.glob("*.kt"):
+        assert "FLAG_SECURE" not in _read(f).replace("no FLAG_SECURE since 12.0.1", ""), f.name
 
 
 def test_launcher_is_native_and_setup_is_gone():

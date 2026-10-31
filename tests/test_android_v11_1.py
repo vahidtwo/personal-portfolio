@@ -15,7 +15,11 @@ def test_version_11_1_0_semver_and_same_cert():
 def test_sms_raw_text_stays_on_the_phone():
     src = ROOT / "android" / "app" / "src" / "main" / "java" / "app" / "myinventory"
     receiver = (src / "SmsReceiver.kt").read_text(encoding="utf-8")
-    post = receiver[receiver.index("private fun postSpend("):]
-    assert 'payload.put("amount_toman", amount)' in post and 'payload.put("note", note)' in post
-    assert "body" not in post.split("connection.outputStream")[0].split("val payload")[1]
+    queue = (src / "SmsQueue.kt").read_text(encoding="utf-8")
+    payload = queue[queue.index("fun payload("):queue.index("// ---- storage")]
+    assert '.put("amount_toman", e.amountToman).put("note", e.note)' in payload
+    assert "body" not in payload
+    assert "SmsQueue.Entry(amount, note, idem," in receiver
+    entry = queue[queue.index("data class Entry("):].split("\n")[0]
+    assert "body" not in entry and "sender" not in entry
     assert "SmsKeywords.cleanNote(body)" in (src / "SmsDecision.kt").read_text(encoding="utf-8")

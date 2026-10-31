@@ -453,6 +453,28 @@ async def profile_delete_spend(
     return RedirectResponse(target, status_code=303)
 
 
+SMS_QUEUE_MAX_AGE_DAYS = 7
+
+
+def sms_spent_on(sms_at, today):
+    """A spend queued on the phone while logged out keeps the SMS's own Tehran date (sms_at = epoch ms).
+
+    Missing, invalid, future or older than SMS_QUEUE_MAX_AGE_DAYS -> today, as before.
+    """
+    from datetime import datetime, timezone
+
+    from app.formatting import TEHRAN
+
+    try:
+        ms = int(sms_at)
+        day = datetime.fromtimestamp(ms / 1000, tz=timezone.utc).astimezone(TEHRAN).date()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return today
+    if day > today or (today - day).days > SMS_QUEUE_MAX_AGE_DAYS:
+        return today
+    return day
+
+
 @router.post("/api/sms-spend")
 async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     user = get_authenticated_user(request, db)
@@ -483,8 +505,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     )
     if child is None:
         return JSONResponse({"ok": False, "error": "category"}, status_code=500)
-    today = tehran_today()
-    spent_on = today.togregorian()
+    spent_on = sms_spent_on(payload.get("sms_at"), tehran_today().togregorian())
     duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
     if idem:
         duplicate = duplicate_query.filter(DailySpend.note.like(f"[{idem}]%")).first()

@@ -165,7 +165,7 @@ def test_bars_sorted_top_four_with_share_and_more(client, no_network, mehr28):
     db.commit()
     db.close()
     html = client.get(DAILY).text
-    bars = re.findall(r'<span class="v"><b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b> تومان، ([^<]+)</span>', html)
+    bars = re.findall(r'<span class="v"><b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b> تومان، <b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b></span>', html)
     assert [b[0] for b in bars] == ["۶۰٬۰۰۰", "۵۰٬۰۰۰", "۴۰٬۰۰۰", "۳۰٬۰۰۰", "۲۰٬۰۰۰", "۱۰٬۰۰۰"]
     assert bars[0][1] == "۲۹٪"
     assert html.count("data-sp-rest>") == 2 and html.count("<li hidden data-sp-rest>") == 2
@@ -209,7 +209,7 @@ def test_page_contract(client, no_network, mehr28):
     assert "chart.umd" not in full  # the doughnut is gone from this tab
     html = full[full.index("data-sp-page"):full.index("</footer>") if "</footer>" in full else None]
     assert "confirm(" not in html and " · " not in html.split("<footer")[0]
-    assert re.search(r'aria-label="گزینه‌های خرج ۴۵٬۰۰۰ تومان، [^"]+"', html)
+    assert re.search(r'aria-label="گزینه‌های خرج [^"۰-۹]+، [^"]+"', html) and "data-sp-amount" not in html
     assert 'role="menu"' in html and "حذف…" in html and 'id="sp-del-form"' in html
     assert 'id="daily-spend-form"' in html and 'name="parent_id" id="spend-parent"' in html  # same POST fields
     assert "<h1 id=\"sp-h\">خرج‌ها</h1>" in html and "فهرست خرج‌ها" in html

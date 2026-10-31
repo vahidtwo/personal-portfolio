@@ -68,6 +68,15 @@
 
   var URL_ = "/profile?tab=debts";
   function $(s, r) { return (r || document).querySelector(s); }
+  // Amounts come from the row only while they are shown; a masked page uses the amount-free text.
+  function deleteBody(btn, row) {
+    var shown = document.documentElement.getAttribute("data-show-portfolio") === "1";
+    if (!shown || !row) return btn.getAttribute("data-body-masked");
+    function amt(sel) { var el = $(sel, row); return el ? el.textContent.trim() : ""; }
+    return btn.getAttribute("data-body")
+      .replace("{monthly}", amt(".a [data-amount]"))
+      .replace("{total}", amt(".dv-meta [data-amount]"));
+  }
   function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
   var page, scrim, openSheet = null, opener = null, openMenu = null;
 
@@ -285,7 +294,7 @@
     } else if (t.matches("[data-dv-del]")) {
       var sheet = $('[data-dv-sheet="delete"]'), btnRow = t.closest("[data-dv-row]");
       $("[data-dv-del-title]", sheet).textContent = "«" + t.getAttribute("data-title") + "» حذف شود؟";
-      $("[data-dv-del-body]", sheet).textContent = t.getAttribute("data-body");
+      $("[data-dv-del-body]", sheet).textContent = deleteBody(t, btnRow);
       var hint = $("[data-dv-del-hint]", sheet); hint.textContent = t.getAttribute("data-hint"); hint.hidden = !t.getAttribute("data-hint");
       $("[data-dv-del-form]", sheet).action = t.getAttribute("data-action");
       show(sheet, btnRow ? $("[data-dv-dots]", btnRow) : t);

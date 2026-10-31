@@ -70,7 +70,8 @@
             </form>
             {% endif %}
             <button type="button" role="menuitem" class="d" data-dv-del data-action="/profile/debts/{{ r.id }}/delete"
-                    data-title="{{ r.display_title }}" data-body="{% if r.active %}{{ r.months_label }} قسط {{ r.monthly_label }} تومانی، جمعاً {{ r.total_label }} تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد.{% else %}از فهرست برداشته می‌شود. حذف برگشت ندارد.{% endif %}"
+                    data-title="{{ r.display_title }}" data-body="{% if r.active %}{{ r.months_label }} قسط {monthly} تومانی، جمعاً {total} تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد.{% else %}از فهرست برداشته می‌شود. حذف برگشت ندارد.{% endif %}"
+                    data-body-masked="{% if r.active %}{{ r.months_label }} قسط باقی‌مانده از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد.{% else %}از فهرست برداشته می‌شود. حذف برگشت ندارد.{% endif %}"
                     data-hint="{% if r.active %}اگر فقط یک قسط پرداخت کرده‌اید، «پرداخت شد» را بزنید.{% endif %}">حذف…</button>
           </div>
         </li>
@@ -106,7 +107,8 @@
             <a role="menuitem" href="/profile?tab=debts&spend={{ x.id }}" data-dv-edit="expense" data-id="{{ x.id }}"
                data-form='{{ {"title": x.title, "amount_toman": x.amount_raw, "due_day": x.due_day, "orig": x.amount_orig} | tojson | forceescape }}'>ویرایش</a>
             <button type="button" role="menuitem" class="d" data-dv-del data-action="/profile/expenses/{{ x.id }}/delete"
-                    data-title="{{ x.display_title }}" data-body="ماهانه {{ x.amount_label }} تومان از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد." data-hint="">حذف…</button>
+                    data-title="{{ x.display_title }}" data-body="ماهانه {monthly} تومان از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد."
+                    data-body-masked="از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد." data-hint="">حذف…</button>
           </div>
         </li>
         {% endfor %}

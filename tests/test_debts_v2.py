@@ -257,6 +257,7 @@ def test_page_contract(client, no_network, clock):
     assert 'role="menu"' in html and 'aria-label="گزینه‌های لپ‌تاپ"' in html and 'role="alertdialog"' in html
     assert 'id="debt-form"' in html and 'id="expense-form"' in html and 'data-dv-close>انصراف</button>' in html
     assert "پرداخت شد، یک قسط کم کن" in html and 'name="expect" value="9"' in html
-    assert "۹ قسط ۱٬۷۵۰٬۰۰۰ تومانی، جمعاً ۱۵٬۷۵۰٬۰۰۰ تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد." in html
+    assert "۹ قسط {monthly} تومانی، جمعاً {total} تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد." in html
+    assert 'data-body-masked="۹ قسط باقی‌مانده از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد."' in html
     from app.config import STATIC_ASSET_VERSION
     assert f"/static/debts-page.js?v={STATIC_ASSET_VERSION}" in html

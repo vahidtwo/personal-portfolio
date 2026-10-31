@@ -71,8 +71,11 @@ def test_allocation_legend_bars_and_donut_neutral_when_hidden(client, no_network
     assert f"{hid} .share-bar i,\n{hid} .acard .line i {{ visibility: hidden; }}" in CSS
     assert f"{hid} .donut-wrap canvas {{ visibility: hidden; }}" in CSS
     assert f"{hid} .donut-wrap::before {{" in CSS
-    # restored by the same attribute the toggle flips, no reload: nothing masked in JS
-    assert "data-show-portfolio" not in (Path(__file__).resolve().parents[1] / "app" / "static" / "dashboard.js").read_text(encoding="utf-8")
+    # restored by the same attribute the toggle flips, no reload: the donut is masked by CSS alone;
+    # only the line chart reads the attribute, to drop its axis values and tooltip
+    js = (Path(__file__).resolve().parents[1] / "app" / "static" / "dashboard.js").read_text(encoding="utf-8")
+    assert js.count("data-show-portfolio") == 2
+    assert 'attributeFilter: ["data-show-portfolio"]' in js
 
 
 def _lum(hex_):

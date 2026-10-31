@@ -139,4 +139,134 @@ def test_landing_inline_links_get_44px_tap_targets(client):
 def test_static_asset_version_bumped():
     from app.config import STATIC_ASSET_VERSION
 
-    assert STATIC_ASSET_VERSION > "20261031a"
+    assert STATIC_ASSET_VERSION > "20261031b"
+
+
+class _SvgText(HTMLParser):
+    """Every text run inside an <svg> (title, text, tspan, desc) and whether it sits inside a [data-mask]."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack = []  # (tag, masked, in_svg)
+        self.runs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in _AmountScan.VOID:
+            return
+        top = self.stack[-1] if self.stack else ("", False, False)
+        self.stack.append((tag, top[1] or "data-mask" in dict(attrs), top[2] or tag == "svg"))
+
+    def handle_startendtag(self, tag, attrs):
+        pass
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                return
+
+    def handle_data(self, data):
+        top = self.stack[-1] if self.stack else ("", False, False)
+        if top[2] and data.strip():
+            self.runs.append((data.strip(), top[1]))
+
+
+def test_chart_text_is_masked_axis_footer_and_svg(client, no_network, clock):
+    _register(client)
+    _seed([("وام نمونه", 2350000, 12, 1405, 8, 5)])
+    home = client.get("/dashboard").text
+    # footer: max, min and the change for the range all sit inside a small mask
+    foot = home.split('id="chart-foot"', 1)[1].split("</div>", 1)[0]
+    for el in ("chart-max", "chart-min", "chart-change"):
+        tag = re.search(rf'<b id="{el}"[^>]*>', foot)[0]
+        assert 'data-mask="portfolio"' in tag and "mask-sm" in tag, el
+    # with the footer filled the way the chart script fills it, the scan finds nothing unmasked...
+    filled = home.replace('id="chart-foot" hidden', 'id="chart-foot"')
+    for el in ("chart-max", "chart-min"):
+        filled = re.sub(rf'(<b id="{el}"[^>]*>)</b>', r"\g<1>۱٬۲۳۴٫۵ میلیون تومان</b>", filled)
+    assert _scan(filled).unmasked_amounts() == []
+    # ...and does find the numbers once the masks are taken off
+    assert len(_scan(filled.replace("data-mask=", "data-x=")).unmasked_amounts()) >= 2
+    # SVG text: any digit in an svg is masked or a percentage, never an amount
+    p = _SvgText()
+    p.feed(_main(home))
+    for text, masked in p.runs:
+        if DIGIT.search(text) and not masked:
+            assert "٪" in text or "%" in text, text
+            assert not re.search(r"(تومان|دلار|هزار|میلیون|میلیارد)", text), text
+
+
+def test_chart_canvas_drops_axis_values_and_tooltip_while_hidden():
+    js = (STATIC / "dashboard.js").read_text(encoding="utf-8")
+    assert 'return document.documentElement.getAttribute("data-show-portfolio") !== "1";' in js
+    opts = js.split("function chartOptions(view, opts) {", 1)[1].split("\n  }\n", 1)[0]
+    assert "const hideValues = amountsHidden();" in opts
+    assert "enabled: !rangeSelect && !hideValues," in opts
+    y = opts.split("        y: {", 1)[1]
+    assert "display: !hideValues," in y.split("grid:", 1)[0]
+    # the line itself is untouched and the toggle redraws it
+    assert 'attributeFilter: ["data-show-portfolio"]' in js
+    assert "new MutationObserver(() => renderChart())" in js
+
+
+AMOUNT_ATTR = re.compile(r"[0-9۰-۹][0-9۰-۹٬,٫.]*\s*(تومان|دلار|هزار|میلیون|میلیارد)")
+
+
+def _attrs(html):
+    """Every (tag, name, value) attribute in the page body."""
+    out = []
+
+    class P(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            out.extend((tag, k, v or "") for k, v in attrs)
+
+    P(convert_charrefs=True).feed(_main(html))
+    return out
+
+
+def test_no_amount_in_aria_labels_titles_or_data_attributes(client, no_network, clock):
+    _register(client)
+    _seed([("وام نمونه", 2350000, 12, 1405, 8, 5)], expenses=[("اجاره نمونه", 7100000, 1)])
+    _seed_spends()
+    for url in ("/dashboard", "/dashboard?tab=daily", "/profile?tab=debts"):
+        html = client.get(url).text
+        for tag, name, value in _attrs(html):
+            if name in ("aria-label", "title", "alt", "placeholder") or name.startswith("data-"):
+                assert not AMOUNT_ATTR.search(value), (url, tag, name, value)
+        assert "data-sp-amount" not in html
+    # the row menu is named by the spend and day, not its amount
+    daily = client.get("/dashboard?tab=daily").text
+    assert re.search(r'aria-label="گزینه‌های خرج [^"]+"', daily)
+    assert not re.search(r'aria-label="گزینه‌های خرج [^"]*[0-9۰-۹]{2}[^"]*تومان', daily)
+
+
+def test_category_share_percent_is_masked(client, no_network, clock):
+    _register(client)
+    _seed_spends()
+    html = _main(client.get("/dashboard?tab=daily").text)
+    p = _AmountScan()
+    p.feed(html)
+    percents = [(t, m) for t, m, skip in p.chunks if not skip and "٪" in t and DIGIT.search(t)]
+    assert percents, "the category list shows shares"
+    assert all(m for _, m in percents), [t for t, m in percents if not m]
+    # and the check sees them once masks are off
+    q = _AmountScan()
+    q.feed(html.replace("data-mask=", "data-x="))
+    assert any(not m for t, m, skip in q.chunks if not skip and "٪" in t and DIGIT.search(t))
+
+
+def test_delete_confirm_prints_amount_only_when_shown():
+    js = (STATIC / "spending-page.js").read_text(encoding="utf-8")
+    fn = js.split("function confirmDelete(row, back) {", 1)[1].split("document.body.appendChild(d);", 1)[0]
+    assert "data-sp-amount" not in js
+    assert 'var shown = document.documentElement.getAttribute("data-show-portfolio") === "1";' in fn
+    assert 'var amt = shown ? $(".a [data-amount]", row) : null;' in fn
+    assert 'var desc = (amt ? amt.textContent.trim() + " تومان، " : "") + row.getAttribute("data-sp-name")' in fn
+
+
+def test_debt_delete_confirm_fills_amounts_only_when_shown():
+    js = (STATIC / "debts-page.js").read_text(encoding="utf-8")
+    fn = js.split("function deleteBody(btn, row) {", 1)[1].split("\n  }\n", 1)[0]
+    assert 'if (!shown || !row) return btn.getAttribute("data-body-masked");' in fn
+    assert '.replace("{monthly}", amt(".a [data-amount]"))' in fn
+    assert "textContent = deleteBody(t, btnRow);" in js

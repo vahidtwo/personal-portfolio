@@ -321,7 +321,7 @@ async def _rpc(body: dict, db: Session, user: User) -> Response:
             {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "my-inventory", "version": "1.0.0"},
+                "serverInfo": {"name": "daraiito", "version": "1.0.0"},
             },
         )
     if method == "tools/list":

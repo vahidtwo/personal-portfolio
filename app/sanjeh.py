@@ -46,7 +46,7 @@ async def fetch_sanjeh_portfolio(token: str) -> SanjehPortfolio:
         "accept": "*/*",
         "origin": "https://sanjeh.app",
         "referer": "https://sanjeh.app/",
-        "User-Agent": "my-inventory/1.0",
+        "User-Agent": "daraiito/1.0 (+https://daraiito.ir)",
     }
     async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
         response = await client.get(KHODRO45_PROFILE_URL, headers=headers)

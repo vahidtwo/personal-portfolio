@@ -9,6 +9,7 @@ from app.jobs import run_hourly_job
 logger = logging.getLogger(__name__)
 
 _worker_task: asyncio.Task | None = None
+_backup_task: asyncio.Task | None = None
 
 
 async def _hourly_worker() -> None:
@@ -31,8 +32,26 @@ def start_hourly_scheduler() -> None:
     logger.info("Hourly scheduler started (interval=%s h)", PRICE_REFRESH_HOURS)
 
 
+def start_nightly_backup() -> None:
+    """Nightly SQLite backup at 03:30 Asia/Tehran (see app/backup.py)."""
+    global _backup_task
+    if _backup_task is not None and not _backup_task.done():
+        return
+    from app.backup import nightly_worker
+
+    _backup_task = asyncio.create_task(nightly_worker(), name="nightly-backup")
+    logger.info("Nightly backup scheduled (03:30 Asia/Tehran)")
+
+
 async def stop_hourly_scheduler() -> None:
-    global _worker_task
+    global _worker_task, _backup_task
+    if _backup_task is not None:
+        _backup_task.cancel()
+        try:
+            await _backup_task
+        except asyncio.CancelledError:
+            pass
+        _backup_task = None
     if _worker_task is None:
         return
     _worker_task.cancel()

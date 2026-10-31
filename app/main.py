@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -39,7 +38,7 @@ from app.mcp_http import router as mcp_router
 from app.profile import router as profile_router
 from app.push_routes import router as push_router
 from app.pwa import router as pwa_router
-from app.scheduler import start_hourly_scheduler, stop_hourly_scheduler
+from app.scheduler import start_hourly_scheduler, start_nightly_backup, stop_hourly_scheduler
 from app.spends import router as spends_router
 from app.web import BASE_DIR
 
@@ -47,17 +46,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Placeholder values from docker-compose.yml / .env.example. Running with one of them means every
+# deploy can sign sessions with a guessable key, so start-up stops instead.
+PLACEHOLDER_SECRET_KEYS = frozenset({"change-me-in-dokploy", "change-me-to-a-long-random-string"})
+
+
+class InsecureSecretKey(RuntimeError):
+    pass
+
+
 def _secret_key() -> str:
-    if SECRET_KEY:
-        return SECRET_KEY
-    secret_path = DATA_DIR / "secret_key"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if secret_path.exists():
-        return secret_path.read_text(encoding="utf-8").strip()
-    generated = secrets.token_urlsafe(48)
-    secret_path.write_text(generated, encoding="utf-8")
-    logger.warning("SECRET_KEY was not set; generated %s", secret_path)
-    return generated
+    key = (SECRET_KEY or "").strip()
+    if not key:
+        raise InsecureSecretKey(
+            "SECRET_KEY is not set. Set it to a long random string (e.g. in Dokploy > Environment); "
+            "for local runs export an explicit dev key, e.g. SECRET_KEY=dev-only-key."
+        )
+    if key in PLACEHOLDER_SECRET_KEYS:
+        raise InsecureSecretKey(
+            f"SECRET_KEY is the placeholder {key!r}. Set a long random value (e.g. in Dokploy > Environment)."
+        )
+    return key
 
 
 @asynccontextmanager
@@ -67,6 +76,7 @@ async def lifespan(_app: FastAPI):
     await run_hourly_job(take_snapshots=False)
     if ENABLE_INTERNAL_SCHEDULER:
         start_hourly_scheduler()
+        start_nightly_backup()
     else:
         logger.info("Internal hourly scheduler disabled (use external cron + scripts/create_snapshot.py)")
     yield
@@ -74,7 +84,7 @@ async def lifespan(_app: FastAPI):
 
 
 # Server release (semver). The Android app keeps its own versionName in android_release.json.
-SERVER_VERSION = "12.0.2"
+SERVER_VERSION = "12.1.0"
 app = FastAPI(title="Daraiito", version=SERVER_VERSION, lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
 app.add_middleware(

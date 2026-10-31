@@ -1,0 +1,37 @@
+name: web tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SECRET_KEY: ci-only-test-key-not-secret
+      ENABLE_INTERNAL_SCHEDULER: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Fake google-services.json for tests that read it
+        run: |
+          if [ ! -f android/app/google-services.json ]; then
+            cp android/app/google-services.json.example android/app/google-services.json
+          fi
+      - run: python -m pytest -q -n auto -p no:cacheprovider

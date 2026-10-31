@@ -36,12 +36,34 @@ class SmsDecisionTest {
         assertNull(d.decide("کد تایید 1234\nبرداشت 50,000 ریال", "BANK", kw))
     }
 
-    @Test fun keywordGateStillWorksWithRialRule() {
-        val s = d.decide("برداشت 120,000\nحساب ****", "BANK", kw)!!
+    @Test fun keywordGateNeedsAMinusAmount() {
+        val s = d.decide("برداشت 120,000-\nحساب ****", "BANK", kw)!!
         assertEquals("12000", s.amountToman)
         assertEquals(SmsDecision.Path.KEYWORD, s.path)
-        assertEquals("120000", d.decide("برداشت 120,000 تومان", "BANK", kw)!!.amountToman)
-        assertEquals("12000", d.decide("برداشت 120,000 ریال", "BANK", kw)!!.amountToman)
+        assertEquals("120000", d.decide("برداشت -120,000 تومان", "BANK", kw)!!.amountToman)
+        assertNull(d.decide("برداشت 120,000\nحساب ****", "BANK", kw))  // no minus: never a spend
+        assertNull(d.decide("برداشت 120,000 ریال", "BANK", kw))
+        assertNull(d.decide("خرید -120,000", "BANK", kw))  // minus but no keyword and no «مانده»: filtered out
+    }
+
+    @Test fun moneyInIsNeverASpendOnAnyPath() {
+        val sample = "بانک تست\nمبلغ 1,000,000-\nمانده 5"
+        val start = sample.indexOf("1,000,000")
+        val t = SmsParser.Template("TESTBANK", sample, start, start + 9, true)
+        val fakes = listOf(
+            "بانک تست\nمبلغ +2,000,000\nمانده 7",
+            "بانک تست\nمبلغ 2,000,000+\nمانده 7",
+            "بانک تست\nواریز 2,000,000-\nمانده 7",
+            "برداشت واریز -2,000,000",
+            "افزایش موجودی -2,000,000\nمانده 7",
+            "بستانکار 2,000,000-\nمانده 7",
+            "+2,000,000\nمانده: 9,000,000",
+            "انتقال به حساب شما -2,000,000 برداشت",
+        )
+        for (sms in fakes) {
+            assertNull(sms, d.decide(sms, "TESTBANK", kw + "بانک", listOf(t)))
+            assertNull(sms, SmsParser.parse(sms, "TESTBANK", listOf(t)))
+        }
     }
 
     @Test fun tomanLabelKeepsAutoAmount() {
@@ -55,14 +77,21 @@ class SmsDecisionTest {
     }
 
     @Test fun templateSenderPath() {
-        val sample = "بانک تست\nمبلغ 1,000,000\nتاریخ 1405/08/05-10:00\nمانده 5"
+        val sample = "بانک تست\nمبلغ 1,000,000-\nتاریخ 1405/08/05 10:00\nشعبه 5,000-"
         val start = sample.indexOf("1,000,000")
-        val t = SmsParser.Template("TESTBANK", sample, start, start + 9, true)
-        val sms = "بانک تست\nمبلغ 2,000,000\nتاریخ 1405/08/06-21:15\nمانده 7"
+        val t = SmsParser.Template("TESTBANK", sample, start, start + 9, null)
+        val sms = "بانک تست\nمبلغ 2,000,000-\nتاریخ 1405/08/06 21:15\nشعبه 7,000-"
         val s = d.decide(sms, "TESTBANK", emptyList(), listOf(t))!!
         assertEquals("200000", s.amountToman)
         assertEquals(SmsDecision.Path.TEMPLATE, s.path)
         assertNull(d.decide(sms, "OTHER", emptyList(), listOf(t)))
+    }
+
+    @Test fun unsignedTemplateIsNoLongerASpendEvenIfMarkedOut() {
+        val sample = "بانک تست\nمبلغ 1,000,000\nتاریخ 1405/08/05-10:00\nمانده 5"
+        val start = sample.indexOf("1,000,000")
+        val t = SmsParser.Template("TESTBANK", sample, start, start + 9, true)
+        assertNull(d.decide("بانک تست\nمبلغ 2,000,000\nتاریخ 1405/08/06-21:15\nمانده 7", "TESTBANK", emptyList(), listOf(t)))
     }
 
     @Test fun templateJsonRoundTripAndBadInput() {

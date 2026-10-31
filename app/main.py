@@ -73,7 +73,9 @@ async def lifespan(_app: FastAPI):
     await stop_hourly_scheduler()
 
 
-app = FastAPI(title="Daraiito", lifespan=lifespan)
+# Server release (semver). The Android app keeps its own versionName in android_release.json.
+SERVER_VERSION = "12.0.2"
+app = FastAPI(title="Daraiito", version=SERVER_VERSION, lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
 app.add_middleware(
     SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY, secret_key=_secret_key()

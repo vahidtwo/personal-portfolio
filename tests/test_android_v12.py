@@ -69,7 +69,18 @@ def test_full_vazirmatn_with_license():
 
 
 def test_google_services_json_not_committed():
-    assert not (APP / "google-services.json").exists()
+    import subprocess
+
+    root = APP.parents[1]
+    tracked = subprocess.run(["git", "ls-files", "--", "android/app/google-services.json"], cwd=root,
+                             capture_output=True, text=True).stdout
+    assert tracked == ""
+    ignored = subprocess.run(["git", "check-ignore", "-q", "android/app/google-services.json"], cwd=root)
+    assert ignored.returncode == 0
+    # Builds (and the parallel test run) copy the fake example in place; a real config must never be here.
+    gs = APP / "google-services.json"
+    if gs.exists():
+        assert gs.read_bytes() == (APP / "google-services.json.example").read_bytes()
 
 
 def test_native_hide_amounts_defaults_hidden():

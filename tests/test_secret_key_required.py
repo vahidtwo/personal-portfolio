@@ -20,7 +20,7 @@ def _load_main(monkeypatch, tmp_path, value):
     return importlib.import_module("app.main")
 
 
-@pytest.mark.parametrize("value", [None, "", "change-me-in-dokploy", "change-me-to-a-long-random-string"])
+@pytest.mark.parametrize("value", [None, "", "   ", "\t", " \n ", "change-me-in-dokploy", "change-me-to-a-long-random-string"])
 def test_refuses_missing_or_placeholder_key(monkeypatch, tmp_path, value):
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         _load_main(monkeypatch, tmp_path, value)
@@ -40,7 +40,7 @@ def test_compose_has_no_placeholder_default():
     assert "change-me-in-dokploy" not in web
 
 
-@pytest.mark.parametrize("value", ["  spaced-key  ", "   ", "key\twith-tab\n"])
+@pytest.mark.parametrize("value", ["  spaced-key  ", "key\twith-tab\n", "\tk"])
 def test_key_is_used_exactly_as_set(monkeypatch, tmp_path, value):
     main = _load_main(monkeypatch, tmp_path, value)
     assert main._secret_key() == value

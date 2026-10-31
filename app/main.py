@@ -57,8 +57,9 @@ class InsecureSecretKey(RuntimeError):
 
 def _secret_key() -> str:
     # Used exactly as set: surrounding spaces are part of the key, never trimmed away.
+    # A key of only whitespace counts as missing.
     key = SECRET_KEY or ""
-    if not key:
+    if not key.strip():
         raise InsecureSecretKey(
             "SECRET_KEY is not set. Set it to a long random string (e.g. in Dokploy > Environment); "
             "for local runs export an explicit dev key, e.g. SECRET_KEY=dev-only-key."

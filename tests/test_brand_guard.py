@@ -24,6 +24,8 @@ ALLOWED = [
     r"portfolio\.vahidtwo\.ir",
     r"Theme[._]MyInventory[\w.]*",
     r"InventoryMessagingService",
+    # The public source link, only as an href (exact URL).
+    r'href="https://github\.com/vahidtwo/personal-portfolio"',
 ]
 _ALLOWED_RE = re.compile("|".join(ALLOWED))
 
@@ -55,10 +57,14 @@ def _hits(text):
 
 
 def test_guard_catches_old_names_and_spares_identifiers():
-    for bad in ("موجودی من", "My Inventory", "my-inventory/1.0", "MyInventory", "vahidtwo", "personal-portfolio"):
+    for bad in ("موجودی من", "My Inventory", "my-inventory/1.0", "MyInventory", "vahidtwo", "personal-portfolio",
+                "https://github.com/vahidtwo/personal-portfolio",
+                'href="https://github.com/vahidtwo/personal-portfolio/tree/main"',
+                'href="https://github.com/vahidtwo/personal-portfolio-fork"'):
         assert _hits(bad), bad
     for ok in ("app.myinventory", "/download/my-inventory.apk", "privacy-portfolio", "https://portfolio.vahidtwo.ir",
-               "Theme.MyInventory.Starting", "inventory_signed_in", "دارایی‌تو", "daraiito"):
+               "Theme.MyInventory.Starting", "inventory_signed_in",
+               '<a href="https://github.com/vahidtwo/personal-portfolio" target="_blank">', "دارایی‌تو", "daraiito"):
         assert not _hits(ok), ok
 
 

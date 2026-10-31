@@ -1,6 +1,8 @@
 package app.myinventory
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -61,5 +63,16 @@ class ServerAddressTest {
         assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction(null, "https://portfolio.vahidtwo.ir"))
         assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction("about:blank", "https://portfolio.vahidtwo.ir"))
         assertEquals(ServerAddress.BridgeAction.IGNORE, ServerAddress.bridgeAction("http://portfolio.vahidtwo.ir/", "https://portfolio.vahidtwo.ir"))
+    }
+
+    @Test
+    fun githubOpensExternallyOnlyOverHttpsExactHost() {
+        assertTrue(ServerAddress.opensExternally("https", "github.com"))
+        assertTrue(ServerAddress.opensExternally("HTTPS", "GitHub.com"))
+        for ((scheme, host) in listOf("http" to "github.com", "https" to "github.com.evil.example",
+                "https" to "evil-github.com", "https" to "daraiito.ir", "https" to null, null to "github.com")) {
+            assertFalse("$scheme $host", ServerAddress.opensExternally(scheme, host))
+        }
+        assertFalse(ServerAddress.isAllowedRemote("https", "github.com", "https://daraiito.ir"))
     }
 }

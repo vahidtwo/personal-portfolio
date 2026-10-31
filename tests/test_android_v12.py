@@ -12,11 +12,11 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def test_version_17_with_draft_notes():
+def test_version_18_with_draft_notes():
     g = _read(APP / "build.gradle.kts")
-    assert "?.toInt() ?: 17" in g and '?: "12.1.1"' in g
+    assert "?.toInt() ?: 18" in g and '?: "12.1.2"' in g
     rel = json.loads(_read(ROOT / "app" / "android_release.json"))
-    assert rel["versionCode"] == 17 and rel["versionName"] == "12.1.1"
+    assert rel["versionCode"] == 18 and rel["versionName"] == "12.1.2"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
     assert rel["notes_approved"] is False and rel["notes"]  # draft until reviewed
 

@@ -81,6 +81,8 @@ h2{font-size:var(--fs-xl);line-height:1.4;margin:0 0 var(--s3);text-wrap:balance
 footer{border-top:1px solid var(--border);padding:var(--s6) 0;color:var(--text-muted);font-size:var(--fs-sm)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s5);justify-content:space-between;align-items:center}
 footer nav{display:flex;flex-wrap:wrap;gap:var(--s2)}
+/* Inline text links: 44px tap target from padding, line height unchanged (negative margin). */
+main p a:not(.btn),main li a:not(.btn),main figcaption a:not(.btn){display:inline-block;padding:10px 6px;margin:-10px -6px;min-width:44px;min-height:44px;box-sizing:border-box;text-align:center}
 footer a{min-height:44px;min-width:44px;justify-content:center;display:inline-flex;align-items:center;padding:0 var(--s2);color:var(--text-soft)}
 footer .open-source{flex-basis:100%;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s1)}
 @media (min-width:900px){

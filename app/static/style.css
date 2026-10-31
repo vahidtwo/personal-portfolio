@@ -2459,15 +2459,16 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 
 /* SMS offer card (Android v7, shown only when AndroidBridge.getSmsAutoState() is "off") */
 /* Phase 3: SMS offer card (spending page, Android app only) and «از پیامک» tag on spends. */
-.sms-offer { position: relative; }
+/* One-line banner: never pushes the add-spend form down. */
+.sms-offer { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px 0 0; padding-inline-start: 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--accent-muted, transparent); font-size: 13.5px; }
 .sms-offer[hidden] { display: none; }
-.sms-offer h2 { margin: 0 0 6px; font-size: 16px; padding-inline-end: 48px; }
-.sms-offer-close {
-  position: absolute; top: 8px; inset-inline-end: 8px; min-width: 44px; min-height: 44px;
-  border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer;
-}
-.sms-offer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.sms-offer-actions .btn { min-height: 44px; }
+.sms-offer-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sms-offer-enable, .sms-offer-close { flex: none; min-width: 44px; min-height: 44px; border: 0; background: transparent; cursor: pointer; font: inherit; }
+.sms-offer-enable { color: var(--accent); font-weight: 700; padding: 0 8px; }
+.sms-offer-close { color: var(--text-muted); font-size: 15px; border-radius: 50%; }
+/* Small inline amounts: the mask must match the text size, not the 22px default. */
+.mask-sm[data-mask]::after { font-size: 13px; letter-spacing: 0.06em; }
 /* «از پیامک»: spends saved automatically from a bank SMS (category sms_bank + idempotency key in the note) */
 .tag-sms {
   display: inline-block; padding: 0 8px; line-height: 22px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
@@ -2612,7 +2613,7 @@ body.sp-locked{overflow:hidden}
   .sp-addbar{display:none}
 }
 @media (max-width:899px){
-  .sp-page{padding-bottom:84px}
+  .sp-page{padding-bottom:140px}
   [data-sp-js] .sp-form:not(.open){display:none}
   .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;scroll-padding-bottom:96px;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 16px;background:var(--surface-solid,#11131a)}
   [data-theme=light] .sp-form.open{background:#fff}

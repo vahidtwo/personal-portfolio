@@ -147,7 +147,7 @@ def test_day_groups_totals_cover_the_whole_month(client, no_network, mehr28):
     db.commit()
     db.close()
     html = client.get(DAILY).text
-    assert "<b>امروز، ۲۸ مهر</b><span><span class=\"num\">۲۰٬۰۰۰</span> تومان</span>" in html
+    assert "<b>امروز، ۲۸ مهر</b><span><span class=\"num mask-sm\" data-mask=\"portfolio\" data-amount>۲۰٬۰۰۰</span> تومان</span>" in html
     assert "۱۵ از ۲۱ خرج در مهر" in html and "نمایش ۶ خرج بیشتر" in html
     more = client.get(DAILY + "&jy=1405&jm=7&page=2").text  # «نمایش بیشتر» grows the list
     assert "۲۱ از ۲۱ خرج در مهر" in more and "<b>دیروز، ۲۷ مهر</b>" in more and "data-sp-more" not in more
@@ -165,7 +165,7 @@ def test_bars_sorted_top_four_with_share_and_more(client, no_network, mehr28):
     db.commit()
     db.close()
     html = client.get(DAILY).text
-    bars = re.findall(r'<span class="v"><b>([^<]+)</b> تومان، ([^<]+)</span>', html)
+    bars = re.findall(r'<span class="v"><b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b> تومان، ([^<]+)</span>', html)
     assert [b[0] for b in bars] == ["۶۰٬۰۰۰", "۵۰٬۰۰۰", "۴۰٬۰۰۰", "۳۰٬۰۰۰", "۲۰٬۰۰۰", "۱۰٬۰۰۰"]
     assert bars[0][1] == "۲۹٪"
     assert html.count("data-sp-rest>") == 2 and html.count("<li hidden data-sp-rest>") == 2
@@ -180,9 +180,9 @@ def test_past_month_drops_today_tile(client, no_network, mehr28):
     db.commit()
     db.close()
     past = client.get(DAILY + "&jy=1405&jm=6").text
-    assert "<span>امروز</span>" not in past and '<span>جمع شهریور</span><b class="num">۹٬۰۰۰</b>' in past
+    assert "<span>امروز</span>" not in past and '<span>جمع شهریور</span><b class="num" data-mask="portfolio" data-amount>۹٬۰۰۰</b>' in past
     now = client.get(DAILY).text
-    assert '<span>امروز</span><b class="num">۱٬۰۰۰</b>' in now and "<span>این ماه</span>" in now
+    assert '<span>امروز</span><b class="num" data-mask="portfolio" data-amount>۱٬۰۰۰</b>' in now and "<span>این ماه</span>" in now
 
 
 def test_empty_states(client, no_network, mehr28):
@@ -196,7 +196,7 @@ def test_empty_states(client, no_network, mehr28):
     db.close()
     month = client.get(DAILY + "&jy=1405&jm=6").text
     assert "در شهریور خرجی ثبت نشده است" in month and "ثبت خرج در شهریور" in month
-    assert '<span>جمع شهریور</span><b class="num">۰</b>' in month and "data-sp-addbar" in month
+    assert '<span>جمع شهریور</span><b class="num" data-mask="portfolio" data-amount>۰</b>' in month and "data-sp-addbar" in month
 
 
 def test_page_contract(client, no_network, mehr28):

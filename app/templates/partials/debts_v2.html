@@ -29,14 +29,14 @@
       {% else %}
       <h2 id="dv-sum-h">این ماه</h2>
       <div class="dv-tiles">
-        <div class="dv-tile"><span>قسط‌های این ماه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small class="dv-unit">تومان</small></div>
-        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small class="dv-unit">تومان</small></div>
-        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>قسط‌های این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
 {% include "partials/debts_left_tile.html" %}
       </div>
       <div data-dv-swap="next">
       {% if dv.next %}
-      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num">{{ dv.next.amount_label }}</bdi> تومان</span><span class="d">{{ dv.next.chip }}</span></p>
+      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num mask-sm" data-mask="portfolio" data-amount>{{ dv.next.amount_label }}</bdi> تومان</span><span class="d">{{ dv.next.chip }}</span></p>
       {% endif %}
       </div>
       <p class="dv-formula">مانده = حقوق − قسط‌ها − هزینهٔ ماهانه. حقوق فقط با دکمهٔ چشم نشان داده می‌شود و ذخیره نمی‌شود.</p>
@@ -53,12 +53,12 @@
         {% for r in dv.rows %}
         <li class="dv-row{% if not r.active %} done{% endif %}" data-dv-row="{{ r.id }}">
           <div class="t"><b>{{ r.display_title }}</b><small>{% if r.active %}{{ r.months_label }} قسط مانده، تا {{ r.end_label }}{% else %}همهٔ قسط‌ها پرداخت شده{% endif %}</small></div>
-          <div class="a"><b class="num"><bdi>{{ r.monthly_label }}</bdi></b><small>تومان در ماه</small></div>
+          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ r.monthly_label }}</bdi></b><small>تومان در ماه</small></div>
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ r.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta">
             {% if r.badge %}<span class="dv-badge {{ r.badge }}">{{ r.badge_label }}</span>{% endif %}
-            {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num">{{ r.total_label }}</b> تومان</span>{% else %}<span>از جمع‌ها بیرون است</span>{% endif %}
+            {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num mask-sm" data-mask="portfolio" data-amount>{{ r.total_label }}</b> تومان</span>{% else %}<span>از جمع‌ها بیرون است</span>{% endif %}
           </div>
           <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ r.display_title }}" hidden data-dv-menu>
             <a role="menuitem" href="/profile?tab=debts&edit={{ r.id }}" data-dv-edit="debt" data-id="{{ r.id }}"
@@ -76,7 +76,7 @@
         </li>
         {% endfor %}
       </ul>
-      <p class="dv-sumrow"><span>جمع بدهی مانده</span><b class="num"><bdi>{{ dv.total_label }}</bdi> تومان</b></p>
+      <p class="dv-sumrow"><span>جمع بدهی مانده</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ dv.total_label }}</bdi> تومان</b></p>
       {% else %}
       <div class="dv-empty">
         <h3>وام یا قسطی ثبت نشده است</h3>
@@ -98,7 +98,7 @@
         {% for x in dv.expenses %}
         <li class="dv-row" data-dv-row="x{{ x.id }}">
           <div class="t"><b>{{ x.display_title }}</b><small>روز {{ x.day_label }} هر ماه</small></div>
-          <div class="a"><b class="num"><bdi>{{ x.amount_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ x.amount_label }}</bdi></b><small class="dv-unit">تومان</small></div>
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ x.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta"><span>نوبت بعدی: <b>{{ x.next_label }}</b></span></div>
@@ -111,7 +111,7 @@
         </li>
         {% endfor %}
       </ul>
-      <p class="dv-sumrow"><span>جمع هزینهٔ ماهانه</span><b class="num"><bdi>{{ dv.expense_label }}</bdi> تومان</b></p>
+      <p class="dv-sumrow"><span>جمع هزینهٔ ماهانه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ dv.expense_label }}</bdi> تومان</b></p>
       {% else %}
       <div class="dv-empty">
         <h3>هزینهٔ ماهانه‌ای ثبت نشده است</h3>

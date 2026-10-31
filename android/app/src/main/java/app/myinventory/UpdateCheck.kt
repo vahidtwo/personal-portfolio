@@ -10,6 +10,9 @@ object UpdateCheck {
     const val SNOOZE_MS = 24L * 60 * 60 * 1000
     const val MAX_NOTES = 4
 
+    /** False in the store flavor: the store delivers updates (no check, download or install prompt). */
+    val inAppUpdatesEnabled: Boolean get() = BuildConfig.IN_APP_UPDATES
+
     data class Info(
         val versionCode: Long,
         val versionName: String,

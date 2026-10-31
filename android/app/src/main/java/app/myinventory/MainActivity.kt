@@ -114,6 +114,10 @@ class MainActivity : AppCompatActivity() {
                 val target = request.url ?: return false
                 if (target.scheme == "file") return false
                 if (handOffToNative(target)) return true
+                if (ServerAddress.opensExternally(target.scheme, target.host)) {
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, target).addCategory(Intent.CATEGORY_BROWSABLE)) }
+                    return true
+                }
                 if (isAllowedRemoteUrl(target)) return false
                 return true
             }

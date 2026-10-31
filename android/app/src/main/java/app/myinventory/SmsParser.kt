@@ -6,7 +6,9 @@ package app.myinventory
  * Auto-detect first: after normalizing, the withdrawal is the one number with a minus sign directly
  * before or after it. The number after «مانده»/«موجودی» is the balance, never the amount. A user template
  * is used only when auto-detect finds no candidate or more than one. SMS amounts are in rial; results
- * are in toman (rial / 10, rounded down). Deposits are ignored.
+ * are in toman (rial / 10, rounded down).
+ * Only a number with a minus sign is a spend, on every path. Money in (a plus sign next to a number, or
+ * «واریز», «افزایش», «بستانکار», «انتقال به حساب شما») is never a spend: see [isMoneyIn].
  */
 object SmsParser {
     enum class Source { AUTO, TEMPLATE }
@@ -32,8 +34,14 @@ object SmsParser {
     private val BALANCE = Regex("""(?:$BALANCE_WORDS)\s*[:：]?\s*-?\s*(\d+)-?""")
     private val MINUS_BEFORE = Regex("""(?<![\d.\-])-\s?(\d+)(?![\d.])""")
     private val MINUS_AFTER = Regex("""(?<![\d.])(\d+)\s?-(?![\d\-])""")
-    private val OUT_WORDS = listOf("برداشت", "انتقالی", "خرید")
-    private const val IN_WORD = "واریز"
+    private val IN_WORDS = listOf("واریز", "افزایش", "بستانکار", "انتقال به حساب شما", "دریافتی")
+    private val PLUS_NUMBER = Regex("""\+\s?\d|\d\s?\+""")
+
+    /** True for any money-in SMS: a plus-signed number or a money-in word. Such an SMS is never a spend. */
+    fun isMoneyIn(body: String): Boolean {
+        val t = normalize(body)
+        return PLUS_NUMBER.containsMatchIn(t) || IN_WORDS.any { t.contains(it) }
+    }
 
     /** ي/ى→ی, ك→ک, Persian/Arabic digits→ASCII, other minus signs→'-', thousands separators removed. */
     fun normalize(text: String): String {
@@ -93,6 +101,7 @@ object SmsParser {
 
     /** The withdrawal when exactly one signed number is found; null for none or several. */
     fun autoDetect(body: String): Result? {
+        if (isMoneyIn(body)) return null
         val c = minusCandidates(body)
         if (c.size != 1) return null
         val toman = amountToman(body, c[0])
@@ -136,13 +145,8 @@ object SmsParser {
             val rial = g.value.toLongOrNull() ?: continue
             val signed = text.substring(0, g.range.first).trimEnd().endsWith("-") ||
                 text.substring(g.range.last + 1).trimStart().startsWith("-")
-            val out = when {
-                signed -> true
-                text.contains(IN_WORD) -> false
-                OUT_WORDS.any { text.contains(it) } -> true
-                else -> t.out
-            }
-            if (out != true) return null
+            // Minus sign only: the template's saved in/out answer and out-words no longer make a spend.
+            if (!signed || isMoneyIn(body)) return null
             val toman = amountToman(body, rial)
             if (toman <= 0) return null
             return Result(-toman, balanceToman(body), Source.TEMPLATE)
@@ -152,5 +156,5 @@ object SmsParser {
 
     /** One decision per SMS: auto-detect first, the user's templates only when that is not confident. */
     fun parse(body: String, sender: String, templates: List<Template> = emptyList()): Result? =
-        autoDetect(body) ?: matchTemplate(body, sender, templates)
+        if (isMoneyIn(body)) null else autoDetect(body) ?: matchTemplate(body, sender, templates)
 }

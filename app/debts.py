@@ -84,6 +84,9 @@ def debt_rows(debts: list[Debt], today: jdatetime.date | None = None) -> tuple[l
                 "next_short": ds.day_month(nxt) if nxt else None,
                 "days": (nxt.togregorian() - today.togregorian()).days if nxt else None,
                 "end_label": ds.month_year(end) if end else None,
+                "overdue": bool(nxt and nxt < today),
+                "overdue_label": ds.days_chip((nxt.togregorian() - today.togregorian()).days) if nxt and nxt < today else None,
+                "missed": ds.missed_count(debt, today),
                 "badge": kind,
                 "badge_label": badge_label,
             }
@@ -356,8 +359,7 @@ async def profile_debt_paid(
         flash(request, message, error=True)
         return RedirectResponse(DEBTS_URL, status_code=303)
     before = _state(debt)
-    nxt = ds.next_due(debt)
-    y, m = ds.add_months(nxt.year, nxt.month, 1)
+    y, m = ds.after_payment(debt)  # the oldest unpaid one is paid: exactly one month on, never skipped
     debt.months_left = months - 1
     debt.due_year, debt.due_month = y, m  # due_day kept: a day-31 loan stays day 31 (readers clamp)
     db.commit()

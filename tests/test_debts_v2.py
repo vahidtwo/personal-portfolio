@@ -182,11 +182,11 @@ def test_paid_needs_csrf_and_ownership(client, no_network, clock):
 
 def test_day_31_loan_keeps_its_day_and_last_payment_ends_it(client, no_network, clock):
     _register(client)
-    (debt_id,) = _seed([("روز ۳۱", 1000, 2, 1405, 6, 31)])  # stored date in the past: next due is from the calendar
+    (debt_id,) = _seed([("روز ۳۱", 1000, 2, 1405, 6, 31)])  # stored شهریور 31 is overdue on 1405/07/28
     t = _csrf(client, P)
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "2", "csrf": t})
-    assert _debt(debt_id) == (1, 1405, 8, 31)  # next due was 30 مهر (clamped); moved to آبان, day 31 kept
-    assert "قسط بعدی: <b>۳۰ آبان</b>" in client.get(P).text
+    assert _debt(debt_id) == (1, 1405, 7, 31)  # the missed شهریور one is paid; مهر is next, day 31 kept
+    assert "قسط بعدی: <b>۳۰ مهر</b>" in client.get(P).text  # clamped to the 30-day month, due in 2 days
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "1", "csrf": t})
     assert _debt(debt_id)[0] == 0
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "0", "csrf": t})
@@ -227,7 +227,8 @@ def test_legacy_rows_load_edit_and_never_count_down_by_themselves(client, no_net
     _register(client)
     (debt_id,) = _seed([("قدیمی", "1500000.5", 10, 1404, 1, 15)])  # past date and a fraction, as old versions saved
     page = client.get(P).text
-    assert "۱۰ قسط مانده" in page and "قسط بعدی: <b>۱۵ آبان</b>" in page
+    assert "۱۰ قسط مانده" in page and "قسط بعدی: <b>۱۵ فروردین</b>" in page  # an old unpaid date stays overdue
+    assert '<span class="dv-badge late">' in page
     snapshot = re.findall(r'data-dv-num><bdi dir="ltr">([^<]+)<', page)
     clock["now"] = datetime(2026, 11, 25, 8, 30, tzinfo=timezone.utc)  # a month later, no «پرداخت شد»
     later = client.get(P).text

@@ -101,7 +101,7 @@ def test_past_month_totals_unchanged(client, freeze, no_network):
 def test_instalment_due_today_in_the_0000_0330_window(client, freeze, no_network):
     _register(client)
     client.post("/profile/debts", data={"title": "وام", "monthly_toman": "250000", "months_left": "6",
-                                        "due_year": "1405", "due_month": "1", "due_day": "26",
+                                        "due_year": "1405", "due_month": "7", "due_day": "26",
                                         "csrf": _csrf(client, "/profile?tab=debts")})
     freeze(datetime(2026, 10, 17, 21, 0, tzinfo=timezone.utc))  # 00:30 Tehran, 1405/07/26 (UTC date is still the 25th)
     html = client.get("/dashboard").text

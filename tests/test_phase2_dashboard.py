@@ -178,8 +178,8 @@ def test_next_instalment_due_chip(client):
     from app.models import Debt
 
     today = jdatetime.date(1405, 7, 25)
-    d1 = Debt(title="وام خودرو", monthly_toman=Decimal("4500000"), months_left=3, due_year=1405, due_month=1, due_day=5)
-    d2 = Debt(title="کارت", monthly_toman=Decimal("100"), months_left=3, due_year=1405, due_month=1, due_day=26)
+    d1 = Debt(title="وام خودرو", monthly_toman=Decimal("4500000"), months_left=3, due_year=1405, due_month=8, due_day=5)
+    d2 = Debt(title="کارت", monthly_toman=Decimal("100"), months_left=3, due_year=1405, due_month=7, due_day=26)
     n = next_instalment([d1, d2], today)
     assert n["chip"] == "فردا" and n["title"] == "کارت" and n["amount_label"] == "۱۰۰"
     n = next_instalment([d1], today)
@@ -259,7 +259,7 @@ def _seed(client):
     _set_price("usd", "100000")
     client.post("/profile", data={"btc": "2", "usd": "200", "cash_toman": "1500000", "csrf": _csrf(client)})
     client.post("/profile/debts", data={"title": "وام", "monthly_toman": "100000", "months_left": "3",
-                                        "due_year": "1405", "due_month": "1", "due_day": "1",
+                                        "due_year": "1499", "due_month": "1", "due_day": "1",
                                         "csrf": _csrf(client, "/profile?tab=debts")})
     db = SessionLocal()
     user = db.query(User).filter(User.username == "alice").one()

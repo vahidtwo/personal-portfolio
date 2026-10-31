@@ -36,7 +36,7 @@
       </div>
       <div data-dv-swap="next">
       {% if dv.next %}
-      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num">{{ dv.next.amount_label }}</bdi> تومان</span><span class="d">{{ dv.next.chip }}</span></p>
+      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num">{{ dv.next.amount_label }}</bdi> تومان</span><span class="d{% if dv.next.days < 0 %} late{% endif %}">{{ dv.next.chip }}</span></p>
       {% endif %}
       </div>
       <p class="dv-formula">مانده = حقوق − قسط‌ها − هزینهٔ ماهانه. حقوق فقط با دکمهٔ چشم نشان داده می‌شود و ذخیره نمی‌شود.</p>
@@ -57,6 +57,7 @@
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ r.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta">
+            {% if r.overdue %}<span class="dv-badge late">{{ r.overdue_label }}{% if r.missed > 1 %}، {{ r.missed | string | fa }} قسط عقب{% endif %}</span>{% endif %}
             {% if r.badge %}<span class="dv-badge {{ r.badge }}">{{ r.badge_label }}</span>{% endif %}
             {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num">{{ r.total_label }}</b> تومان</span>{% else %}<span>از جمع‌ها بیرون است</span>{% endif %}
           </div>

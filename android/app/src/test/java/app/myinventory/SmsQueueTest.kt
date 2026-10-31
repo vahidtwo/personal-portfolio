@@ -63,4 +63,32 @@ class SmsQueueTest {
     }
 
     @Test fun userSurvivesRoundTrip() = assertEquals("alice", SmsQueue.decode(SmsQueue.encode(listOf(e("a")))).single().user)
+
+    // 12.1.2: failed live sends (network / 5xx) go to the same queue and are retried.
+    @Test fun networkErrorAnd5xxAreQueuedForRetry() {
+        for (c in listOf(null, 500, 502, 503, 504)) {
+            org.junit.Assert.assertTrue("$c", ServerAddress.retryLater(c))
+            assertEquals(ServerAddress.SmsOutcome.FAILED, ServerAddress.smsOutcome(c))
+            assertEquals(SmsQueue.Result.KEEP, SmsQueue.classify(c))
+        }
+    }
+
+    @Test fun badRequestsAndSuccessAreNotRetried() {
+        for (c in listOf(200, 201, 301, 400, 401, 403, 404, 422)) org.junit.Assert.assertFalse("$c", ServerAddress.retryLater(c))
+    }
+
+    @Test fun failedSendQueuedTwiceIsOneEntryAndFlushesOnceForItsUser() {
+        var q = SmsQueue.added(emptyList(), e("fail", now - day, "alice"))
+        q = SmsQueue.added(q, e("fail", now, "alice"))   // the same SMS failing again
+        q = SmsQueue.added(q, e("bob1", now, "bob"))
+        assertEquals(2, q.size)
+        val (send, keep) = SmsQueue.split(q, "Alice", now)
+        assertEquals(listOf("fail"), send.map { it.idem }); assertEquals(listOf("bob1"), keep.map { it.idem })
+        assertEquals("fail", SmsQueue.payload(send.single()).getString("idempotency_key"))
+    }
+
+    @Test fun failedSendExpiresAfterSevenDays() {
+        val q = listOf(e("old", now - 8 * day), e("new", now - 6 * day))
+        assertEquals(listOf("new"), SmsQueue.split(q, "alice", now).first.map { it.idem })
+    }
 }

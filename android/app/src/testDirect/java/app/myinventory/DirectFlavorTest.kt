@@ -10,6 +10,6 @@ class DirectFlavorTest {
         assertTrue(BuildConfig.IN_APP_UPDATES)
         assertTrue(UpdateCheck.inAppUpdatesEnabled)
         assertEquals("app.myinventory", BuildConfig.APPLICATION_ID)
-        assertEquals(17, BuildConfig.VERSION_CODE)
+        assertEquals(18, BuildConfig.VERSION_CODE)
     }
 }

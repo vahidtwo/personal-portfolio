@@ -149,7 +149,7 @@ def test_admin_price_uses_shared_parser(client, monkeypatch):
     db.merge(MarketPrice(symbol="btc", price_toman=Decimal("1"), fetched_at=datetime.now(timezone.utc)))
     db.commit(); db.close()
     client.post("/admin/db/market-prices/btc", data={"price_toman": "۷٬۲۰۰٬۰۰۰٬۰۰۰٫۵", "fetched_at": "",
-                                                     "csrf": _csrf(client, "/admin")})
+                                                     "csrf": _csrf(client, "/profile")})
     db = SessionLocal()
     try:
         assert db.get(MarketPrice, "btc").price_toman == Decimal("7200000000.5")

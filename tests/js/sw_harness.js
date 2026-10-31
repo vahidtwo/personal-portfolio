@@ -18,7 +18,7 @@ function makeCaches() {
         async match(k) { const r = m.get(keyOf(k)); return r ? r.clone() : undefined; },
         async put(k, r) { m.set(keyOf(k), r.clone()); },
         async delete(k) { return m.delete(keyOf(k)); },
-        async add() {},
+        async add() { adding++; maxAdding = Math.max(maxAdding, adding); await new Promise((r) => setTimeout(r, 1)); adding--; added++; },
         _keys: () => [...m.keys()],
       });
     }
@@ -35,11 +35,24 @@ function makeCaches() {
 }
 
 const listeners = {};
+const messages = [];
+let preloadCalls = 0; // enable/setHeaderValue/getState: must stay 0
+let preloadDisables = 0;
+let adding = 0;
+let maxAdding = 0;
+let added = 0;
+const DEFAULT_ID = "uTESTUSERaaaa0001";
 let clock = scenario.start || 1_000_000;
 let network = null; // function(request) -> Response | throws
 const caches = makeCaches();
 const sandbox = {
-  self: { location: { origin: "https://app.test" }, addEventListener: (t, f) => (listeners[t] = f), skipWaiting() {}, clients: { claim() {} } },
+  self: {
+    location: { origin: "https://app.test" },
+    addEventListener: (t, f) => (listeners[t] = f),
+    skipWaiting() {},
+    clients: { claim() {}, async get(id) { return { postMessage: (m) => messages.push({ to: id, ...m }) }; } },
+    registration: { navigationPreload: { async enable() { preloadCalls++; }, async disable() { preloadDisables++; }, async setHeaderValue() { preloadCalls++; }, async getState() { preloadCalls++; return {}; } } },
+  },
   caches,
   fetch: async (req) => { if (!network) throw new TypeError("offline"); return network(req); },
   Response, Headers, Request, URL, console, Number, Promise, String,
@@ -47,9 +60,17 @@ const sandbox = {
 };
 sandbox.self.caches = caches;
 // Fake cookieStore: the readable signed-in marker (scenario.marker / step.marker toggles it).
+// marker: true = default user id, a string = that user id, false = signed out,
+// "1" = old (pre-v11) server: inventory_signed_in=1 but no inventory_page_key.
 let marker = scenario.marker === undefined ? true : scenario.marker;
+const markerValue = () => (marker === true ? DEFAULT_ID : marker);
 if (scenario.cookieStore !== false) {
-  sandbox.self.cookieStore = { async get(name) { return name === "inventory_signed_in" && marker ? { name, value: "1" } : null; } };
+  sandbox.self.cookieStore = { async get(name) {
+    if (!marker) return null;
+    if (name === "inventory_signed_in") return { name, value: "1" };
+    if (name === "inventory_page_key" && marker !== "1") return { name, value: markerValue() };
+    return null;
+  } };
 }
 let src = fs.readFileSync(swPath, "utf8")
   .replace(/__STATIC_ASSET_VERSION__/g, "test")
@@ -67,18 +88,24 @@ async function dispatch(path, { method = "GET", mode = "navigate" } = {}) {
   const url = new URL(path, "https://app.test").href;
   const request = { url, method, mode, clone() { return this; } };
   let responded = null;
-  listeners.fetch({ request, respondWith: (p) => (responded = p) });
+  const waits = [];
+  listeners.fetch({ request, resultingClientId: "client-" + path, respondWith: (p) => (responded = p), waitUntil: (p) => waits.push(p) });
   if (!responded) return { handled: false };
   try {
     const res = await responded;
+    await Promise.all(waits);
     return { handled: true, status: res.status, type: res.type, body: res.status === 0 ? "" : await res.clone().text() };
   } catch (e) {
     return { handled: true, error: String(e) };
   }
 }
 
-const PAGE = "inventory-vtest-pages-v2";
-async function pageKeys() { const s = caches._stores.get(PAGE); return s ? s._keys() : []; }
+async function pageKeys() {
+  const out = [];
+  for (const [name, s] of caches._stores) if (name.includes("-pages-")) for (const k of s._keys()) out.push(k);
+  return out;
+}
+const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-pages-"));
 
 (async () => {
   const out = [];
@@ -91,11 +118,14 @@ async function pageKeys() { const s = caches._stores.get(PAGE); return s ? s._ke
     if (step.online === "redirect-login") network = () => html("<p>login</p>", 200, { redirected: true, url: "https://app.test/login" });
     if (step.online === "opaqueredirect") network = () => { const r = new Response(null, { status: 200 }); Object.defineProperty(r, "type", { value: "opaqueredirect" }); Object.defineProperty(r, "status", { value: 0 }); return r; };
     if (step.online === "login-page") network = () => html("<p>login</p>");
+    if (step.install) { let ip; listeners.install({ waitUntil: (p) => (ip = p) }); await ip; }
+    if (step.activate) { let ap; listeners.activate({ waitUntil: (p) => (ap = p) }); await ap; }
     if (step.offline_html) await (await caches.open("inventory-vtest-static")).put("/offline.html", html("<p>offline page</p>"));
     if (step.go) {
       const r = await dispatch(step.go, step.opts || {});
-      out.push({ go: step.go, ...r, pages: await pageKeys() });
+      out.push({ go: step.go, ...r, pages: await pageKeys(), stores: pageStores(), messages: messages.splice(0) });
     }
   }
+  out.push({ preloadCalls, preloadDisables, maxAdding, added });
   console.log(JSON.stringify(out));
 })();

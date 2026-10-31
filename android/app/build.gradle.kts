@@ -23,15 +23,35 @@ android {
         minSdk = 26
         targetSdk = 34
         // QA-only overrides (e.g. the throwaway v7 test APK): -PversionCodeOverride=7 -PversionNameOverride=7.0-test
-        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 10
-        versionName = (project.findProperty("versionNameOverride") as String?) ?: "10.0"
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 16
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "12.1.0"
         // Release: the update check uses the saved server address, https only.
         buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
         buildConfigField("String", "UPDATE_HTTP_HOST", "\"\"")
+        // Biometric unlock (Phase 4 hypothesis) ships later; off until then.
+        buildConfigField("boolean", "BIOMETRIC_UNLOCK", "false")
+        // Native login/home talk to this origin only (no setup screen, no server-settings sheet).
+        buildConfigField("String", "APP_BASE", "\"https://daraiito.ir\"")
     }
 
     buildFeatures {
         buildConfig = true
+    }
+
+    // direct: the APK served from app/static/my-inventory.apk, with in-app updates.
+    // store: Iranian app store build; the store delivers updates, so no in-app update
+    // check/download/install and no REQUEST_INSTALL_PACKAGES (see src/store/AndroidManifest.xml).
+    flavorDimensions += "dist"
+    productFlavors {
+        create("direct") {
+            dimension = "dist"
+            isDefault = true
+            buildConfigField("boolean", "IN_APP_UPDATES", "true")
+        }
+        create("store") {
+            dimension = "dist"
+            buildConfigField("boolean", "IN_APP_UPDATES", "false")
+        }
     }
 
     signingConfigs {
@@ -67,6 +87,9 @@ android {
             val qaBase = (project.findProperty("qaUpdateBaseUrl") as String?) ?: "http://10.0.2.2:8765"
             buildConfigField("String", "UPDATE_BASE_URL", "\"$qaBase\"")
             buildConfigField("String", "UPDATE_HTTP_HOST", "\"10.0.2.2\"")
+            // Local fake server for native login/home QA (never prod).
+            val qaApp = (project.findProperty("qaAppBase") as String?) ?: "http://10.0.2.2:8810"
+            buildConfigField("String", "APP_BASE", "\"$qaApp\"")
         }
     }
 
@@ -79,9 +102,24 @@ android {
     }
 }
 
+// Keep the direct release file name as before (app-release.apk); store gets its own name.
+androidComponents {
+    onVariants { variant ->
+        val name = when (variant.flavorName) {
+            "direct" -> "app-${variant.buildType}.apk"
+            "store" -> "my-inventory-store-${variant.buildType}.apk"
+            else -> null
+        } ?: return@onVariants
+        variant.outputs.forEach { out ->
+            (out as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(name)
+        }
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
     implementation("com.google.firebase:firebase-messaging")
     testImplementation("junit:junit:4.13.2")

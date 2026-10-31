@@ -8,7 +8,7 @@ from tests.test_unified_auth import _continue, _csrf, _signup
 
 
 def _logout(client):
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
 
 
 def _users():
@@ -31,7 +31,7 @@ def _locked_client(client, fails=None):
 
 def test_retry_after_unit(monkeypatch):
     clock = [1000.0]
-    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(rate_limit.time, "time", lambda: clock[0])
     assert rate_limit.retry_after("k", 3, 900) == 0
     for _ in range(2):
         rate_limit.record("k", 900)
@@ -60,21 +60,21 @@ def test_lockout_shows_minutes_and_retry_after_header(client, monkeypatch):
     assert "disabled" in btn and re.search(r'data-retry-seconds="(88\d|89\d|900)"', btn) and "دوباره امتحان کنید، ۱۵ دقیقهٔ دیگر" in btn and "<bdi" not in btn
     assert 'value="lockme"' in r.text and "password123" not in r.text
     # time passes: 5 minutes later it says 10, and the header counts down
-    real = rate_limit.time.monotonic
-    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: real() + 300)
+    real = rate_limit.time.time
+    monkeypatch.setattr(rate_limit.time, "time", lambda: real() + 300)
     later = _continue(client, "lockme", "password123")
     assert later.status_code == 429 and 595 <= int(later.headers["retry-after"]) <= 600
     assert "تا حدود ۱۰ دقیقهٔ دیگر بسته است." in later.text
     # after the window the right password gets in again
-    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: real() + 901)
+    monkeypatch.setattr(rate_limit.time, "time", lambda: real() + 901)
     ok = _continue(client, "lockme", "password123")
     assert ok.status_code == 303 and ok.headers["location"] == "/dashboard"
 
 
 def test_lockout_minutes_round_up(client, monkeypatch):
     _locked_client(client)
-    real = rate_limit.time.monotonic
-    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: real() + 841)  # 59 s left -> still «۱ دقیقه»
+    real = rate_limit.time.time
+    monkeypatch.setattr(rate_limit.time, "time", lambda: real() + 841)  # 59 s left -> still «۱ دقیقه»
     r = _continue(client, "lockme", "password123")
     assert r.status_code == 429 and "تا حدود ۱ دقیقهٔ دیگر" in r.text.replace("۱ دقیقهٔ", "۱ دقیقهٔ")
     assert 1 <= int(r.headers["retry-after"]) <= 60
@@ -220,7 +220,7 @@ def test_login_flow_used_by_the_android_webview_is_unchanged(client):
     ok = _continue(client, "droid1", "password123")
     assert ok.status_code == 303 and ok.headers["location"] == "/dashboard" and "session" in ok.headers.get("set-cookie", "")
     assert client.get("/dashboard").status_code == 200
-    out = client.post("/logout", data={"csrf": _csrf(client, "/dashboard")}, follow_redirects=False)
+    out = client.post("/logout", data={"csrf": _csrf(client, "/profile")}, follow_redirects=False)
     assert out.headers["location"] == "/auth"
     for path in ("/login", "/register"):
         assert client.get(path, follow_redirects=False).headers["location"] == "/auth"

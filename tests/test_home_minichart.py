@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -17,8 +17,12 @@ def _snap(at, **unit):
     return SimpleNamespace(taken_at=at, breakdown_json=json.dumps({"unit_price": {k: str(v) for k, v in unit.items()}}))
 
 
+# Midday in Tehran: the 2-hour-older snapshot of each day stays on the same Tehran day.
+FIXED_NOW = datetime(2026, 10, 20, 8, 30, tzinfo=timezone.utc)
+
+
 def test_series_last_snapshot_per_day_plus_live_old_to_new():
-    now = utcnow()
+    now = FIXED_NOW
     snaps = [_snap(now - timedelta(days=d, hours=h), gold=100 + 10 * (8 - d) + h) for d in range(1, 10) for h in (0, 2)]
     trends = build_week_asset_trends(snaps, _view(gold="500", cash="1"), now)
     assert len(trends["gold"]) <= 8 and trends["gold"][-1] == 500.0

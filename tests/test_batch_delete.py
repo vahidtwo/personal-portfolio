@@ -183,7 +183,7 @@ def test_non_admin_cannot_use_batch_delete(client, monkeypatch):
     from app.db import SessionLocal
     from app.user_delete import count_user_rows, new_backup_name
     db = SessionLocal(); exp = json.dumps({str(ids["alice"]): count_user_rows(db, ids["alice"])}); db.close()
-    t = _csrf(client, "/dashboard")
+    t = _csrf(client, "/profile")
     client.post("/admin/users/delete", data={"csrf": t, "ids": [str(ids["alice"])], "expected_json": exp,
                 "backup_name": new_backup_name(), "confirm_count": "1"})
     assert _exists(ids["alice"])

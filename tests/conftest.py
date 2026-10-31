@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Faster password hashing in tests only (production default stays 12; see test_bcrypt_cost_default).
+os.environ.setdefault("BCRYPT_ROUNDS", "4")
 
 
 def _purge_app_modules() -> None:

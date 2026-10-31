@@ -56,7 +56,7 @@ def test_login_locks_after_repeated_failures(client: TestClient):
         data={"username": "victim", "password": "password123", "csrf": _csrf(client, "/login")},
         follow_redirects=False,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 429
     assert "۱۵ دقیقه" in resp.text
 
 
@@ -94,9 +94,15 @@ def test_client_ip_ignores_spoofed_cf_header_off_cloudflare():
     def req(headers):
         return Request({"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers.items()], "client": ("10.0.0.5", 1)})
 
-    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "9.9.9.9"})) == "9.9.9.9"
-    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.5.5.5, 162.158.1.1"})) == "1.2.3.4"
+    def req_from(peer, headers):
+        return Request({"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers.items()], "client": (peer, 1)})
+
+    # X-Forwarded-For is never read; the peer is request.client.host (uvicorn --proxy-headers).
+    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "9.9.9.9"})) == "10.0.0.5"
+    assert client_ip(req({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.5.5.5, 162.158.1.1"})) == "10.0.0.5"
     assert client_ip(req({"cf-connecting-ip": "1.2.3.4"})) == "10.0.0.5"
+    assert client_ip(req_from("162.158.1.1", {"cf-connecting-ip": "1.2.3.4"})) == "1.2.3.4"
+    assert client_ip(req_from("162.158.1.1", {"cf-connecting-ip": "not-an-ip"})) == "162.158.1.1"
 
 
 def test_sw_version_matches_static_asset_version(client: TestClient):

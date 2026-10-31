@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.session_marker import SessionMarkerMiddleware
+from app.native_api import router as native_api_router
 from app.static_gzip import StaticGZipMiddleware
 
 from app.admin_users import router as admin_users_router
@@ -72,9 +73,13 @@ async def lifespan(_app: FastAPI):
     await stop_hourly_scheduler()
 
 
-app = FastAPI(title="Daraiito", lifespan=lifespan)
+# Server release (semver). The Android app keeps its own versionName in android_release.json.
+SERVER_VERSION = "12.0.2"
+app = FastAPI(title="Daraiito", version=SERVER_VERSION, lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
-app.add_middleware(SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY)
+app.add_middleware(
+    SessionMarkerMiddleware, max_age=SESSION_MAX_AGE_SECONDS, https_only=HTTPS_ONLY, secret_key=_secret_key()
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=_secret_key(),
@@ -125,6 +130,7 @@ app.include_router(pwa_router)
 app.include_router(push_router)
 app.include_router(auth_router)
 app.include_router(unified_auth_router)
+app.include_router(native_api_router)
 app.include_router(dashboard_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)

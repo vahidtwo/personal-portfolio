@@ -10,6 +10,8 @@ import android.net.http.SslError
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
@@ -24,6 +26,7 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import kotlin.concurrent.thread
 
@@ -38,8 +41,18 @@ class MainActivity : AppCompatActivity() {
     /** After a successful retry, drop the error screen from the back stack. */
     private var clearHistoryOnSuccess = false
 
+    /** v11: the launch splash stays until the first page paints (or [StartupGate.SPLASH_MAX_MS]). */
+    private val startup = StartupGate()
+    /** v11: main-frame errors for a page the service worker actually served are ignored (see MainFrameErrors). */
+    private val frameErrors = MainFrameErrors()
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        startup.created(SystemClock.uptimeMillis())
+        // A tab opened from the native home shows the skeleton cover at once instead of holding the window
+        // blank behind the splash condition; the cover still hides at the first paint.
+        val tabLaunch = intent?.getStringExtra(EXTRA_PATH) != null
+        installSplashScreen().setKeepOnScreenCondition { !tabLaunch && startup.keepSplash(SystemClock.uptimeMillis()) }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = Color.parseColor("#050608")
@@ -47,7 +60,20 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         web = findViewById(R.id.web)
         loading = findViewById(R.id.loading)
-        web.setBackgroundColor(Color.parseColor("#050608"))
+        val bgColor = if (isNight()) Color.parseColor("#050608") else Color.parseColor("#EEF1F8")
+        web.setBackgroundColor(bgColor)
+        if (tabLaunch) {
+            window.statusBarColor = bgColor
+            // Same colour as the native bar composited over the page, so the inset does not jump on a tab switch.
+            window.navigationBarColor = WebNav.systemBarColor(isNight())
+            if (android.os.Build.VERSION.SDK_INT >= 28) window.navigationBarDividerColor = Color.TRANSPARENT
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !isNight(); isAppearanceLightNavigationBars = !isNight()
+            }
+            findViewById<View>(android.R.id.content).setBackgroundColor(bgColor)
+            LoadingSkeleton.install(loading as android.widget.FrameLayout, isNight())
+            showLoading(true)
+        }
 
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -87,12 +113,24 @@ class MainActivity : AppCompatActivity() {
                 if (!request.isForMainFrame) return false
                 val target = request.url ?: return false
                 if (target.scheme == "file") return false
+                if (handOffToNative(target)) return true
+                if (ServerAddress.opensExternally(target.scheme, target.host)) {
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, target).addCategory(Intent.CATEGORY_BROWSABLE)) }
+                    return true
+                }
                 if (isAllowedRemoteUrl(target)) return false
                 return true
             }
 
             override fun onPageCommitVisible(view: WebView, url: String?) {
                 super.onPageCommitVisible(view, url)
+                // v11: first paint of the new page -> drop the splash/cover now, not at onPageFinished (load).
+                // Not while the hidden old-host /health page is read, and not for a failed page (error screen next).
+                frameErrors.committed(url)
+                if (StartupGate.revealOnCommit(url, readingOldPrivacy, errorPending || frameErrors.pending != null)) {
+                    showLoading(false)
+                    startup.firstPaint(SystemClock.uptimeMillis(), url)
+                }
                 // Earliest point after the /auth -> /dashboard redirect: persist the new session cookie before the
                 // page finishes loading, so a force-stop ~1 s after login keeps the user signed in.
                 CookieManager.getInstance().flush()
@@ -100,6 +138,8 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (url != null && handOffToNative(Uri.parse(url))) { view.stopLoading(); return }
+                frameErrors.started(url)
                 if (url != null && url.startsWith("https://")) showLoading(true)
             }
 
@@ -109,7 +149,14 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError,
             ) {
                 super.onReceivedError(view, request, error)
-                if (request.isForMainFrame) showConnectionError(request.url?.toString())
+                if (!request.isForMainFrame) return
+                val failed = request.url?.toString()
+                if (frameErrors.holdNetworkError(failed, readingOldPrivacy)) {
+                    Log.i(StartupGate.TAG, "main-frame error held (${error.errorCode})")
+                    view.postDelayed({ decideHeldError(null) }, MainFrameErrors.DECIDE_AFTER_MS)
+                } else {
+                    showConnectionError(failed)
+                }
             }
 
             override fun onReceivedHttpError(
@@ -123,7 +170,12 @@ class MainActivity : AppCompatActivity() {
                 val path = request.url?.path.orEmpty().trimEnd('/')
                 // 5xx = server down / deploying; 404 on /dashboard = not our server.
                 if (status >= 500 || (status == 404 && path == "/dashboard")) {
-                    showConnectionError(request.url?.toString())
+                    val failed = request.url?.toString()
+                    if (frameErrors.holdHttpError(failed, readingOldPrivacy)) {
+                        view.postDelayed({ decideHeldError(null) }, MainFrameErrors.DECIDE_AFTER_MS)
+                    } else {
+                        showConnectionError(failed)
+                    }
                 }
             }
 
@@ -139,34 +191,11 @@ class MainActivity : AppCompatActivity() {
                 // Persist the session cookie right after each page (e.g. the /auth -> /dashboard login), not only
                 // in onPause: a process kill without onPause (force-stop, OOM) otherwise logs the user out.
                 CookieManager.getInstance().flush()
-                if (readingOldPrivacy) {
-                    if (url.startsWith(ServerAddress.OLD_DEFAULT)) {
-                        view.evaluateJavascript(
-                            "(function(){try{return localStorage.getItem('privacy-portfolio')}catch(e){return 'err'}})()",
-                        ) { r -> finishMove(r) }
-                    }
+                if (frameErrors.isPendingFor(url)) {
+                    decideHeldError { finishPage(view, url) }
                     return
                 }
-                if (url.startsWith("https://")) {
-                    applyPendingHide(url)
-                    checkNewHostPage(url)
-                }
-                if (url.startsWith("file:")) {
-                    errorPending = false
-                    showLoading(false)
-                    UpdateNotifier.hideQuietly()
-                    return
-                }
-                if (errorPending) return // the error screen is on its way
-                showLoading(false)
-                if (url.startsWith("https://")) {
-                    if (clearHistoryOnSuccess) {
-                        clearHistoryOnSuccess = false
-                        view.clearHistory()
-                    }
-                    PushRegistrar.registerFcmToken(this@MainActivity)
-                }
-                UpdateNotifier.onPageLoaded(this@MainActivity, url, savedBaseUrl())
+                finishPage(view, url)
             }
         }
 
@@ -181,8 +210,9 @@ class MainActivity : AppCompatActivity() {
 
         SmsPrefs.ensureMigrated(this)
         askNotificationPermission()
-        if (intent?.action == ACTION_OPEN_SETUP) {
-            openAdvancedSetup()
+        val tabPath = intent?.getStringExtra(EXTRA_PATH)
+        if (tabPath != null && savedInstanceState == null) {
+            loadRemote(NativeSession.BASE, tabPath)
         } else {
             startWithHostMove(savedInstanceState)
         }
@@ -329,13 +359,12 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (!prefs.getBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false)) return
         prefs.edit { putBoolean(SmsReceiver.KEY_LOGIN_NEEDED, false) }
-        Toast.makeText(this, "پیامک خرج ثبت نشد، چون وارد نشده‌اید. لطفاً دوباره وارد شوید.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "پیامک خرج رسید ولی وارد نشده‌اید؛ بعد از ورود خودکار ذخیره می‌شود.", Toast.LENGTH_LONG).show()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ACTION_OPEN_SETUP) openAdvancedSetup()
     }
 
     /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */
@@ -350,6 +379,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         showSmsLoginPromptIfNeeded()
+        SmsReceiver.flushQueued(this)
         UpdateNotifier.onResume(this)
     }
 
@@ -398,11 +428,63 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isNight(): Boolean =
+        (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
     private fun showLoading(show: Boolean) {
         loading.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     /** Never leave Android's "Webpage not available" page up: show our Persian error screen. */
+    private fun finishPage(view: WebView, url: String) {
+        if (readingOldPrivacy) {
+            if (url.startsWith(ServerAddress.OLD_DEFAULT)) {
+                view.evaluateJavascript(
+                    "(function(){try{return localStorage.getItem('privacy-portfolio')}catch(e){return 'err'}})()",
+                ) { r -> finishMove(r) }
+            }
+            return
+        }
+        if (url.startsWith("https://")) {
+            applyPendingHide(url)
+            checkNewHostPage(url)
+        }
+        if (url.startsWith("file:")) {
+            errorPending = false
+            showLoading(false)
+            startup.firstPaint(SystemClock.uptimeMillis(), url)
+            UpdateNotifier.hideQuietly()
+            return
+        }
+        if (errorPending) return // the error screen is on its way
+        showLoading(false)
+        startup.firstPaint(SystemClock.uptimeMillis(), url)
+        Log.i(StartupGate.TAG, "pageFinished +${SystemClock.uptimeMillis() - startup.createdAt}ms")
+        if (url.startsWith("https://")) {
+            if (clearHistoryOnSuccess) {
+                clearHistoryOnSuccess = false
+                view.clearHistory()
+            }
+            PushRegistrar.registerFcmToken(this@MainActivity)
+        }
+        UpdateNotifier.onPageLoaded(this@MainActivity, url, savedBaseUrl())
+    }
+
+    /** Decide a held main-frame error: served page = ignore and [onServed]; else the error screen. */
+    private fun decideHeldError(onServed: (() -> Unit)?) {
+        val url = frameErrors.pending ?: return
+        web.evaluateJavascript(MainFrameErrors.SERVED_JS) { r ->
+            if (!frameErrors.isPendingFor(url)) return@evaluateJavascript
+            if (frameErrors.resolve(r)) {
+                Log.i(StartupGate.TAG, "main-frame error ignored: page was served")
+                if (onServed != null) onServed() else if (!errorPending) { showLoading(false); startup.firstPaint(SystemClock.uptimeMillis(), url) }
+            } else {
+                showConnectionError(url)
+            }
+        }
+    }
+
     private fun showConnectionError(failedUrl: String?) {
         if (readingOldPrivacy) { finishMove(null); return } // old host unreachable: move anyway, hidden
         UpdateNotifier.hideQuietly()
@@ -411,19 +493,13 @@ class MainActivity : AppCompatActivity() {
         showLoading(true)
         // The saved address is kept on purpose: being offline never wipes it.
         web.stopLoading()
-        web.loadUrl(SETUP_ERROR_ASSET)
+        web.loadUrl(ERROR_ASSET + "?theme=" + (if (isNight()) "dark" else "light"))
         maybeFallBackToOldHost(failedUrl)
     }
 
     private fun retryLast() {
-        val target = lastFailedUrl
-            ?: savedBaseUrl()?.let { "$it/dashboard" }
-        if (target == null) {
-            web.loadUrl(SETUP_ASSET)
-            return
-        }
         clearHistoryOnSuccess = true
-        web.loadUrl(target)
+        web.loadUrl(retryTarget(lastFailedUrl, NativeSession.BASE))
     }
 
     private fun restoreOrSetup(savedInstanceState: Bundle?) {
@@ -437,15 +513,29 @@ class MainActivity : AppCompatActivity() {
             if (saved != null && (restoredUrl == null || restoredUrl.startsWith(SETUP_ASSET))) {
                 loadRemote(saved, "/dashboard")
             } else if (restoredUrl == null) {
-                web.loadUrl(SETUP_ASSET)
+                loadRemote(NativeSession.BASE, "/dashboard")
             }
             return
         }
-        if (saved != null) {
-            loadRemote(saved, "/dashboard")
-        } else {
-            web.loadUrl(SETUP_ASSET)
+        loadRemote(saved ?: NativeSession.BASE, "/dashboard")
+    }
+
+    /**
+     * Phase 4: home and login are native. A WebView tab that navigates to the plain home (/dashboard) or to the
+     * sign-in page (after a web logout or an expired session) closes and hands back to [HomeActivity].
+     */
+    private fun handOffToNative(uri: Uri): Boolean {
+        if (uri.host != Uri.parse(NativeSession.BASE).host) return false
+        val path = uri.path.orEmpty().trimEnd('/')
+        val toAuth = path == "/auth" || path == "/login"
+        val toHome = path == "/dashboard" && uri.getQueryParameter("tab") == null
+        if (!toAuth && !toHome) return false
+        if (isFinishing) return true
+        if (toAuth) {
+            startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+        finish()
+        return true
     }
 
     fun loadRemote(base: String, path: String) {
@@ -453,6 +543,8 @@ class MainActivity : AppCompatActivity() {
         saveBaseUrl(normalized)
         val suffix = if (path.startsWith("/")) path else "/$path"
         showLoading(true)
+        Log.i(StartupGate.TAG, "loadUrl +${SystemClock.uptimeMillis() - startup.createdAt}ms")
+        startup.handOffToCover()
         web.loadUrl("$normalized$suffix")
     }
 
@@ -501,9 +593,20 @@ class MainActivity : AppCompatActivity() {
         const val KEY_PHRASE = "sms_phrase"
         const val DEFAULT_PHRASE = "برداشت"
         private const val SETUP_ASSET = "file:///android_asset/www/setup.html"
-        private const val SETUP_ERROR_ASSET = "$SETUP_ASSET?error=connect"
+        /** Phase 4: retry-only error page (no setup link). */
+        private const val ERROR_ASSET = "file:///android_asset/www/error.html"
         private const val SETUP_ADVANCED_ASSET = "$SETUP_ASSET?advanced=1"
         private const val STATE_FAILED_URL = "last_failed_url"
         const val ACTION_OPEN_SETUP = "app.myinventory.OPEN_SETUP"
+        const val EXTRA_PATH = "app.myinventory.PATH"
+
+        /** «تلاش دوباره» reloads the failed page only when it is on the app's own origin; else the home. */
+        fun retryTarget(failed: String?, base: String): String {
+            val host = runCatching { java.net.URI(base).host }.getOrNull()
+            val ok = failed != null && runCatching { java.net.URI(failed) }.getOrNull()?.let {
+                it.scheme == java.net.URI(base).scheme && it.host == host
+            } == true
+            return if (ok) failed!! else "$base/dashboard"
+        }
     }
 }

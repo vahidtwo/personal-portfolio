@@ -99,7 +99,8 @@ def test_anonymous_auth_visit_sets_session_cookie_but_no_marker():
 def test_sms_no_session_never_silent():
     src = (SRC / "SmsReceiver.kt").read_text(encoding="utf-8")
     assert "catch (t: Throwable)" in src and "KEY_LOGIN_NEEDED" in src
-    assert "instanceFollowRedirects = false" in src
+    assert "instanceFollowRedirects = false" in (SRC / "SmsQueue.kt").read_text(encoding="utf-8")
+    assert "SmsQueue.add(context, entry)" in src
     main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
     assert "showSmsLoginPromptIfNeeded()" in main
 

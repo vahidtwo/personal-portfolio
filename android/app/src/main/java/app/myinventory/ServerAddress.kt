@@ -12,6 +12,12 @@ object ServerAddress {
     /** Hosts the WebView main frame may open (exact match, https only). */
     val KNOWN_HOSTS = setOf("portfolio.vahidtwo.ir", "daraiito.ir")
 
+    /** Hosts that always open in the external browser, never inside the WebView (exact match, https only). */
+    val EXTERNAL_HOSTS = setOf("github.com")
+
+    fun opensExternally(scheme: String?, host: String?): Boolean =
+        scheme?.lowercase() == "https" && host?.lowercase() in EXTERNAL_HOSTS
+
     /**
      * Returns the https origin (scheme://host[:port]) for [raw], or null when it can't be used.
      * - blank -> null (callers fall back to [DEFAULT])

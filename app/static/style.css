@@ -2771,6 +2771,7 @@ html.dv-locked{overflow:hidden}
 .dv-badge{display:inline-flex;align-items:center;padding:0 8px;border-radius:8px;font-size:12px;font-weight:700;min-height:22px}
 .dv-badge.end{background:#12302a;color:var(--accent-text)}[data-theme=light] .dv-badge.end{background:#dff5ee}
 .dv-badge.soon{background:#33270d;color:var(--warn-text)}[data-theme=light] .dv-badge.soon{background:#fff3db}
+.dv-badge.late{background:var(--danger-bg);color:var(--danger)}.dv-next .d.late{color:var(--danger)}
 .dv-sumrow{display:flex;justify-content:space-between;gap:12px;padding:12px 0 0;margin:4px 0 0;border-top:1px solid var(--border);font-size:14px}
 .dv-sumrow b{white-space:nowrap}
 .dv-menu{position:absolute;z-index:40;top:52px;inset-inline-end:0;min-width:220px;padding:6px;border-radius:14px;border:1px solid var(--border);background:var(--surface-solid,#11131a);box-shadow:0 12px 30px rgba(0,0,0,.35)}

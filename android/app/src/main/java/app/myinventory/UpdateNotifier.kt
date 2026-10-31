@@ -55,6 +55,7 @@ object UpdateNotifier {
 
     /** From MainActivity.onPageFinished for every successfully loaded page. */
     fun onPageLoaded(activity: MainActivity, pageUrl: String?, savedBase: String?) {
+        if (!UpdateCheck.inAppUpdatesEnabled) return
         activityRef = WeakReference(activity)
         if (!UpdateCheck.isEligiblePage(pageUrl, savedBase)) {
             hideQuietly()
@@ -64,6 +65,7 @@ object UpdateNotifier {
     }
 
     fun onResume(activity: MainActivity) {
+        if (!UpdateCheck.inAppUpdatesEnabled) return
         activityRef = WeakReference(activity)
         maybeShow()
         refresh() // e.g. back from the «نصب از منابع ناشناس» settings screen
@@ -76,6 +78,7 @@ object UpdateNotifier {
     }
 
     private fun startCheck(activity: MainActivity, savedBase: String?) {
+        if (!UpdateCheck.inAppUpdatesEnabled) return
         checkStarted = true
         val base = checkBase(savedBase) ?: return
         val endpoint = UpdateCheck.resolveDownloadUrl(base, "/api/app-version", httpAllowedHost) ?: return

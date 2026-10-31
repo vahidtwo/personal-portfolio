@@ -38,6 +38,22 @@ android {
         buildConfig = true
     }
 
+    // direct: the APK served from app/static/my-inventory.apk, with in-app updates.
+    // store: Iranian app store build; the store delivers updates, so no in-app update
+    // check/download/install and no REQUEST_INSTALL_PACKAGES (see src/store/AndroidManifest.xml).
+    flavorDimensions += "dist"
+    productFlavors {
+        create("direct") {
+            dimension = "dist"
+            isDefault = true
+            buildConfigField("boolean", "IN_APP_UPDATES", "true")
+        }
+        create("store") {
+            dimension = "dist"
+            buildConfigField("boolean", "IN_APP_UPDATES", "false")
+        }
+    }
+
     signingConfigs {
         if (releaseKeystoreProps != null) {
             create("release") {
@@ -83,6 +99,20 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+// Keep the direct release file name as before (app-release.apk); store gets its own name.
+androidComponents {
+    onVariants { variant ->
+        val name = when (variant.flavorName) {
+            "direct" -> "app-${variant.buildType}.apk"
+            "store" -> "my-inventory-store-${variant.buildType}.apk"
+            else -> null
+        } ?: return@onVariants
+        variant.outputs.forEach { out ->
+            (out as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(name)
+        }
     }
 }
 

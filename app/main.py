@@ -56,7 +56,8 @@ class InsecureSecretKey(RuntimeError):
 
 
 def _secret_key() -> str:
-    key = (SECRET_KEY or "").strip()
+    # Used exactly as set: surrounding spaces are part of the key, never trimmed away.
+    key = SECRET_KEY or ""
     if not key:
         raise InsecureSecretKey(
             "SECRET_KEY is not set. Set it to a long random string (e.g. in Dokploy > Environment); "
@@ -69,6 +70,18 @@ def _secret_key() -> str:
     return key
 
 
+SCHEDULER_OFF_WARNING = (
+    "ENABLE_INTERNAL_SCHEDULER is off: the hourly job and the nightly SQLite backups will NOT run in this "
+    "process. No backups will be made unless an external cron runs scripts/create_snapshot.py and the backup."
+)
+
+
+def warn_scheduler_off() -> None:
+    logger.warning("!" * 72)
+    logger.warning(SCHEDULER_OFF_WARNING)
+    logger.warning("!" * 72)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
@@ -78,7 +91,7 @@ async def lifespan(_app: FastAPI):
         start_hourly_scheduler()
         start_nightly_backup()
     else:
-        logger.info("Internal hourly scheduler disabled (use external cron + scripts/create_snapshot.py)")
+        warn_scheduler_off()
     yield
     await stop_hourly_scheduler()
 

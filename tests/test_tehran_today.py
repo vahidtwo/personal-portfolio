@@ -28,8 +28,8 @@ def _tehran(*args):
 def _month_line(client, query=""):
     html = client.get("/dashboard?tab=daily" + query).text
     # Spending v2 tiles: «امروز» + «این ماه», or a single «جمع {ماه}» for a past month (no «امروز» there).
-    today = re.search(r'<span>امروز</span><b class="num">([^<]+)</b>', html)
-    month = re.search(r'<span>(?:این ماه|جمع [^<]+)</span><b class="num">([^<]+)</b>', html)
+    today = re.search(r'<span>امروز</span><b class="num"[^>]*>([^<]+)</b>', html)
+    month = re.search(r'<span>(?:این ماه|جمع [^<]+)</span><b class="num"[^>]*>([^<]+)</b>', html)
     title = re.search(r"data-sp-title>([^<]+ [۰-۹]{4})</strong>", html).group(1)
     return title, today.group(1) if today else None, month.group(1)
 

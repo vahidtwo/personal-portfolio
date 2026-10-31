@@ -300,7 +300,13 @@
     return out;
   }
 
+  /** True while the user has amounts hidden: the chart then keeps only its line, no values. */
+  function amountsHidden() {
+    return document.documentElement.getAttribute("data-show-portfolio") !== "1";
+  }
+
   function chartOptions(view, opts) {
+    const hideValues = amountsHidden();
     const { labels, datasets, unit, first, last, nowMs } = view;
     const { rangeSelect, zoomOn, height } = opts;
     const muted = cssVar("--text-muted") || "#9aa3b2";
@@ -315,7 +321,7 @@
     const plugins = {
       legend: { display: false },
       tooltip: {
-        enabled: !rangeSelect,
+        enabled: !rangeSelect && !hideValues,
         position: "nearest",
         rtl: true,
         backgroundColor: surface,
@@ -413,6 +419,7 @@
           max: yScale.max,
           beginAtZero: false,
           ticks: {
+            display: !hideValues,
             color: muted,
             font: { size: 11.5, weight: "500" },
             stepSize: yScale.stepSize,
@@ -677,6 +684,13 @@
     assetSelect?.addEventListener("input", onSeriesChange);
 
     renderChart();
+    // Hiding or showing amounts redraws the chart without (or with) its axis values and tooltip.
+    if (window.MutationObserver) {
+      new MutationObserver(() => renderChart()).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-show-portfolio"],
+      });
+    }
     // Re-draw once Vazirmatn has loaded (font-display: swap), so axis/tooltip digits match.
     if (document.fonts && document.fonts.load) {
       Promise.all([document.fonts.load('12px Vazirmatn', "۱٬۲۳۴٫۵"), document.fonts.ready])

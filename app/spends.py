@@ -37,6 +37,40 @@ _SMS_KEY = _re.compile(r"\s*\[[0-9a-f]{64}\]\s*")
 SMS_NOTE_MAX = 120
 SMS_MERCHANT_MAX = 40
 
+def _sms_merchant(body: str) -> str:
+    """Merchant or description in an SMS text (see sms_note_text), cut to SMS_MERCHANT_MAX."""
+    return sms_note_text(body)[:SMS_MERCHANT_MAX].strip()
+
+
+def sms_note_for_storage(raw_note: str, idem: str) -> str:
+    """Stored note for a new SMS spend: merchant first, then the key, then as much SMS text as fits."""
+    raw_note = (raw_note or "").strip()
+    if not idem:
+        return raw_note[:SMS_NOTE_MAX]
+    key = f"[{idem}]"
+    merchant = _sms_merchant(raw_note) if _re.fullmatch(r"[0-9a-f]{64}", idem) else ""
+    head = f"{merchant} {key}" if merchant else key
+    return f"{head} {raw_note}".strip()[:SMS_NOTE_MAX]
+
+
+def sms_note_key(note: str | None) -> tuple[str, str] | None:
+    """(merchant, SMS text) around the key in a stored SMS note, old or new layout.
+
+    None without a key, or when the text before the key could not be a stored merchant (digits, bank words).
+    """
+    note = note or ""
+    m = _SMS_KEY.search(note)
+    if m is None:
+        return None
+    merchant = note[:m.start()].strip()
+    if merchant and (len(merchant) > SMS_MERCHANT_MAX or sms_note_text(merchant) != merchant):
+        return None
+    return merchant, note[m.end():].strip()
+
+
+_SMS_KEY_ANY = _re.compile(r"\[[0-9a-fA-F]{64}\]")
+
+
 _D = "0-9۰-۹٠-٩"
 _SMS_DROP = [
     _re.compile(r"\[[0-9a-fA-F]{64}\]"),
@@ -52,42 +86,24 @@ _SMS_WORDS = set("""بانک ملت ملی صادرات تجارت سامان پ
 _SMS_EDGE = {"به", "از", "در", "با", "و", "بابت"}
 
 
-def _sms_merchant(body: str) -> str:
-    """Merchant or description in an SMS text: bank words, digits, dates, times and balance dropped."""
+def sms_note_text(body: str) -> str:
+    """Merchant or description left in an SMS body once bank boilerplate, digits, dates, times and balance go."""
     s = body or ""
     for rx in _SMS_DROP:
         s = rx.sub(" ", s)
-    words = [t.strip("،,:;؛()[]-_") for t in s.split()]
-    words = [t for t in words if t]
-    kept = [i for i, t in enumerate(words) if t not in _SMS_WORDS]
+    tokens = [t.strip("،,:;؛()[]-_") for t in s.split()]
+    kept = [t for t in tokens if t and t not in _SMS_WORDS]
     if not kept:
         return ""
-    span = [t for t in words[kept[0]:kept[-1] + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
+    words = [t for t in tokens if t]
+    first = words.index(kept[0])
+    last = len(words) - 1 - words[::-1].index(kept[-1])
+    span = [t for t in words[first:last + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
     while span and span[0] in _SMS_EDGE:
         span.pop(0)
     while span and span[-1] in _SMS_EDGE:
         span.pop()
-    return " ".join(span)[:SMS_MERCHANT_MAX].strip()
-
-
-def sms_note_for_storage(raw_note: str, idem: str) -> str:
-    """Stored note for a new SMS spend: merchant first, then the key, then as much SMS text as fits."""
-    raw_note = (raw_note or "").strip()
-    if not idem:
-        return raw_note[:SMS_NOTE_MAX]
-    key = f"[{idem}]"
-    merchant = _sms_merchant(raw_note) if _re.fullmatch(r"[0-9a-f]{64}", idem) else ""
-    head = f"{merchant} {key}" if merchant else key
-    return f"{head} {raw_note}".strip()[:SMS_NOTE_MAX]
-
-
-def sms_note_key(note: str | None) -> tuple[str, str] | None:
-    """(merchant, SMS text) around the key in a stored SMS note, old or new layout; None without a key."""
-    note = note or ""
-    m = _SMS_KEY.search(note)
-    if m is None:
-        return None
-    return note[:m.start()].strip(), note[m.end():].strip()
+    return " ".join(span)
 
 
 SMS_COMMISSION_MAX_TOMAN = Decimal("50000")
@@ -156,15 +172,20 @@ def sms_spend_category(db: Session, user: User, amount_toman) -> SpendCategory |
 def sms_spend_parts(
     note: str | None, category_slug: str | None, category_name: str | None = None
 ) -> tuple[bool, str]:
-    """(from_sms, note without the internal key) for one spend."""
+    """(from_sms, note shown to the user) for one spend.
+
+    A note that carries the app's SMS key (at the start, or after the merchant in newer notes) marks an SMS
+    spend in any category (bank, «کارمزد» or one the user picked later): only its merchant or description
+    part is shown (see sms_note_text), a stored merchant once and as is; when nothing is left, the
+    «از پیامک» tag alone stands for it.
+    Any other note is shown as saved, minus a stray key. Stored notes are not changed.
+    """
     note = note or ""
     parts = sms_note_key(note)
-    if parts and (category_slug in ("sms_bank", SMS_COMMISSION_SLUG) or category_name == SMS_COMMISSION_NAME):
+    if parts:
         merchant, text = parts
-        if merchant and merchant not in text:
-            return True, f"{merchant} — {text}" if text else merchant
-        return True, text or merchant
-    return False, note
+        return True, merchant or sms_note_text(text)
+    return False, _re.sub(r"\s{2,}", " ", _SMS_KEY_ANY.sub("", note)).strip()
 
 router = APIRouter()
 
@@ -305,7 +326,7 @@ def daily_view(
             "day": str(editing["day"]),
             "parent_id": str(editing["parent_id"]),
             "category_id": str(editing["category_id"]),
-            "note": editing["note"],
+            "note": editing["note_display"],
         }
     if spend_form is None:
         today = tehran_today()
@@ -458,7 +479,8 @@ def _save_daily_spend(
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
-        item.note = form["note"]
+        if form["note"] != sms_spend_parts(item.note, None)[1]:
+            item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
     target = f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}"

@@ -133,6 +133,40 @@ def active_installment(debts) -> Decimal:
     return sum((Decimal(d.monthly_toman) for d in debts if is_active(d)), Decimal("0"))
 
 
+def month_due(debts, today: jdatetime.date | None = None) -> tuple[Decimal, Decimal]:
+    """(due by the end of today's Jalali month, overdue part of it).
+
+    Every unpaid instalment dated in the current Jalali month or earlier counts once; the overdue part
+    is the ones dated before today. Instalments after this month are not included.
+    """
+    today = today or tehran_today()
+    total = overdue = Decimal("0")
+    for debt in debts:
+        nxt = next_due(debt, today)
+        if nxt is None:
+            continue
+        amount = Decimal(debt.monthly_toman)
+        y, m = nxt.year, nxt.month
+        for _ in range(int(debt.months_left)):
+            if (y, m) > (today.year, today.month):
+                break
+            total += amount
+            if clamp(y, m, debt.due_day) < today:
+                overdue += amount
+            y, m = add_months(y, m, 1)
+    return total, overdue
+
+
+def overdue_count(debts, today: jdatetime.date | None = None) -> int:
+    """Active debts whose oldest unpaid instalment is before today."""
+    today = today or tehran_today()
+    return sum(1 for d in debts if (n := next_due(d, today)) is not None and n < today)
+
+
+def overdue_loans_label(count: int) -> str | None:
+    return f"{persian_digits(str(count))} وام عقب‌افتاده" if count > 0 else None
+
+
 def badge(months_left: int) -> tuple[str | None, str | None]:
     if months_left == 1:
         return "end", "آخرین قسط"
@@ -165,5 +199,6 @@ def soonest(debts, today: jdatetime.date | None = None) -> dict | None:
     days = (best.togregorian() - today.togregorian()).days
     amount = sum((Decimal(d.monthly_toman) for d in group), Decimal("0"))
     title = f"{persian_digits(str(len(group)))} قسط" if len(group) > 1 else ((group[0].title or "").strip() or "قسط")
+    late = overdue_count(debts, today)
     return {"date": best, "days": days, "chip": days_chip(days), "amount": amount, "amount_label": format_toman(amount),
-            "title": title, "date_label": day_month(best)}
+            "title": title, "date_label": day_month(best), "overdue_count": late, "overdue_label": overdue_loans_label(late)}

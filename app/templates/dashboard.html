@@ -225,7 +225,7 @@
     {% if next_instalment %}
     <div class="v"><bdi dir="ltr" data-mask="portfolio" data-amount>{{ next_instalment.amount_label }}</bdi> <span class="s">تومان</span></div>
     <div class="s">{{ next_instalment.title }}، {{ next_instalment.date_label }}</div>
-    <div class="row"><span class="badge badge-due{% if next_instalment.days <= 3 %} is-soon{% endif %}">{{ next_instalment.chip }}</span></div>
+    <div class="row"><span class="badge badge-due{% if next_instalment.days <= 3 %} is-soon{% endif %}">{{ next_instalment.chip }}</span>{% if next_instalment.overdue_label %}<span class="badge badge-due is-soon" data-overdue-loans>{{ next_instalment.overdue_label }}</span>{% endif %}</div>
     {% else %}
     <div class="v v-empty">قسطی ثبت نشده</div>
     <div class="row"><span class="btn-text">{{ ui_icon('plus') }}افزودن بدهی</span></div>
@@ -265,7 +265,7 @@
     <p class="card-desc">مانده = حقوق − اقساط این ماه − هزینهٔ ماهانه. روی ارزش پرتفوی اثری ندارد.</p>
   </div>
   <dl class="net-line">
-    <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_month_label }}</bdi> تومان</dd></div>
+    <div><dt>اقساط این ماه و عقب‌افتاده</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_month_label }}</bdi> تومان{% if installment_overdue_label %}<small class="muted" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_overdue_label }}</bdi> تومان</small>{% endif %}</dd></div>
     <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ expense_month_label }}</bdi> تومان</dd></div>
     <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
   </dl>

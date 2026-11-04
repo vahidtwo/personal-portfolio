@@ -45,10 +45,19 @@ def test_no_merchant_keeps_old_layout():
 def test_old_format_notes_still_parse():
     from app.spends import sms_spend_parts
 
-    assert sms_spend_parts(f"[{KEY}] خرید نان", "sms_bank") == (True, "خرید نان")
-    assert sms_spend_parts(f"[{KEY}]", "sms_bank") == (True, "")
+    assert sms_spend_parts(f"[{KEY}] بانک ملت برداشت از کارت ****-1234 خرید از نانوایی نمونه", "sms_bank") == (True, "نانوایی نمونه")
+    assert sms_spend_parts(f"[{KEY}] بانک ملت برداشت -50,000 ریال", "sms_bank") == (True, "")
     assert sms_spend_parts("نان", "sms_bank") == (False, "نان")
-    assert sms_spend_parts(f"[{KEY}] x", "food") == (False, f"[{KEY}] x")
+
+
+def test_new_layout_through_render_path_keeps_merchant_once():
+    from app.spends import sms_note_for_storage, sms_spend_parts
+
+    note = sms_note_for_storage(LONG, KEY)
+    for slug in ("sms_bank", "sms_fee", "food", None):
+        tagged, shown = sms_spend_parts(note, slug)
+        assert tagged and shown == "فروشگاه آزمایشی مرکزی"
+        assert KEY not in shown and not re.search(r"[0-9۰-۹٠-٩*]", shown) and "مانده" not in shown
 
 
 def test_api_long_sms_merchant_survives_tag_and_dedup(client, no_network):
@@ -60,7 +69,9 @@ def test_api_long_sms_merchant_survives_tag_and_dedup(client, no_network):
     notes = _stored()
     assert len(notes) == 1 and len(notes[0]) <= 120 and "فروشگاه آزمایشی مرکزی" in notes[0]
     html = client.get("/dashboard?tab=daily").text
-    assert "از پیامک" in html and "فروشگاه آزمایشی مرکزی" in html and KEY not in html
+    assert "از پیامک" in html and html.count("فروشگاه آزمایشی مرکزی") >= 1 and KEY not in html
+    for leak in ("1234", "12,345,678", "99887766", "556677", "1405/08/13"):
+        assert leak not in html
 
 
 def test_dedup_matches_old_layout_rows(client, no_network):
@@ -81,3 +92,10 @@ def test_dedup_matches_old_layout_rows(client, no_network):
     r = client.post("/api/sms-spend", json={"amount_toman": "125000", "note": LONG, "idempotency_key": KEY}).json()
     assert r["duplicate"] and r["id"] == old_id
     assert _stored() == [f"[{KEY}] بانک ملت برداشت"]
+
+
+def test_text_before_key_that_is_not_a_merchant_is_not_sms():
+    from app.spends import sms_spend_parts
+
+    assert sms_spend_parts(f"کارت ****1234 [{KEY}] خرید", "sms_bank") == (False, "کارت ****1234 خرید")
+    assert sms_spend_parts(f"{'الف' * 50} [{KEY}] خرید", "sms_bank")[0] is False

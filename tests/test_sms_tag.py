@@ -26,7 +26,7 @@ def test_sms_spend_shows_tag_and_hides_internal_key(client, no_network):
 def test_manual_spend_has_no_tag(client, no_network):
     from app.spends import sms_spend_parts
     assert sms_spend_parts("[" + "b" * 64 + "] x", "sms_bank") == (True, "x")
-    assert sms_spend_parts("[" + "b" * 64 + "] x", "food") == (False, "x")
-    assert sms_spend_parts("[" + "b" * 64 + "] بانک ملت", "food") == (False, "از پیامک")
+    assert sms_spend_parts("[" + "b" * 64 + "] x", "food") == (True, "x")
+    assert sms_spend_parts("[" + "b" * 64 + "] بانک ملت", "food") == (True, "")
     assert sms_spend_parts("نان", "sms_bank") == (False, "نان")
     assert sms_spend_parts(None, None) == (False, "")

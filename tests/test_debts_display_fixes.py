@@ -135,7 +135,7 @@ def test_sms_note_only_boilerplate_falls_back():
     from app.spends import sms_note_text, sms_spend_parts
     body = "بانک ملی برداشت از حساب **** مبلغ 120,000 ریال 1405/08/12 09:05 موجودی 9,876,543"
     assert sms_note_text(body) == ""
-    assert sms_spend_parts(f"[{KEY}] {body}", "food") == (False, "از پیامک")
+    assert sms_spend_parts(f"[{KEY}] {body}", "food") == (True, "")
     assert sms_spend_parts(f"[{KEY}] {body}", "sms_bank") == (True, "")
 
 
@@ -159,3 +159,14 @@ def test_note_is_outside_amount_mask():
     tpl = (Path(__file__).resolve().parents[1] / "app/templates/partials/daily_spend.html").read_text()
     small = re.search(r'<span class="t">.*?</small></span>', tpl, re.S).group(0)
     assert "note_display" in small and "data-mask" not in small and "data-amount" not in small
+
+
+def test_commission_sms_spend_is_tagged_and_cleaned(client, no_network):
+    _register(client)
+    r = client.post("/api/sms-spend", json={"amount_toman": "12000", "idempotency_key": "e" * 64,
+                                            "note": "ملت کارت **** برداشت 120,000 کافه فرضی 08/12 10:15 مانده 7,654,321"})
+    assert r.status_code == 200
+    rows = _list(client)
+    assert "کارمزد" in rows
+    assert '<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>' in rows
+    assert "کافه فرضی" in rows and "e" * 64 not in rows and "7,654,321" not in rows and "مانده" not in rows

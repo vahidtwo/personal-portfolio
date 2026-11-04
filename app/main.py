@@ -93,7 +93,7 @@ def warn_scheduler_off() -> None:
 async def lifespan(_app: FastAPI):
     init_db()
     validate_firebase_admin_at_startup()
-    await run_hourly_job(take_snapshots=False)
+    await run_hourly_job(take_snapshots=False, send_reminders=False)
     if ENABLE_INTERNAL_SCHEDULER:
         start_hourly_scheduler()
         start_nightly_backup()

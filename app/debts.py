@@ -18,7 +18,7 @@ from app import debt_schedule as ds
 from app.db import get_db
 from app.debt_validation import FIELD_SHORT, summary_fa, validate_debt, validate_expense
 from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, persian_digits, tehran_today
-from app.models import Debt, MonthlyExpense, User
+from app.models import Debt, DueReminder, MonthlyExpense, User
 from app.security import get_authenticated_user, redirect_to_login, require_csrf
 from app.web import flash, pop_flash, render
 
@@ -415,6 +415,7 @@ async def profile_delete_debt(
     debt = _owned_debt(db, user, debt_id)
     if debt is None:
         return _not_found(request)
+    db.query(DueReminder).filter(DueReminder.debt_id == debt.id).delete(synchronize_session=False)
     db.delete(debt)
     db.commit()
     undo = request.session.get("debt_undo") or {}

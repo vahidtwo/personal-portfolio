@@ -5,6 +5,8 @@ from decimal import Decimal
 import jdatetime
 import pytest
 
+from tests.test_holdings import no_network  # noqa: F401
+
 TEHRAN_NOON = timedelta(hours=8, minutes=30)  # 12:00 Asia/Tehran in UTC
 
 
@@ -205,3 +207,82 @@ def test_single_alembic_head():
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parent.parent / "app" / "migrations"))
     assert ScriptDirectory.from_config(cfg).get_heads() == ["0006_due_reminders"]
+
+
+def _hourly(monkeypatch, **kw):
+    import asyncio
+
+    import app.due_reminders as dr
+    import app.jobs as jobs
+
+    called = []
+    monkeypatch.setattr(dr, "send_due_reminders", lambda db: called.append(1) or 0)
+
+    async def _noop(*a, **k):
+        return None
+
+    monkeypatch.setattr(jobs, "fetch_and_store_prices", _noop)
+    monkeypatch.setattr(jobs, "refresh_all_sanjeh_cars", _noop)
+    asyncio.run(jobs.run_hourly_job(**kw))
+    return called
+
+
+def test_startup_run_sends_no_reminders_with_scheduler_off(monkeypatch, client):
+    import asyncio
+
+    import app.main as main
+
+    seen = []
+
+    async def _fake_job(**kw):
+        seen.append(kw)
+
+    monkeypatch.setattr(main, "ENABLE_INTERNAL_SCHEDULER", False)
+    monkeypatch.setattr(main, "run_hourly_job", _fake_job)
+
+    async def _boot():
+        async with main.lifespan(main.app):
+            pass
+
+    asyncio.run(_boot())
+    assert seen and all(kw.get("send_reminders") is False for kw in seen)
+    assert _hourly(monkeypatch, take_snapshots=False, send_reminders=False) == []
+
+
+def test_scheduler_run_still_sends_reminders(monkeypatch, client):
+    import inspect
+
+    import app.scheduler as scheduler
+
+    assert "send_reminders=False" not in inspect.getsource(scheduler)
+    monkeypatch.setattr("app.jobs.create_snapshots", lambda: 0)
+    assert _hourly(monkeypatch, take_snapshots=True) == [1]
+
+
+def test_deleting_loan_deletes_its_reminders(client, no_network):
+    from app.db import SessionLocal
+    from app.models import Debt, DueReminder
+    from tests.test_holdings import _csrf, _register
+
+    _register(client, "fake_del")
+    s = SessionLocal()
+    from app.models import User
+
+    uid = s.query(User).filter(User.username == "fake_del").one().id
+    keep = Debt(user_id=uid, title="نگه", monthly_toman=Decimal("1000"), months_left=3, due_year=1405, due_month=8, due_day=1)
+    gone = Debt(user_id=uid, title="حذف", monthly_toman=Decimal("1000"), months_left=3, due_year=1405, due_month=8, due_day=1)
+    s.add_all([keep, gone])
+    s.flush()
+    s.add_all([DueReminder(user_id=uid, debt_id=gone.id, kind="upcoming", due_date="1405/08/01"),
+               DueReminder(user_id=uid, debt_id=gone.id, kind="overdue", due_date="1405/08/01"),
+               DueReminder(user_id=uid, debt_id=keep.id, kind="upcoming", due_date="1405/08/01")])
+    s.commit()
+    gone_id, keep_id = gone.id, keep.id
+    s.close()
+    t = _csrf(client, "/profile?tab=debts")
+    client.post(f"/profile/debts/{gone_id}/delete", data={"csrf": t})
+    s = SessionLocal()
+    assert s.get(Debt, gone_id) is None
+    assert s.query(DueReminder).filter(DueReminder.debt_id == gone_id).count() == 0
+    assert s.query(DueReminder).filter(DueReminder.debt_id == keep_id).count() == 1
+    s.close()

@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.session_marker import SessionMarkerMiddleware
+from app.https_redirect import HttpsRedirectMiddleware
 from app.native_api import router as native_api_router
 from app.static_gzip import StaticGZipMiddleware
 
@@ -25,6 +26,7 @@ from app.unified_auth import router as unified_auth_router
 from app.config import (
     DATA_DIR,
     ENABLE_INTERNAL_SCHEDULER,
+    HSTS_MAX_AGE,
     HTTPS_ONLY,
     SECRET_KEY,
     SESSION_COOKIE_NAME,
@@ -117,6 +119,9 @@ app.add_middleware(
     max_age=SESSION_MAX_AGE_SECONDS,
 )
 app.add_middleware(StaticGZipMiddleware, minimum_size=1000)  # /static/*.css|*.js only
+if HTTPS_ONLY:
+    # Outside the session middlewares: plain http is redirected before a session or cookie is touched.
+    app.add_middleware(HttpsRedirectMiddleware, hsts_max_age=HSTS_MAX_AGE)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 

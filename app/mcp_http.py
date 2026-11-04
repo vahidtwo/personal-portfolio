@@ -141,10 +141,11 @@ def _monthly_expenses(db: Session, user: User) -> dict:
 
 
 def _monthly_left(db: Session, user: User) -> dict:
-    """Same figure as the dashboard مانده: salary − installments − monthly expenses."""
-    from app.debt_schedule import month_due
+    """Same figure as the dashboard مانده: salary − this month's instalments − monthly expenses."""
+    from app.debt_schedule import this_month_installments
 
-    installment, _overdue = month_due(db.query(Debt).filter(Debt.user_id == user.id).all())
+    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    installment = this_month_installments(debts)
     expense_total = sum(
         (
             Decimal(row.amount_toman)

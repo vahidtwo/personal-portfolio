@@ -29,10 +29,11 @@ def monthly_view(
     editing_expense_id: int | None = None,
 ) -> dict:
     """Monthly cash report. Salary comes only from the profile account field."""
-    from app.debt_schedule import month_due
+    from app.debt_schedule import month_due, salary_left, this_month_installments
 
-    # «اقساط این ماه»: unpaid instalments due this Jalali month plus overdue ones, each once (also in مانده / /api/salary).
-    installment, installment_overdue = month_due(db.query(Debt).filter(Debt.user_id == user.id).all())
+    # «اقساط این ماه»: unpaid instalments due this Jalali month plus overdue ones, each once.
+    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    installment, installment_overdue = month_due(debts)
     income_total = Decimal(user.salary_toman or 0)
     items = (
         db.query(MonthlyExpense)
@@ -61,11 +62,12 @@ def monthly_view(
     return {
         "expenses": rows,
         "installment_month_label": format_toman(installment),
+        "month_total_label": format_toman(this_month_installments(debts)),
         "installment_overdue_label": format_toman(installment_overdue) if installment_overdue else None,
         "expense_month_label": format_toman(expense_total),
         "income_month_label": format_toman(income_total),
         "monthly_pay_label": format_toman(outflow),
-        "monthly_left_label": format_toman(income_total - outflow),
+        "monthly_left_label": format_toman(salary_left(income_total, debts, expense_total)),
         "expense_form": expense_form or {"title": "", "amount_toman": "", "due_day": ""},
         "editing_expense_id": editing_expense_id,
     }

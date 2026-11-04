@@ -1,4 +1,5 @@
 const VERSION = "inventory-v__STATIC_ASSET_VERSION__";
+const ASSET_VERSION = "__STATIC_ASSET_VERSION__";
 const STATIC_CACHE = VERSION + "-static";
 // v3 (v11): one page cache per signed-in user, named by the marker's per-user id (never shared).
 const PAGE_CACHE_PREFIX = VERSION + "-pages-v3-";
@@ -349,7 +350,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/static/")) {
-    if (isMutableStatic(url.pathname)) {
+    // A URL carrying this build's ?v= is immutable (a deploy changes the URL): serve it from the cache
+    // without touching the network, so switching tabs does not wait on ~15 CSS/JS round trips.
+    if (isMutableStatic(url.pathname) && url.searchParams.get("v") !== ASSET_VERSION) {
       event.respondWith(networkFirstStatic(request));
     } else {
       event.respondWith(cacheFirstStatic(request));

@@ -5,6 +5,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship
 
 from app.db import Base
+from app.token_crypto import EncryptedToken
 
 
 def utcnow() -> datetime:
@@ -37,7 +38,8 @@ class User(Base):
     _legacy_cash_toman: Mapped[Decimal] = mapped_column("cash_toman", Numeric(20, 2), default=Decimal("0"))
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     _legacy_car_count: Mapped[int] = mapped_column("car_count", default=0)
-    sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Encrypted at rest ("enc1:" + Fernet); the attribute is always plaintext (or None if unreadable).
+    sanjeh_token: Mapped[str | None] = mapped_column(EncryptedToken(512), nullable=True)
     # last Sanjeh fetch outcome: 'ok' | 'rejected' | 'failed'; NULL (rows before 0004) = treated as connected
     sanjeh_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mcp_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)

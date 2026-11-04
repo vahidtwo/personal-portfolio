@@ -4,8 +4,9 @@ Manual-only countdown: `months_left` is the stored source of truth. It changes o
 «پرداخت شد» (and its undo) or an edit; nothing here derives it from the calendar.
 A debt with months_left == 0 is "done": it stays listed (last) but is out of every total.
 
-Stored date: (due_year, due_month) is the next instalment month, due_day the instalment day.
-«پرداخت شد» moves the month on and keeps due_day, so a day-31 loan stays day 31; a stored
+Stored date: (due_year, due_month) is the OLDEST unpaid instalment month, due_day the instalment day.
+A stored date before today is overdue and stays put until «پرداخت شد»; nothing rolls it forward.
+«پرداخت شد» moves the stored month on by exactly one and keeps due_day, so a day-31 loan stays day 31; a stored
 triple like 1405/08/31 is therefore allowed and every reader goes through `clamp`.
 """
 
@@ -42,26 +43,52 @@ def is_active(debt) -> bool:
 
 
 def next_due(debt, today: jdatetime.date | None = None) -> jdatetime.date | None:
-    """Next instalment date: the stored month if still ahead, otherwise the next occurrence of due_day.
+    """Oldest unpaid instalment date (the stored month, clamped). It may be in the past: that is overdue.
 
-    The second branch keeps legacy rows (whose stored date is in the past) behaving as before;
-    it only moves the date shown, never the count.
+    Only a row whose stored date cannot be read falls back to the next occurrence of due_day.
     """
     if not is_active(debt):
         return None
-    today = today or tehran_today()
     try:
-        stored = clamp(debt.due_year, debt.due_month, debt.due_day)
+        return clamp(debt.due_year, debt.due_month, debt.due_day)
     except (TypeError, ValueError):
-        stored = None
-    if stored is not None and stored >= today:
-        return stored
+        pass
+    today = today or tehran_today()
     year, month = today.year, today.month
     candidate = clamp(year, month, debt.due_day)
     if candidate < today:
         year, month = add_months(year, month, 1)
         candidate = clamp(year, month, debt.due_day)
     return candidate
+
+
+def overdue_days(debt, today: jdatetime.date | None = None) -> int:
+    """Days since the oldest unpaid instalment was due; 0 when it is today or ahead."""
+    nxt = next_due(debt, today)
+    if nxt is None:
+        return 0
+    today = today or tehran_today()
+    return max(0, (today.togregorian() - nxt.togregorian()).days)
+
+
+def missed_count(debt, today: jdatetime.date | None = None) -> int:
+    """Unpaid instalments whose date has passed (capped at months_left)."""
+    nxt = next_due(debt, today)
+    if nxt is None:
+        return 0
+    today = today or tehran_today()
+    count = 0
+    y, m = nxt.year, nxt.month
+    while count < int(debt.months_left) and clamp(y, m, debt.due_day) < today:
+        count += 1
+        y, m = add_months(y, m, 1)
+    return count
+
+
+def after_payment(debt, today: jdatetime.date | None = None) -> tuple[int, int]:
+    """(year, month) of the next unpaid instalment once the oldest one is paid: exactly one month on."""
+    nxt = next_due(debt, today)
+    return add_months(nxt.year, nxt.month, 1)
 
 
 def end_due(debt, today: jdatetime.date | None = None) -> jdatetime.date | None:
@@ -85,6 +112,8 @@ def month_year(value: jdatetime.date) -> str:
 
 
 def days_chip(days: int) -> str:
+    if days < 0:
+        return f"{persian_digits(str(-days))} روز گذشته"
     if days == 0:
         return "امروز"
     if days == 1:

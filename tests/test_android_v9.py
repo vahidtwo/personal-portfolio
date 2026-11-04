@@ -52,7 +52,7 @@ def test_health_and_app_version_and_apk_ok_on_both_hosts():
     for host in ("portfolio.vahidtwo.ir", "daraiito.ir"):
         c = TestClient(app, base_url=f"https://{host}")
         r = c.get("/health")
-        assert r.status_code == 200 and r.json() == {"ok": True}
+        assert r.status_code == 200 and r.json()["ok"] is True and isinstance(r.json()["commit"], str)
         v = c.get("/api/app-version")
         assert v.status_code == 200 and v.json()["versionCode"] >= 9
         assert not v.json()["url"].startswith("http")  # relative: each host serves its own APK

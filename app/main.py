@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -99,7 +101,7 @@ async def lifespan(_app: FastAPI):
 
 
 # Server release (semver). The Android app keeps its own versionName in android_release.json.
-SERVER_VERSION = "12.1.0"
+SERVER_VERSION = "12.2.0"
 app = FastAPI(title="Daraiito", version=SERVER_VERSION, lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
 app.add_middleware(
@@ -168,9 +170,22 @@ async def no_store_html(request, call_next):
     return response
 
 
+_COMMIT_ENV_VARS = ("GIT_SHA", "SOURCE_COMMIT", "DOKPLOY_COMMIT_SHA", "DOKPLOY_COMMIT_HASH")
+_COMMIT_RE = re.compile(r"[0-9a-fA-F]{7,40}")
+
+
+def deployed_commit() -> str:
+    """Short SHA of the deployed commit from the first set commit env var; 'unknown' if unset or not hex."""
+    for name in _COMMIT_ENV_VARS:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value[:7].lower() if _COMMIT_RE.fullmatch(value) else "unknown"
+    return "unknown"
+
+
 @app.get("/health")
 async def health():
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "commit": deployed_commit()})
 
 
 app.include_router(pwa_router)

@@ -1,6 +1,9 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+# Deployed commit for /health: pass --build-arg GIT_SHA=<commit> (Dokploy: Build Time Arguments).
+ARG GIT_SHA=
+ENV GIT_SHA=$GIT_SHA
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DATA_DIR=/app/data

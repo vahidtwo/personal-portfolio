@@ -58,7 +58,6 @@
     <div class="stat"><dt>جمع دارایی</dt><dd data-mask="portfolio" data-amount>{% if total_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ total_big.label }}</bdi> <small>{{ total_big.unit }}</small></dd></div>
     <div class="stat"><dt>جمع بدهی</dt><dd data-mask="portfolio" data-amount>{% if debt_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ debt_big.label }}</bdi> <small>{{ debt_big.unit }}</small></dd></div>
     <div class="stat stat-usd"><dt>معادل دلاری</dt><dd><span data-mask="portfolio"><bdi dir="ltr">{{ usd_portfolio_label }}</bdi> <small>دلار آمریکا</small></span>{% if usd_spark %}<svg class="mc {{ usd_spark.kind }}" viewBox="0 0 64 20" width="64" height="20" role="img" aria-label="{{ usd_spark.label }}" focusable="false"><title>{{ usd_spark.label }}</title><path d="{{ usd_spark.path }}"/><circle cx="{{ usd_spark.end_x }}" cy="{{ usd_spark.end_y }}" r="2.2"/></svg>{% endif %}</dd></div>
-    <div><dt>جمع اقساط این ماه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount data-month-total>{{ month_total_label }}</bdi> تومان</dd></div>
   </dl>
   {% if missing_fa %}
   <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>
@@ -267,6 +266,7 @@
   </div>
   <dl class="net-line">
     <div><dt>اقساط باقی‌مانده</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_month_label }}</bdi> تومان{% if installment_overdue_label %}<small class="muted" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_overdue_label }}</bdi> تومان</small>{% endif %}</dd></div>
+    <div><dt>جمع اقساط این ماه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount data-month-total>{{ month_total_label }}</bdi> تومان</dd></div>
     <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ expense_month_label }}</bdi> تومان</dd></div>
     <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
   </dl>

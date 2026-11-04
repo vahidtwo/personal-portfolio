@@ -97,3 +97,17 @@ def test_pages_split_remaining_and_month_total(client, no_network, clock):  # no
     assert re.search(r'<span>جمع اقساط این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount data-month-total><bdi dir="ltr">۱٬۷۰۰٬۰۰۰<', tab)
     assert re.search(r"<span>اقساط باقی‌مانده</span><b[^>]*data-mask=\"portfolio\"[^>]*><bdi dir=\"ltr\">۲٬۲۰۰٬۰۰۰<", tab)
     assert client.get("/api/salary").json()["left"] == "۷٬۳۰۰٬۰۰۰"
+
+
+def test_dashboard_month_total_sits_in_monthly_report(client, no_network, clock):  # noqa: F811
+    from tests.test_debts_v2 import _seed
+    from tests.test_holdings import _register
+
+    _register(client)
+    _seed([("باز", 200000, 2, 1405, 7, 30)])
+    dash = client.get("/dashboard").text
+    report = dash[dash.index('id="month-report-heading"'):]
+    stats = dash[:dash.index('id="month-report-heading"')]
+    assert "<dt>جمع اقساط این ماه</dt>" not in stats
+    assert report.index("<dt>اقساط باقی‌مانده</dt>") < report.index("<dt>جمع اقساط این ماه</dt>") < report.index("<dt>هزینهٔ ماهانه</dt>")
+    assert 'data-mask="portfolio" data-amount data-month-total>۲۰۰٬۰۰۰<' in report

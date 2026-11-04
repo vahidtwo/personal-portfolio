@@ -108,3 +108,25 @@ def test_manual_small_spend_unaffected_and_user_can_recategorize(client, no_netw
     spends, fee = _rows(client)
     assert all(cat.id == food_id for cat, _ in spends.values())
     assert len(spends) == 2 and len(fee) == 1
+
+
+@pytest.mark.parametrize("name", ["\u0643\u0627\u0631\u0645\u0632\u062f", "  \u06a9\u0627\u0631\u200c\u0645\u0632\u062f ", "\u06a9\u0627\u0631 \u0645\u0632\u062f"])
+def test_variant_names_are_reused(client, no_network, name):
+    _register(client)
+    from app.db import SessionLocal
+    from app.models import SpendCategory
+
+    client.get(DAILY)
+    with SessionLocal() as db:
+        parent = db.query(SpendCategory).filter(SpendCategory.slug == "bills").one()
+        mine = SpendCategory(user_id=parent.user_id, parent_id=parent.id, name=name, sort_order=9)
+        db.add(mine)
+        db.commit()
+        mine_id = mine.id
+    a = _sms(client, 300, "a")
+    b = _sms(client, 400, "b")
+    with SessionLocal() as db:
+        assert db.query(SpendCategory).filter(SpendCategory.slug == "sms_fee").count() == 0
+        assert db.query(SpendCategory).filter(SpendCategory.name == "\u06a9\u0627\u0631\u0645\u0632\u062f").count() == 0
+    spends, _ = _rows(client)
+    assert spends[a][0].id == mine_id and spends[b][0].id == mine_id

@@ -45,18 +45,22 @@ def is_sms_commission(amount_toman) -> bool:
     return Decimal(amount_toman) < SMS_COMMISSION_MAX_TOMAN
 
 
+def _normalize_category_name(name: str | None) -> str:
+    """Arabic ك/ي to Persian ک/ی, no ZWNJ, no whitespace."""
+    text = (name or "").replace("\u0643", "\u06a9").replace("\u064a", "\u06cc").replace("\u200c", "")
+    return "".join(text.split())
+
+
 def commission_category(db: Session, user: User) -> SpendCategory:
     """The user's «کارمزد» subcategory: reused when one with exactly that name exists, else created once under «پیامک»."""
-    found = (
+    target = _normalize_category_name(SMS_COMMISSION_NAME)
+    subcategories = (
         db.query(SpendCategory)
-        .filter(
-            SpendCategory.user_id == user.id,
-            SpendCategory.name == SMS_COMMISSION_NAME,
-            SpendCategory.parent_id.isnot(None),
-        )
+        .filter(SpendCategory.user_id == user.id, SpendCategory.parent_id.isnot(None))
         .order_by(SpendCategory.id)
-        .first()
+        .all()
     )
+    found = next((row for row in subcategories if _normalize_category_name(row.name) == target), None)
     if found is not None:
         return found
     parent = (

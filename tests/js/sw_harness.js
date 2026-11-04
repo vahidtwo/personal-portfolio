@@ -121,6 +121,7 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
     if (step.install) { let ip; listeners.install({ waitUntil: (p) => (ip = p) }); await ip; }
     if (step.activate) { let ap; listeners.activate({ waitUntil: (p) => (ap = p) }); await ap; }
     if (step.offline_html) await (await caches.open("inventory-vtest-static")).put("/offline.html", html("<p>offline page</p>"));
+    if (step.static_put) await (await caches.open("inventory-vtest-static")).put(step.static_put, new Response("precached " + step.static_put));
     if (step.go) {
       const r = await dispatch(step.go, step.opts || {});
       out.push({ go: step.go, ...r, pages: await pageKeys(), stores: pageStores(), messages: messages.splice(0) });

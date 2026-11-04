@@ -60,6 +60,13 @@ const PRECACHE = [
   "/static/style.css",
   "/static/theme.js",
   "/static/privacy.js",
+  "/static/amounts.js",
+  "/static/confirm-dialog.js",
+  "/static/android-bridge.js",
+  "/static/debts-page.js",
+  "/static/spending-page.js",
+  "/static/settings-page.js",
+  "/static/sms-offer.js",
   "/static/number-format.js",
   "/static/dashboard.js",
   "/static/amount-input.js",
@@ -131,7 +138,8 @@ self.addEventListener("install", (event) => {
           await Promise.all(
             PRECACHE.slice(i, i + PRECACHE_BATCH).map(async (path) => {
               try {
-                await cache.add(path);
+                // straight from the server: never a copy of an older build from the HTTP cache
+                await cache.add(new Request(new URL(path, self.location.origin).href, { cache: "reload" }));
               } catch (err) {
                 console.warn("precache skip", path, err);
               }
@@ -169,10 +177,36 @@ function isDashboard(url) {
   return tab === null || tab === "portfolio" || tab === "daily";
 }
 
+// The debts tab exactly (an ?edit= link opens a form with that item's amount: never cached).
+function isDebtsTab(url) {
+  return url.origin === self.location.origin && url.pathname === "/profile" && url.search === "?tab=debts";
+}
+
+// Signed-in pages shown first from this user's cache.
+function isCachedPage(url) {
+  return isDashboard(url) || isDebtsTab(url);
+}
+
+// A page whose amounts are loaded by amounts.js has empty data-amt slots and no amounts in its HTML.
+// Pages added to the cache after the dashboard are stored only in that form.
+async function amountFree(response) {
+  try {
+    return (await response.clone().text()).includes("data-amt=");
+  } catch (e) {
+    return false;
+  }
+}
+
 async function cacheFirstStatic(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
+  // This build's ?v= URL: the precached copy (stored without the query) is the same file.
+  const url = new URL(request.url);
+  if (url.searchParams.get("v") === ASSET_VERSION) {
+    const precached = await cache.match(url.origin + url.pathname);
+    if (precached) return precached;
+  }
   const response = await fetch(request);
   if (response.ok) await cache.put(request, response.clone());
   return response;
@@ -261,6 +295,7 @@ async function storeDashboard(request, response, id) {
     return "ended";
   }
   const type = response.headers.get("content-type") || "";
+  if (isDebtsTab(new URL(request.url)) && !(await amountFree(response))) return "skip";
   // The account may have changed while the request was in flight: store only under the current id.
   if (response.ok && type.includes("text/html") && id && (await sessionId()) === id) {
     const cache = await caches.open(pageCacheName(id));
@@ -309,10 +344,11 @@ async function dashboardNavigation(event) {
   try {
     response = await network;
   } catch (err) {
+    const otherTab = isDashboard(new URL(request.url));
     const page =
       cached ||
-      (await freshCachedPage(cache, "/dashboard", now)) ||
-      (await freshCachedPage(cache, "/dashboard?tab=daily", now));
+      (otherTab && (await freshCachedPage(cache, "/dashboard", now))) ||
+      (otherTab && (await freshCachedPage(cache, "/dashboard?tab=daily", now)));
     if (page) return page;
     const offline = await caches.match("/offline.html");
     if (offline) return offline;
@@ -376,7 +412,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate" && isDashboard(url)) {
+  if (request.mode === "navigate" && isCachedPage(url)) {
     event.respondWith(dashboardNavigation(event));
     return;
   }

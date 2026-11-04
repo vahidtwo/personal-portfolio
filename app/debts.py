@@ -61,7 +61,8 @@ def debt_rows(debts: list[Debt], today: jdatetime.date | None = None) -> tuple[l
         end = ds.end_due(debt, today)
         amount = ds.remaining(debt)
         stored = _edit_date(debt)
-        kind, badge_label = ds.badge(months)
+        late = bool(nxt and nxt < today)
+        kind, badge_label = (None, None) if late else ds.badge(months)
         title = (debt.title or "").strip()
         rows.append(
             {
@@ -84,7 +85,7 @@ def debt_rows(debts: list[Debt], today: jdatetime.date | None = None) -> tuple[l
                 "next_short": ds.day_month(nxt) if nxt else None,
                 "days": (nxt.togregorian() - today.togregorian()).days if nxt else None,
                 "end_label": ds.month_year(end) if end else None,
-                "overdue": bool(nxt and nxt < today),
+                "overdue": late,
                 "overdue_label": ds.days_chip((nxt.togregorian() - today.togregorian()).days) if nxt and nxt < today else None,
                 "missed": ds.missed_count(debt, today),
                 "badge": kind,
@@ -143,7 +144,7 @@ def debts_page(
     items = db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
     rows, total, _ = debt_rows(debts, today)
     exp_rows = expense_rows(items, today)
-    installment = ds.active_installment(debts)
+    installment, installment_overdue = ds.month_due(debts, today)
     expense_total = sum((Decimal(i.amount_toman) for i in items), Decimal("0"))
     sheet = None
     if debt_errors or editing_id:
@@ -166,6 +167,7 @@ def debts_page(
         "active_count": sum(1 for r in rows if r["active"]),
         "total_label": format_toman(total),
         "installment_label": format_toman(installment),
+        "installment_overdue_label": format_toman(installment_overdue) if installment_overdue else None,
         "expense_label": format_toman(expense_total),
         "next": nearest,
         "debt_form": debt_form or EMPTY_DEBT_FORM,

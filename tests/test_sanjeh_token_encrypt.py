@@ -53,13 +53,13 @@ def test_migration_up_encrypts_is_idempotent_and_down_decrypts(tmp_path):
     from app.token_crypto import decrypt_token
 
     db = _fake_db_at_0004(tmp_path)
-    assert _alembic(db, "upgrade", "head").returncode == 0
+    assert _alembic(db, "upgrade", "0005_sanjeh_token_encrypt").returncode == 0
     t = _tokens(db)
     assert t[1].startswith("enc1:") and decrypt_token(t[1], KEY) == "FAKE-TOKEN-1"
     assert t[2] is None and t[3] == ""
     # re-run: the encrypted row is skipped (byte-identical), not double-encrypted
     assert _alembic(db, "stamp", "0004_sanjeh_status").returncode == 0
-    assert _alembic(db, "upgrade", "head").returncode == 0
+    assert _alembic(db, "upgrade", "0005_sanjeh_token_encrypt").returncode == 0
     assert _tokens(db) == t
     assert _alembic(db, "downgrade", "0004_sanjeh_status").returncode == 0
     assert _tokens(db) == {1: "FAKE-TOKEN-1", 2: None, 3: ""}
@@ -67,7 +67,7 @@ def test_migration_up_encrypts_is_idempotent_and_down_decrypts(tmp_path):
 
 def test_downgrade_with_wrong_key_leaves_row_and_does_not_fail(tmp_path):
     db = _fake_db_at_0004(tmp_path)
-    assert _alembic(db, "upgrade", "head").returncode == 0
+    assert _alembic(db, "upgrade", "0005_sanjeh_token_encrypt").returncode == 0
     enc = _tokens(db)[1]
     assert _alembic(db, "downgrade", "0004_sanjeh_status", key="rotated-key").returncode == 0
     assert _tokens(db)[1] == enc
@@ -75,7 +75,7 @@ def test_downgrade_with_wrong_key_leaves_row_and_does_not_fail(tmp_path):
 
 def test_migration_without_secret_key_refuses_to_store_plain_tokens(tmp_path):
     db = _fake_db_at_0004(tmp_path)
-    r = _alembic(db, "upgrade", "head", key=None)
+    r = _alembic(db, "upgrade", "0005_sanjeh_token_encrypt", key=None)
     assert r.returncode != 0 and "SECRET_KEY" in r.stderr
     assert _tokens(db)[1] == "FAKE-TOKEN-1"  # transaction rolled back, nothing half-written
 

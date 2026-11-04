@@ -161,20 +161,47 @@ def test_hourly_job_calls_reminders(monkeypatch, client):
     assert called == [1]
 
 
-def test_migration_0006_adds_only_the_table_and_downgrade_drops_it(tmp_path):
+def test_migration_chain_0004_0005_0006_up_and_down(tmp_path):
     import sqlite3
 
-    from tests.test_sanjeh_migration import _alembic, _dump, _fake_db_at_0003
+    from tests.test_sanjeh_migration import _dump, _fake_db_at_0003
+    from tests.test_sanjeh_token_encrypt import _alembic, _tokens
+
+    def ok(*args):
+        r = _alembic(db, *args)
+        assert r.returncode == 0, r.stderr
+
+    def version():
+        return sqlite3.connect(db).execute("select version_num from alembic_version").fetchone()[0]
+
+    def tables():
+        return {r[0] for r in sqlite3.connect(db).execute("select name from sqlite_master where type='table'")}
 
     db = _fake_db_at_0003(tmp_path)
-    _alembic(db, "upgrade", "0004_sanjeh_status")
+    ok("upgrade", "0004_sanjeh_status")
     before = _dump(db)
-    _alembic(db, "upgrade", "0006_due_reminders")
-    _alembic(db, "stamp", "0004_sanjeh_status")
-    _alembic(db, "upgrade", "0006_due_reminders")  # table already there: no-op
+    ok("upgrade", "0005_sanjeh_token_encrypt")
+    assert version() == "0005_sanjeh_token_encrypt" and _tokens(db)[1].startswith("enc1:")
+    assert "due_reminders" not in tables()
+    ok("upgrade", "head")
+    assert version() == "0006_due_reminders"
+    ok("stamp", "0005_sanjeh_token_encrypt")
+    ok("upgrade", "head")  # table already there: no-op
     after = _dump(db)
     assert after.pop("due_reminders") == (["id", "user_id", "debt_id", "kind", "due_date", "sent_at"], [])
-    assert after == before
-    _alembic(db, "downgrade", "0004_sanjeh_status")
-    tables = {r[0] for r in sqlite3.connect(db).execute("select name from sqlite_master where type='table'")}
-    assert "due_reminders" not in tables and _dump(db) == before
+    ok("downgrade", "0005_sanjeh_token_encrypt")
+    assert version() == "0005_sanjeh_token_encrypt" and "due_reminders" not in tables()
+    assert _tokens(db)[1].startswith("enc1:")
+    ok("downgrade", "0004_sanjeh_status")
+    assert version() == "0004_sanjeh_status" and _dump(db) == before
+
+
+def test_single_alembic_head():
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(__file__).resolve().parent.parent / "app" / "migrations"))
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0006_due_reminders"]

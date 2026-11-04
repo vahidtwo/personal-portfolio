@@ -1,13 +1,13 @@
 """Add due_reminders (new table only; existing tables and rows untouched).
 
 Revision ID: 0006_due_reminders
-Revises: 0004_sanjeh_status
+Revises: 0005_sanjeh_token_encrypt
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "0006_due_reminders"
-down_revision = "0004_sanjeh_status"
+down_revision = "0005_sanjeh_token_encrypt"
 branch_labels = None
 depends_on = None
 

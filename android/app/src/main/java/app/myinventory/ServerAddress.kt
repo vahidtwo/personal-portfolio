@@ -159,6 +159,9 @@ object ServerAddress {
         else -> SmsOutcome.FAILED
     }
 
+    /** A failed live send worth retrying later from the queue: network error/exception (null) or 5xx. */
+    fun retryLater(code: Int?): Boolean = code == null || code >= 500
+
     /**
      * Cold launch on the moved-to new host that is not confirmed yet: probe /health natively
      * first, because daraiito.ir's service worker answers a dead network with its cached offline

@@ -13,7 +13,7 @@ class StoreFlavorTest {
 
     @Test fun sameAppIdentityAsDirect() {
         assertEquals("app.myinventory", BuildConfig.APPLICATION_ID)
-        assertEquals(17, BuildConfig.VERSION_CODE)
-        assertEquals("12.1.1", BuildConfig.VERSION_NAME)
+        assertEquals(18, BuildConfig.VERSION_CODE)
+        assertEquals("12.1.2", BuildConfig.VERSION_NAME)
     }
 }

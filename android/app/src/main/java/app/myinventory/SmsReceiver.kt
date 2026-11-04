@@ -40,17 +40,22 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                     .onFailure { Log.w(TAG, "sms: local log failed", it) }
                 // v9: signed-in session on the saved host first; else the old host's (same backend).
                 val target = ServerAddress.smsTarget(base) { readCookie(it) }
+                var code: Int? = null
                 val outcome = if (target == null) {
                     Log.i(TAG, "sms: no signed-in session")
                     ServerAddress.SmsOutcome.LOGIN_NEEDED
                 } else {
-                    val code = runCatching { SmsQueue.post(target.first, target.second, SmsQueue.payload(entry)) }
+                    code = runCatching { SmsQueue.post(target.first, target.second, SmsQueue.payload(entry)) }
                         .onFailure { Log.w(TAG, "sms: post failed", it) }.getOrNull()
                     Log.i(TAG, "sms: post code=$code")
                     ServerAddress.smsOutcome(code)
                 }
                 when (outcome) {
-                    ServerAddress.SmsOutcome.SAVED -> notifySaved(context, amount)
+                    ServerAddress.SmsOutcome.SAVED -> {
+                        notifySaved(context, amount)
+                        // The server is reachable again: retry spends queued after earlier failures.
+                        flushQueued(context)
+                    }
                     ServerAddress.SmsOutcome.LOGIN_NEEDED -> {
                         // Kept (encrypted, app-private) until a login succeeds, then sent with the same key.
                         runCatching { SmsQueue.add(context, entry) }.onFailure { Log.w(TAG, "sms: queue failed", it) }
@@ -58,11 +63,18 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                         prefs.edit().putBoolean(KEY_LOGIN_NEEDED, true).apply()
                         notify(context, "خرج پیامک", LOGIN_MESSAGE, HomeActivity::class.java)
                     }
-                    ServerAddress.SmsOutcome.FAILED -> notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
+                    ServerAddress.SmsOutcome.FAILED -> if (ServerAddress.retryLater(code)) {
+                        // Network error or 5xx: kept in the same encrypted queue (bound to the user, 7-day expiry,
+                        // deduped by idempotency key) and retried by flushQueued with the same key.
+                        val queued = runCatching { SmsQueue.add(context, entry) }
+                            .onFailure { Log.w(TAG, "sms: queue failed", it) }.isSuccess
+                        notifyError(context, if (queued) RETRY_MESSAGE else "ذخیره نشد — سرور در دسترس نیست")
+                    } else notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
                 }
             } catch (t: Throwable) {
                 // Never die silently in the background thread (that crashed the process with no notice).
                 Log.w(TAG, "sms: unexpected", t)
+                runCatching { SmsQueue.add(context, entry) }
                 runCatching { notifyError(context, "ذخیره نشد — سرور در دسترس نیست") }
             } finally {
                 pending.finish()
@@ -92,6 +104,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                 else org.json.JSONObject(c.inputStream.bufferedReader().readText()).optString("username").takeIf { it.isNotBlank() }
             } finally { c.disconnect() }
         }.getOrNull()
+        const val RETRY_MESSAGE = "ذخیره نشد — بعداً خودکار دوباره ارسال می‌شود"
         const val LOGIN_MESSAGE = "وارد نشده‌اید — خرج بعد از ورود ذخیره می‌شود"
 
         /** Sends spends queued while signed out, if a session exists now. Safe to call often. */

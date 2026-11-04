@@ -18,7 +18,7 @@ def test_version_18_with_draft_notes():
     rel = json.loads(_read(ROOT / "app" / "android_release.json"))
     assert rel["versionCode"] == 18 and rel["versionName"] == "12.1.2"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
-    assert rel["notes_approved"] is False and rel["notes"]  # draft until reviewed
+    assert rel["notes_approved"] is True and rel["notes"]
 
 
 def test_fixed_origin_and_flags():

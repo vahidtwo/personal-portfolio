@@ -11,6 +11,7 @@ import jdatetime
 import pytest
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 DAILY = "/dashboard?tab=daily"
 TEHRAN_NOON_28_MEHR = datetime(2026, 10, 20, 8, 30, tzinfo=timezone.utc)  # 1405/07/28 12:00 Tehran
@@ -133,7 +134,7 @@ def test_parent_category_spend_shows_parent_name(client, no_network, mehr28):
     _add(db, user, parents[0], 45000, 28, note="ناهار")
     db.commit()
     db.close()
-    html = client.get(DAILY).text
+    html = with_amounts(client, DAILY)
     rows = html.split("data-sp-days")[1].split("</section>\n    \n  </div>")[0]
     assert f"<b>{name}</b>" in rows and "—" not in rows
 
@@ -146,10 +147,10 @@ def test_day_groups_totals_cover_the_whole_month(client, no_network, mehr28):
     _add(db, user, children[1], 5000, 27)
     db.commit()
     db.close()
-    html = client.get(DAILY).text
+    html = with_amounts(client, DAILY)
     assert "<b>امروز، ۲۸ مهر</b><span><span class=\"num mask-sm\" data-mask=\"portfolio\" data-amount>۲۰٬۰۰۰</span> تومان</span>" in html
     assert "۱۵ از ۲۱ خرج در مهر" in html and "نمایش ۶ خرج بیشتر" in html
-    more = client.get(DAILY + "&jy=1405&jm=7&page=2").text  # «نمایش بیشتر» grows the list
+    more = with_amounts(client, DAILY + "&jy=1405&jm=7&page=2")  # «نمایش بیشتر» grows the list
     assert "۲۱ از ۲۱ خرج در مهر" in more and "<b>دیروز، ۲۷ مهر</b>" in more and "data-sp-more" not in more
 
 
@@ -164,7 +165,7 @@ def test_bars_sorted_top_four_with_share_and_more(client, no_network, mehr28):
         _add(db, user, c, (i + 1) * 10000, 20)  # 10k..60k, total 210k
     db.commit()
     db.close()
-    html = client.get(DAILY).text
+    html = with_amounts(client, DAILY)
     bars = re.findall(r'<span class="v"><b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b> تومان، <b class="mask-sm" data-mask="portfolio" data-amount>([^<]+)</b></span>', html)
     assert [b[0] for b in bars] == ["۶۰٬۰۰۰", "۵۰٬۰۰۰", "۴۰٬۰۰۰", "۳۰٬۰۰۰", "۲۰٬۰۰۰", "۱۰٬۰۰۰"]
     assert bars[0][1] == "۲۹٪"
@@ -179,22 +180,22 @@ def test_past_month_drops_today_tile(client, no_network, mehr28):
     _add(db, user, children[0], 1000, 28)
     db.commit()
     db.close()
-    past = client.get(DAILY + "&jy=1405&jm=6").text
+    past = with_amounts(client, DAILY + "&jy=1405&jm=6")
     assert "<span>امروز</span>" not in past and '<span>جمع شهریور</span><b class="num" data-mask="portfolio" data-amount>۹٬۰۰۰</b>' in past
-    now = client.get(DAILY).text
+    now = with_amounts(client, DAILY)
     assert '<span>امروز</span><b class="num" data-mask="portfolio" data-amount>۱٬۰۰۰</b>' in now and "<span>این ماه</span>" in now
 
 
 def test_empty_states(client, no_network, mehr28):
     _register(client)
-    first = client.get(DAILY).text
+    first = with_amounts(client, DAILY)
     assert "اولین خرجتان را ثبت کنید" in first and "ثبت اولین خرج" in first
     assert "sp-tile" not in first and "data-sp-addbar" not in first
     db, user, _, children = _user_cats()
     _add(db, user, children[0], 1000, 28)
     db.commit()
     db.close()
-    month = client.get(DAILY + "&jy=1405&jm=6").text
+    month = with_amounts(client, DAILY + "&jy=1405&jm=6")
     assert "در شهریور خرجی ثبت نشده است" in month and "ثبت خرج در شهریور" in month
     assert '<span>جمع شهریور</span><b class="num" data-mask="portfolio" data-amount>۰</b>' in month and "data-sp-addbar" in month
 
@@ -205,7 +206,7 @@ def test_page_contract(client, no_network, mehr28):
     _add(db, user, children[0], 45000, 28, note="ناهار با همکارها")
     db.commit()
     db.close()
-    full = client.get(DAILY).text
+    full = with_amounts(client, DAILY)
     assert "chart.umd" not in full  # the doughnut is gone from this tab
     html = full[full.index("data-sp-page"):full.index("</footer>") if "</footer>" in full else None]
     assert "confirm(" not in html and " · " not in html.split("<footer")[0]
@@ -249,7 +250,7 @@ def test_legacy_fractional_spend_loads_and_saves_unchanged(client, no_network, m
     spend_id = db.query(DailySpend).filter_by(user_id=user.id).one().id
     db.close()
     page = client.get(DAILY)
-    assert page.status_code == 200 and format_toman(Decimal("125000.5")) in page.text  # loads and shows
+    assert page.status_code == 200 and format_toman(Decimal("125000.5")) in with_amounts(client, DAILY)  # loads and shows
     edit = client.get(f"{DAILY}&edit_spend={spend_id}").text
     prefilled = format_amount_input(Decimal("125000.5"))
     assert f'value="{prefilled}"' in edit and 'data-sp-orig="125000.5"' in edit

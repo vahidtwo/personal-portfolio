@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 
 def _set_price(symbol, price):
@@ -42,7 +43,7 @@ def test_signup_lands_on_assets_page(client, no_network):
 
 def test_dashboard_empty_state_for_new_user(client, no_network):
     _register(client, "emptyuser")
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     # home v2: no assets and no debts -> welcome card instead of an all-zero dashboard
     assert 'id="home-welcome"' in html and "خوش آمدید! بیایید شروع کنیم" in html
     assert 'id="portfolio-table"' not in html and 'id="chart-panel"' not in html
@@ -53,25 +54,25 @@ def test_dashboard_hides_zero_rows_and_shows_them_after_value(client, no_network
     _set_price("btc", "1000000")
     _set_price("eth", "500000")
     client.post("/profile", data={"btc": "2", "csrf": _csrf(client)})
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     table = html[html.index('id="portfolio-table"'):html.index("</table>", html.index('id="portfolio-table"'))]
     assert "/static/logos/btc.svg" in table
     assert "/static/logos/eth.svg" not in table
     assert "دارایی با مقدار صفر پنهان است" in html
     client.post("/profile", data={"btc": "2", "eth": "1", "csrf": _csrf(client)})
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     table = html[html.index('id="portfolio-table"'):html.index("</table>", html.index('id="portfolio-table"'))]
     assert "/static/logos/eth.svg" in table
 
 
 def test_debts_expenses_spends_empty_states(client, no_network):
     _register(client)
-    html = client.get("/profile?tab=debts").text
+    html = with_amounts(client, "/profile?tab=debts")
     # Debts v2: each list has its own empty state with a primary button that opens the sheet.
     assert "از کجا شروع کنم؟" in html and 'class="dv-tiles"' not in html and "<span>مانده از حقوق</span>" not in html  # replaces the tiles
     assert "وام یا قسطی ثبت نشده است" in html and 'data-dv-add="debt"><svg' in html and "افزودن وام یا قسط</span>" in html
     assert "هزینهٔ ماهانه‌ای ثبت نشده است" in html and 'data-dv-add="expense"><svg' in html and "افزودن هزینهٔ ماهانه</span>" in html
-    daily = client.get("/dashboard?tab=daily").text
+    daily = with_amounts(client, "/dashboard?tab=daily")
     assert "اولین خرجتان را ثبت کنید" in daily  # spending v2 first-time empty state
 
 
@@ -79,7 +80,7 @@ def test_daily_form_on_top_with_today_in_persian_digits(client, no_network):
     import jdatetime
     from app.formatting import persian_digits
     _register(client)
-    html = client.get("/dashboard?tab=daily").text
+    html = with_amounts(client, "/dashboard?tab=daily")
     # Spending v2: summary and list first; the form is a side card (≥900px) or a bottom sheet (mobile).
     assert html.index('id="daily-report-heading"') < html.index('id="daily-spend-form"')
     from app.formatting import tehran_today
@@ -92,7 +93,7 @@ def test_spend_form_accepts_persian_and_latin_digits(client, no_network):
     import re
     import jdatetime
     _register(client)
-    page = client.get("/dashboard?tab=daily").text
+    page = with_amounts(client, "/dashboard?tab=daily")
     cat = re.search(r'name="category_id" id="spend-child" required>\s*<option value="(\d+)"', page).group(1)
     from app.formatting import tehran_today
     today = tehran_today()
@@ -111,7 +112,7 @@ def test_spend_form_accepts_persian_and_latin_digits(client, no_network):
 def test_privacy_values_shown_by_default_with_labeled_toggle(client, no_network):
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html
     assert "privacy-label-hide" in html and "پنهان کردن" in html
 
@@ -129,7 +130,7 @@ def test_chart_picker_hides_zero_assets_like_the_table(client, no_network):
     client.post("/profile", data={"btc": "2", "gold_grams": "1", "csrf": _csrf(client)})  # gold has no price
 
     def picker():
-        html = client.get("/dashboard").text
+        html = with_amounts(client, "/dashboard")
         sel = html[html.index('id="chart-asset-select"'):html.index("</select>", html.index('id="chart-asset-select"'))]
         return re.findall(r'<option value="([^"]*)"', sel)
 
@@ -158,7 +159,7 @@ def test_chart_default_falls_back_to_total_when_default_asset_hidden(client, no_
     client.post("/profile", data={"btc": "2", "csrf": _csrf(client)})
 
     def selected():
-        html = client.get("/dashboard").text
+        html = with_amounts(client, "/dashboard")
         sel = html[html.index('id="chart-asset-select"'):html.index("</select>", html.index('id="chart-asset-select"'))]
         return re.findall(r'<option value="([^"]*)"\s+selected', sel)
 
@@ -199,19 +200,19 @@ def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):
     import re
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html)
     assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr"[^>]*>[^<]+</bdi> تومان</dd>', html)
     # Debts v2: «مانده از حقوق» is a tile; the number is an LTR bdi with «تومان» after it, never an LTR block.
     client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": "1000", "due_day": "1", "csrf": _csrf(client, "/profile?tab=debts")})
-    debts = client.get("/profile?tab=debts").text
+    debts = with_amounts(client, "/profile?tab=debts")
     assert re.search(r'<b class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi></b>\s*<small>تومان', debts)
 
 
 def test_glossary_terms(client, no_network):
     _register(client)
-    dash = client.get("/dashboard").text
-    debts = client.get("/profile?tab=debts").text
+    dash = with_amounts(client, "/dashboard")
+    debts = with_amounts(client, "/profile?tab=debts")
     assets = client.get("/assets").text
     for html in (dash, debts):
         assert "هزینهٔ ماهانه" in html and "خرج ماهانه" not in html
@@ -261,7 +262,7 @@ def test_debt_year_placeholder_is_current_jalali_year(client, no_network):
     import jdatetime
     from app.formatting import persian_digits
     _register(client)
-    html = client.get("/profile?tab=debts").text
+    html = with_amounts(client, "/profile?tab=debts")
     assert f'name="due_year" value="" inputmode="numeric" placeholder="{persian_digits(str(__import__('app.formatting', fromlist=['x']).tehran_today().year))}"' in html
 
 

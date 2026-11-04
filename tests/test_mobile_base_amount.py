@@ -4,6 +4,7 @@ from pathlib import Path
 from app.config import STATIC_ASSET_VERSION
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
 from tests.test_phase0_ui import _set_price
+from tests.amounts_helper import with_amounts
 
 CSS = (Path(__file__).resolve().parents[1] / "app" / "static" / "style.css").read_text(encoding="utf-8")
 
@@ -14,7 +15,7 @@ def _cards(client):
     _set_price("coin_emami", "82000000")
     _set_price("usd", "100000")
     client.post("/profile", data={"gold_grams": "4", "coin_emami": "2", "usd": "300", "csrf": _csrf(client)})
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     return html, html[html.index('id="asset-cards"'):html.index('class="table-wrap only-desk"')]
 
 

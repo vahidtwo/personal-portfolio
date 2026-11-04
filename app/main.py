@@ -33,6 +33,7 @@ from app.config import (
     SESSION_MAX_AGE_SECONDS,
     STATIC_ASSET_VERSION,
 )
+from app.amounts_api import router as amounts_router
 from app.dashboard import router as dashboard_router
 from app.db import init_db
 from app.db_admin import router as db_admin_router
@@ -210,6 +211,7 @@ app.include_router(auth_router)
 app.include_router(unified_auth_router)
 app.include_router(native_api_router)
 app.include_router(dashboard_router)
+app.include_router(amounts_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)
 app.include_router(mcp_router)

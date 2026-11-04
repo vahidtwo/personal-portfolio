@@ -580,7 +580,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         )
     missing_fa = [ASSET_LABEL_FA.get(k, k) for k in view.missing_prices]
     chart_data = build_chart_data(db, user.id, view, now)
-    chart_json = json.dumps(chart_data, ensure_ascii=False)
     chart_asset_options = [{"key": "total", "name_fa": "جمع کل"}] + [
         {"key": row.key, "name_fa": row.name_fa} for row in view.rows
     ]
@@ -588,7 +587,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     pie_data = build_pie_data(view)
     for slice_ in pie_data["slices"]:
         slice_["color"] = ASSET_SPARKLINE_COLORS.get(slice_["key"], "#9aa3b2")
-    pie_json = json.dumps(pie_data, ensure_ascii=False)
     flash_message, flash_error = pop_flash(request)
     refresh_wait_sec = market_price_refresh_wait_seconds(db)
     refresh_wait_label = None
@@ -634,10 +632,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         fetched_label=format_when(view.prices_fetched_at),
         price=price_status(view.prices_fetched_at, utcnow()),
         missing_fa=missing_fa,
-        chart_json=chart_json,
+        chart_data=chart_data,
         chart_asset_options=chart_asset_options,
         default_chart_asset_key=default_chart_asset_key,
-        pie_json=pie_json,
+        pie_data=pie_data,
         pie_slices=pie_data["slices"],
         pie_has_data=bool(pie_data["slices"]),
         flash=flash_message,

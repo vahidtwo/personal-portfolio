@@ -8,6 +8,7 @@ from decimal import Decimal
 import jdatetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.daily_spend import (
@@ -29,10 +30,64 @@ from app.web import flash, render
 
 import re as _re
 
-# A spend saved by the Android app from an SMS: category «بانک» (slug sms_bank) and the note starts with
-# the app's idempotency key «[<64 hex>]» (see api_sms_spend). No DB column needed; manual spends never
-# get this prefix from the web form.
-_SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
+# A spend saved by the Android app from an SMS: an SMS category and the note carries the app's
+# idempotency key «[<64 hex>]» (see api_sms_spend). Older notes start with the key; newer ones are
+# «<merchant> [key] <SMS text>» so the merchant survives the 120-character cut. No DB column needed.
+_SMS_KEY = _re.compile(r"\s*\[[0-9a-f]{64}\]\s*")
+SMS_NOTE_MAX = 120
+SMS_MERCHANT_MAX = 40
+
+_D = "0-9۰-۹٠-٩"
+_SMS_DROP = [
+    _re.compile(r"\[[0-9a-fA-F]{64}\]"),
+    _re.compile(rf"(?:مانده|موجودی|موجود|بالانس)\s*[:：]?[^{_D}]{{0,20}}[{_D}][{_D},٬.]*\s*(?:ریال|تومان)?"),
+    _re.compile(rf"[{_D}]{{1,4}}[/\-.][{_D}]{{1,2}}(?:[/\-.][{_D}]{{1,4}})?"),
+    _re.compile(rf"[{_D}]{{1,2}}[:：][{_D}]{{2}}(?::[{_D}]{{2}})?"),
+    _re.compile(rf"[-+]?[{_D}*][{_D}*,٬.\-]*[{_D}*]\s*[-+]?|\*+|[{_D}]"),
+]
+_SMS_WORDS = set("""بانک ملت ملی صادرات تجارت سامان پاسارگاد رسالت مسکن سپه کشاورزی پارسیان آینده شهر رفاه اقتصاد نوین
+بلو بلوبانک توسعه تعاون پست سینا کارآفرین دی خاورمیانه گردشگری ایران زمین قوامین مهر انصار حکمت
+برداشت برداشت: واریز انتقال کارت حساب شبا مبلغ ریال تومان تاریخ ساعت پایانه کد پیگیری مرجع شماره
+خرید پرداخت مانده موجودی بابت به از در با و ـ : - — + / . ، , ؛ ; ( ) ATM POS پوز خودپرداز""".split())
+_SMS_EDGE = {"به", "از", "در", "با", "و", "بابت"}
+
+
+def _sms_merchant(body: str) -> str:
+    """Merchant or description in an SMS text: bank words, digits, dates, times and balance dropped."""
+    s = body or ""
+    for rx in _SMS_DROP:
+        s = rx.sub(" ", s)
+    words = [t.strip("،,:;؛()[]-_") for t in s.split()]
+    words = [t for t in words if t]
+    kept = [i for i, t in enumerate(words) if t not in _SMS_WORDS]
+    if not kept:
+        return ""
+    span = [t for t in words[kept[0]:kept[-1] + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
+    while span and span[0] in _SMS_EDGE:
+        span.pop(0)
+    while span and span[-1] in _SMS_EDGE:
+        span.pop()
+    return " ".join(span)[:SMS_MERCHANT_MAX].strip()
+
+
+def sms_note_for_storage(raw_note: str, idem: str) -> str:
+    """Stored note for a new SMS spend: merchant first, then the key, then as much SMS text as fits."""
+    raw_note = (raw_note or "").strip()
+    if not idem:
+        return raw_note[:SMS_NOTE_MAX]
+    key = f"[{idem}]"
+    merchant = _sms_merchant(raw_note) if _re.fullmatch(r"[0-9a-f]{64}", idem) else ""
+    head = f"{merchant} {key}" if merchant else key
+    return f"{head} {raw_note}".strip()[:SMS_NOTE_MAX]
+
+
+def sms_note_key(note: str | None) -> tuple[str, str] | None:
+    """(merchant, SMS text) around the key in a stored SMS note, old or new layout; None without a key."""
+    note = note or ""
+    m = _SMS_KEY.search(note)
+    if m is None:
+        return None
+    return note[:m.start()].strip(), note[m.end():].strip()
 
 
 SMS_COMMISSION_MAX_TOMAN = Decimal("50000")
@@ -103,9 +158,12 @@ def sms_spend_parts(
 ) -> tuple[bool, str]:
     """(from_sms, note without the internal key) for one spend."""
     note = note or ""
-    m = _SMS_KEY_PREFIX.match(note)
-    if m and (category_slug in ("sms_bank", SMS_COMMISSION_SLUG) or category_name == SMS_COMMISSION_NAME):
-        return True, note[m.end():]
+    parts = sms_note_key(note)
+    if parts and (category_slug in ("sms_bank", SMS_COMMISSION_SLUG) or category_name == SMS_COMMISSION_NAME):
+        merchant, text = parts
+        if merchant and merchant not in text:
+            return True, f"{merchant} — {text}" if text else merchant
+        return True, text or merchant
     return False, note
 
 router = APIRouter()
@@ -559,9 +617,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
         return JSONResponse({"ok": False, "error": "amount"}, status_code=400)
     raw_note = str(payload.get("note") or "").strip()
     idem = str(payload.get("idempotency_key") or "").strip()[:64]
-    note = raw_note[:120]
-    if idem:
-        note = f"[{idem}] {note}".strip()[:120]
+    note = sms_note_for_storage(raw_note, idem)
     ensure_spend_categories(db, user)
     child = sms_spend_category(db, user, amount)
     if child is None:
@@ -569,7 +625,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     spent_on = sms_spent_on(payload.get("sms_at"), tehran_today().togregorian())
     duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
     if idem:
-        duplicate = duplicate_query.filter(DailySpend.note.like(f"[{idem}]%")).first()
+        duplicate = duplicate_query.filter(func.instr(DailySpend.note, f"[{idem}]") > 0).first()
     else:
         duplicate = duplicate_query.filter(
             DailySpend.category_id == child.id,

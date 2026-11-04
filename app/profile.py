@@ -6,7 +6,6 @@ import json
 import logging
 import secrets
 from decimal import Decimal
-from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse

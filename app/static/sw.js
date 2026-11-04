@@ -19,6 +19,7 @@ const MARKER_ID_RE = /^u[A-Za-z0-9_-]{8,64}$/;
 // A cached dashboard is shown first (fast start) while a fresh copy is fetched in the background.
 // Older than this = too stale to show first: wait for the network (still used as the offline copy).
 const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const DEBTS_SHOW_FIRST_MAX_AGE_MS = 60 * 60 * 1000;
 // A form POST (e.g. the price refresh button) answers with a redirect to the dashboard: that next dashboard load
 // must show the server's fresh page (and its flash message), never the cached copy from before the POST.
 const AFTER_POST_WINDOW_MS = 60 * 1000;
@@ -61,6 +62,12 @@ const PRECACHE = [
   "/static/theme.js",
   "/static/privacy.js",
   "/static/amounts.js",
+  "/static/confirm-dialog.js",
+  "/static/android-bridge.js",
+  "/static/debts-page.js",
+  "/static/spending-page.js",
+  "/static/settings-page.js",
+  "/static/sms-offer.js",
   "/static/number-format.js",
   "/static/dashboard.js",
   "/static/amount-input.js",
@@ -132,7 +139,8 @@ self.addEventListener("install", (event) => {
           await Promise.all(
             PRECACHE.slice(i, i + PRECACHE_BATCH).map(async (path) => {
               try {
-                await cache.add(path);
+                // straight from the server: never a copy of an older build from the HTTP cache
+                await cache.add(new Request(new URL(path, self.location.origin).href, { cache: "reload" }));
               } catch (err) {
                 console.warn("precache skip", path, err);
               }
@@ -170,10 +178,53 @@ function isDashboard(url) {
   return tab === null || tab === "portfolio" || tab === "daily";
 }
 
+// The debts tab exactly (an ?edit= link opens a form with that item's amount: never cached).
+function isDebtsTab(url) {
+  return url.origin === self.location.origin && url.pathname === "/profile" && url.search === "?tab=debts";
+}
+
+// Signed-in pages shown first from this user's cache.
+function isCachedPage(url) {
+  return isDashboard(url) || isDebtsTab(url);
+}
+
+// A page whose amounts are loaded by amounts.js has empty data-amt slots and no amounts in its HTML.
+// Pages added to the cache after the dashboard are stored only in that form: any money-looking text
+// (grouped digits, a number next to a currency word, a number in a value attribute) keeps it out.
+const DIGIT = "[0-9\u06F0-\u06F9]";
+const LEAKED_AMOUNT = [
+  new RegExp(DIGIT + "{1,3}(?:[,\u066C]" + DIGIT + "{3})+"),
+  new RegExp(DIGIT + "\\s*(?:\u062A\u0648\u0645\u0627\u0646|toman|\\$|usd|btc)", "i"),
+  new RegExp("\\$[ \u00A0]*" + DIGIT),
+  new RegExp("(?:value|data-sort[\\w-]*)=\"[0-9.,\u066C\u06F0-\u06F9]*" + DIGIT + "{5,}|data-form=[^>]*?" + DIGIT + "{4,}"),
+];
+function amountFreeHtml(html) {
+  if (!html.includes("data-amt=")) return false;
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+  // an empty slot stays a separator, so "date <slot> toman" is not read as a number with a currency
+  const visible = text.replace(/<[^>]*\bdata-amt=[^>]*>/g, " | ").replace(/<[^>]*>/g, " ");
+  return !LEAKED_AMOUNT.slice(0, 3).some((re) => re.test(visible)) && !LEAKED_AMOUNT[3].test(text);
+}
+async function amountFree(response) {
+  try {
+    return amountFreeHtml(await response.clone().text());
+  } catch (e) {
+    return false;
+  }
+}
+
 async function cacheFirstStatic(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
+  // This build's ?v= URL: the precached copy (stored without the query) is the same file.
+  const url = new URL(request.url);
+  if (url.searchParams.get("v") === ASSET_VERSION) {
+    const precached = await cache.match(url.origin + url.pathname);
+    if (precached) return precached;
+  }
   const response = await fetch(request);
   if (response.ok) await cache.put(request, response.clone());
   return response;
@@ -262,6 +313,7 @@ async function storeDashboard(request, response, id) {
     return "ended";
   }
   const type = response.headers.get("content-type") || "";
+  if (isDebtsTab(new URL(request.url)) && !(await amountFree(response))) return "skip";
   // The account may have changed while the request was in flight: store only under the current id.
   if (response.ok && type.includes("text/html") && id && (await sessionId()) === id) {
     const cache = await caches.open(pageCacheName(id));
@@ -293,7 +345,8 @@ async function dashboardNavigation(event) {
   const network = fetch(event.request);
   const fresh = wantsFreshPage(request, now);
   const cached = await freshCachedPage(cache, request, now);
-  if (!fresh && cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
+  const showFirstFor = isDebtsTab(new URL(request.url)) ? DEBTS_SHOW_FIRST_MAX_AGE_MS : SHOW_FIRST_MAX_AGE_MS;
+  if (!fresh && cached && now - cachedAt(cached) < showFirstFor) {
     const clientId = event.resultingClientId || event.clientId;
     event.waitUntil(
       network
@@ -310,10 +363,11 @@ async function dashboardNavigation(event) {
   try {
     response = await network;
   } catch (err) {
+    const otherTab = isDashboard(new URL(request.url));
     const page =
       cached ||
-      (await freshCachedPage(cache, "/dashboard", now)) ||
-      (await freshCachedPage(cache, "/dashboard?tab=daily", now));
+      (otherTab && (await freshCachedPage(cache, "/dashboard", now))) ||
+      (otherTab && (await freshCachedPage(cache, "/dashboard?tab=daily", now)));
     if (page) return page;
     const offline = await caches.match("/offline.html");
     if (offline) return offline;
@@ -377,7 +431,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate" && isDashboard(url)) {
+  if (request.mode === "navigate" && isCachedPage(url)) {
     event.respondWith(dashboardNavigation(event));
     return;
   }

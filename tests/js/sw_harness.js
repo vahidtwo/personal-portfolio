@@ -72,11 +72,11 @@ if (scenario.cookieStore !== false) {
     return null;
   } };
 }
-let src = fs.readFileSync(swPath, "utf8")
-  .replace(/__STATIC_ASSET_VERSION__/g, "test")
-  .replace("__SESSION_MAX_AGE_MS__", String(MAX_AGE_MS));
-vm.createContext(sandbox);
-vm.runInContext(src, sandbox);
+// A new worker build: fresh script scope, same caches and network.
+const loadSw = (version) => vm.runInContext(fs.readFileSync(swPath, "utf8")
+  .replace(/__STATIC_ASSET_VERSION__/g, version)
+  .replace("__SESSION_MAX_AGE_MS__", String(MAX_AGE_MS)), vm.createContext({ ...sandbox }));
+loadSw("test");
 
 function html(body, status = 200, extra = {}) {
   const r = new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
@@ -118,9 +118,11 @@ const pageStores = () => [...caches._stores.keys()].filter((n) => n.includes("-p
     if (step.online === "redirect-login") network = () => html("<p>login</p>", 200, { redirected: true, url: "https://app.test/login" });
     if (step.online === "opaqueredirect") network = () => { const r = new Response(null, { status: 200 }); Object.defineProperty(r, "type", { value: "opaqueredirect" }); Object.defineProperty(r, "status", { value: 0 }); return r; };
     if (step.online === "login-page") network = () => html("<p>login</p>");
+    if (step.new_sw) loadSw(step.new_sw);
     if (step.install) { let ip; listeners.install({ waitUntil: (p) => (ip = p) }); await ip; }
     if (step.activate) { let ap; listeners.activate({ waitUntil: (p) => (ap = p) }); await ap; }
     if (step.offline_html) await (await caches.open("inventory-vtest-static")).put("/offline.html", html("<p>offline page</p>"));
+    if (step.static_put) await (await caches.open("inventory-vtest-static")).put(step.static_put, new Response("precached " + step.static_put));
     if (step.go) {
       const r = await dispatch(step.go, step.opts || {});
       out.push({ go: step.go, ...r, pages: await pageKeys(), stores: pageStores(), messages: messages.splice(0) });

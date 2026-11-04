@@ -151,7 +151,7 @@ def test_sms_note_strips_key_date_time_card_and_balance():
 def test_manual_note_digits_shown_as_typed():
     from app.spends import sms_spend_parts
     assert sms_spend_parts("نان ۲ عدد و 3 شیر 12500", "food") == (False, "نان ۲ عدد و 3 شیر 12500")
-    assert sms_spend_parts("x [" + "d" * 64 + "] y", "food") == (False, "x y")
+    assert sms_spend_parts("x 12 [" + "d" * 64 + "] y", "food") == (False, "x 12 y")
 
 
 def test_note_is_outside_amount_mask():

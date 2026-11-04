@@ -69,7 +69,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 |----------|---------|-------------|
 | `SECRET_KEY` | *(required)* | Session signing key. The server refuses to start if it is empty or a placeholder |
 | `DATA_DIR` | `./data` | SQLite DB and optional auto-generated secret |
-| `HTTPS_ONLY` | `0` | Set `1` when users reach the site over HTTPS (required behind Cloudflare + secure cookies) |
+| `HTTPS_ONLY` | `1` | Redirects http to https (308), adds HSTS and marks cookies Secure. `/health` stays on plain http. Set `0` for local dev over http |
+| `HSTS_MAX_AGE` | `86400` | HSTS max-age in seconds (no includeSubDomains, no preload) |
 | `CHANDE_URL` | chande.net current prices API | Override only if the endpoint changes |
 | `ARZBAN_PRICES_URL` | fm5.ir `/api/v1/prices` | Backup when Chande fails (Arzban public API) |
 | `PRICE_REFRESH_HOURS` | `1` | In-app scheduler interval for prices + snapshots |
@@ -145,7 +146,7 @@ counts and the backup filename.
 
 - Run **one** uvicorn worker (`--workers 1` in the Dockerfile) so the hourly job does not run twice.
 - Mount a persistent volume on `DATA_DIR`.
-- Set a strong `SECRET_KEY` and `HTTPS_ONLY=1` when served over TLS.
+- Set a strong `SECRET_KEY`. `HTTPS_ONLY` is on by default; set `HTTPS_ONLY=0` only for local http.
 - Behind **Cloudflare**, use SSL/TLS mode **Full (strict)** (origin also serves HTTPS). The Docker image enables uvicorn `--proxy-headers` so `X-Forwarded-Proto` is honored. Avoid **Flexible** (visitor HTTPS, origin HTTP) with `HTTPS_ONLY=1`, or session cookies may not stick.
 - **Trusted proxy:** uvicorn trusts `X-Forwarded-*` only from `FORWARDED_ALLOW_IPS` (Dockerfile default `*`, the old behaviour). On Dokploy set it to Traefik's network, e.g. the subnet from `docker network inspect dokploy-network` (`172.x.0.0/16`), then redeploy and check that logins still work and `request.client` shows visitor IPs.
 - **Login limits (12.0.2):** failed logins are counted per IP and per username+IP for `/auth/continue`, `/login` and `/api/auth/continue`, in `DATA_DIR/rate_limit.sqlite` (separate from the app database; survives restarts). Limits: 10 per username+IP and 30 per IP in 15 minutes; each repeat lockout doubles (15 min, 30, 60 ... max 24 h). A successful login clears both counts. Locked requests get 429 with a Persian message and `Retry-After`. The client IP is `request.client.host`; `ar-real-ip` / `CF-Connecting-IP` are trusted only when that peer is in ArvanCloud's / Cloudflare's published ranges (lists in `app/rate_limit.py`). X-Forwarded-For is never read by the app.

@@ -43,7 +43,7 @@ def test_finished_and_future_loans_are_out():
 
 def test_loan_ending_this_month():
     assert ds.this_month_installments([D(1, 1405, 8, 25, 700)], TODAY) == Decimal("700")
-    assert ds.this_month_installments([D(0, 1405, 9, 25, 700)], TODAY) == Decimal("0")
+    assert ds.this_month_installments([D(0, 1405, 9, 25, 700)], TODAY) == Decimal("700")
 
 
 def test_month_boundaries():

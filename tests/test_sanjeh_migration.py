@@ -67,7 +67,7 @@ def test_0004_on_copy_of_fake_db_adds_only_nullable_column_and_keeps_data(tmp_pa
     copy = tmp_path / "copy.db"
     shutil.copyfile(original, copy)
     before = _dump(copy)
-    _alembic(copy, "upgrade", "head")
+    _alembic(copy, "upgrade", "0004_sanjeh_status")
     c = sqlite3.connect(copy)
     info = {r[1]: r for r in c.execute("pragma table_info(users)")}
     assert info["sanjeh_status"][2].upper() == "VARCHAR(16)" and info["sanjeh_status"][3] == 0  # nullable
@@ -81,9 +81,9 @@ def test_0004_on_copy_of_fake_db_adds_only_nullable_column_and_keeps_data(tmp_pa
 def test_0004_is_idempotent_and_downgrade_removes_only_the_column(tmp_path):
     db = _fake_db_at_0003(tmp_path)
     before = _dump(db)
-    _alembic(db, "upgrade", "head")
+    _alembic(db, "upgrade", "0004_sanjeh_status")
     _alembic(db, "stamp", "0003_admin_audit_log")  # column already there: re-running must be a no-op
-    _alembic(db, "upgrade", "head")
+    _alembic(db, "upgrade", "0004_sanjeh_status")
     assert _dump(db) == before
     _alembic(db, "downgrade", "0003_admin_audit_log")
     cols = {r[1] for r in sqlite3.connect(db).execute("pragma table_info(users)")}

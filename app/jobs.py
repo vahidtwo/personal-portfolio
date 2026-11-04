@@ -80,6 +80,16 @@ async def run_hourly_job(take_snapshots: bool = True) -> None:
             await refresh_all_sanjeh_cars()
         except Exception:
             logger.exception("Failed to refresh Sanjeh car values")
+        try:
+            from app.db import SessionLocal
+            from app.due_reminders import send_due_reminders
+
+            with SessionLocal() as db:
+                sent = send_due_reminders(db)
+            if sent:
+                logger.info("Sent %s due reminders", sent)
+        except Exception:
+            logger.exception("Failed to send due reminders")
         if not take_snapshots:
             logger.info("Hourly job finished (no snapshots)")
             return

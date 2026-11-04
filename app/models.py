@@ -213,3 +213,17 @@ class AdminAuditLog(Base):
     counts_json: Mapped[str] = mapped_column(Text)
     backup_filename: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class DueReminder(Base):
+    """One row per reminder sent: (loan, kind, Jalali due date) is sent at most once."""
+
+    __tablename__ = "due_reminders"
+    __table_args__ = (UniqueConstraint("debt_id", "kind", "due_date", name="uq_due_reminders_once"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    debt_id: Mapped[int] = mapped_column(Integer, index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    due_date: Mapped[str] = mapped_column(String(10))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

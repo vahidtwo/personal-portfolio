@@ -67,7 +67,7 @@ def _rows(db_path):
     c = sqlite3.connect(db_path)
     out = {t: c.execute(f"select count(*) from {t}").fetchone()[0] for t in
            ("users", "portfolio_snapshots", "holdings", "debts", "monthly_expenses", "daily_spends",
-            "push_device_tokens", "spend_categories")}
+            "push_device_tokens", "spend_categories", "due_reminders")}
     c.close()
     return out
 
@@ -89,7 +89,8 @@ def test_batch_delete_happy_path_counts_backup_audit(client, monkeypatch):
     after = _rows(_db_path())
     # every counted row is gone, matching the confirm screen exactly
     per_table = {"portfolio_snapshots": 0, "holdings": 0, "debts": 0, "monthly_expenses": 0,
-                 "daily_spends": 0, "push_device_tokens": 0, "spend_categories": 0}
+                 "daily_spends": 0, "push_device_tokens": 0, "spend_categories": 0,
+                 "due_reminders": 0}
     for c in shown.values():
         for k, v in c.items():
             per_table["spend_categories" if k.startswith("spend_categories") else k] += v

@@ -81,10 +81,7 @@ class SmsParserTest {
         val t = template(tSample, "1,250,000")
         val sms = "بانک تست\nبرداشت مبلغ ۳۰۰٬۰۰۰ ریال\nحساب 1111\n1405/08/06 21:15\nمانده 8,000,000"
         assertNull(p.autoDetect(sms))
-        val r = p.parse(sms, "bank", listOf(t))!!
-        assertEquals(-30_000L, r.amountToman)
-        assertEquals(800_000L, r.balanceToman)
-        assertEquals(SmsParser.Source.TEMPLATE, r.source)
+        assertNull(p.parse(sms, "bank", listOf(t)))  // no minus sign: never a spend, even with «برداشت»
     }
 
     @Test fun templateNeedsSameSenderAndShape() {
@@ -99,7 +96,7 @@ class SmsParserTest {
         val sms = "بانک\nمبلغ 2,000,000\nمانده 5"
         assertNull(p.parse(sms, "BANK", listOf(template(sample, "1,000,000"))))
         assertNull(p.parse(sms, "BANK", listOf(template(sample, "1,000,000", out = false))))
-        assertEquals(-200_000L, p.parse(sms, "BANK", listOf(template(sample, "1,000,000", out = true)))!!.amountToman)
+        assertNull(p.parse(sms, "BANK", listOf(template(sample, "1,000,000", out = true))))  // saved answer no longer counts
     }
 
     @Test fun templateDepositIsIgnored() {
@@ -130,7 +127,17 @@ class SmsParserTest {
     @Test fun templateLiteralTextIsEscaped() {
         val sample = "(x) [1,000] *"
         val t = template(sample, "1,000", out = true)
-        assertEquals(-200L, p.parse("(x) [2,000] *", "BANK", listOf(t))!!.amountToman)
-        assertNull(p.parse("(x) {2,000} *", "BANK", listOf(t)))
+        assertEquals(-200L, p.parse("(x) [2,000-] *", "BANK", listOf(t))!!.amountToman)
+        assertNull(p.matchTemplate("(x) {2,000-} *", "BANK", listOf(t)))
+    }
+
+    @Test fun plusAndMoneyInWordsAreMoneyIn() {
+        assertTrue(p.isMoneyIn("+1,000"))
+        assertTrue(p.isMoneyIn("1,000+"))
+        assertTrue(p.isMoneyIn("1,000 +"))
+        assertTrue(p.isMoneyIn("واريز 1,000"))  // Arabic yeh
+        assertTrue(p.isMoneyIn("افزایش 1,000"))
+        assertFalse(p.isMoneyIn("-1,000\nمانده 5"))
+        assertNull(p.autoDetect("+50,000\n-1,000\nمانده 5"))
     }
 }

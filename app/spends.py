@@ -35,6 +35,44 @@ import re as _re
 _SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
 
 
+_SMS_KEY_ANY = _re.compile(r"\[[0-9a-fA-F]{64}\]")
+
+
+_D = "0-9۰-۹٠-٩"
+_SMS_DROP = [
+    _re.compile(r"\[[0-9a-fA-F]{64}\]"),
+    _re.compile(rf"(?:مانده|موجودی|موجود|بالانس)\s*[:：]?[^{_D}]{{0,20}}[{_D}][{_D},٬.]*\s*(?:ریال|تومان)?"),
+    _re.compile(rf"[{_D}]{{1,4}}[/\-.][{_D}]{{1,2}}(?:[/\-.][{_D}]{{1,4}})?"),
+    _re.compile(rf"[{_D}]{{1,2}}[:：][{_D}]{{2}}(?::[{_D}]{{2}})?"),
+    _re.compile(rf"[-+]?[{_D}*][{_D}*,٬.\-]*[{_D}*]\s*[-+]?|\*+|[{_D}]"),
+]
+_SMS_WORDS = set("""بانک ملت ملی صادرات تجارت سامان پاسارگاد رسالت مسکن سپه کشاورزی پارسیان آینده شهر رفاه اقتصاد نوین
+بلو بلوبانک توسعه تعاون پست سینا کارآفرین دی خاورمیانه گردشگری ایران زمین قوامین مهر انصار حکمت
+برداشت برداشت: واریز انتقال کارت حساب شبا مبلغ ریال تومان تاریخ ساعت پایانه کد پیگیری مرجع شماره
+خرید پرداخت مانده موجودی بابت به از در با و ـ : - — + / . ، , ؛ ; ( ) ATM POS پوز خودپرداز""".split())
+_SMS_EDGE = {"به", "از", "در", "با", "و", "بابت"}
+
+
+def sms_note_text(body: str) -> str:
+    """Merchant or description left in an SMS body once bank boilerplate, digits, dates, times and balance go."""
+    s = body or ""
+    for rx in _SMS_DROP:
+        s = rx.sub(" ", s)
+    tokens = [t.strip("،,:;؛()[]-_") for t in s.split()]
+    kept = [t for t in tokens if t and t not in _SMS_WORDS]
+    if not kept:
+        return ""
+    words = [t for t in tokens if t]
+    first = words.index(kept[0])
+    last = len(words) - 1 - words[::-1].index(kept[-1])
+    span = [t for t in words[first:last + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
+    while span and span[0] in _SMS_EDGE:
+        span.pop(0)
+    while span and span[-1] in _SMS_EDGE:
+        span.pop()
+    return " ".join(span)
+
+
 SMS_COMMISSION_MAX_TOMAN = Decimal("50000")
 SMS_COMMISSION_NAME = "کارمزد"
 SMS_COMMISSION_SLUG = "sms_fee"
@@ -101,12 +139,18 @@ def sms_spend_category(db: Session, user: User, amount_toman) -> SpendCategory |
 def sms_spend_parts(
     note: str | None, category_slug: str | None, category_name: str | None = None
 ) -> tuple[bool, str]:
-    """(from_sms, note without the internal key) for one spend."""
+    """(from_sms, note shown to the user) for one spend.
+
+    A note that starts with the app's SMS key marks an SMS spend in any category (bank, «کارمزد» or one the
+    user picked later): only its merchant or description part is shown (see sms_note_text); when nothing is
+    left, the «از پیامک» tag alone stands for it.
+    Any other note is shown as saved, minus a stray key. Stored notes are not changed.
+    """
     note = note or ""
     m = _SMS_KEY_PREFIX.match(note)
-    if m and (category_slug in ("sms_bank", SMS_COMMISSION_SLUG) or category_name == SMS_COMMISSION_NAME):
-        return True, note[m.end():]
-    return False, note
+    if m:
+        return True, sms_note_text(note[m.end():])
+    return False, _re.sub(r"\s{2,}", " ", _SMS_KEY_ANY.sub("", note)).strip()
 
 router = APIRouter()
 
@@ -247,7 +291,7 @@ def daily_view(
             "day": str(editing["day"]),
             "parent_id": str(editing["parent_id"]),
             "category_id": str(editing["category_id"]),
-            "note": editing["note"],
+            "note": editing["note_display"],
         }
     if spend_form is None:
         today = tehran_today()
@@ -400,7 +444,8 @@ def _save_daily_spend(
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
-        item.note = form["note"]
+        if form["note"] != sms_spend_parts(item.note, None)[1]:
+            item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
     target = f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}"

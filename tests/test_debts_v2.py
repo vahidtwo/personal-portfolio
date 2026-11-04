@@ -199,7 +199,7 @@ def test_zero_left_debts_drop_out_of_all_totals(client, no_network, clock):
     from app.mcp_http import _debts, _monthly_left
 
     _register(client)
-    _seed([("فعال", 1000000, 3, 1405, 8, 5), ("تمام‌شده", 9000000, 0, 1405, 8, 2)], expenses=[("اجاره", 2000000, 1)], salary=10000000)
+    _seed([("فعال", 1000000, 3, 1405, 7, 30), ("تمام‌شده", 9000000, 0, 1405, 8, 2)], expenses=[("اجاره", 2000000, 1)], salary=10000000)
     page = client.get(P).text
     assert '<b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">۱٬۰۰۰٬۰۰۰</bdi></b>' in page  # قسط‌های این ماه
     assert '<b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">۳٬۰۰۰٬۰۰۰</bdi></b>' in page  # جمع بدهی مانده

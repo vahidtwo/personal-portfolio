@@ -422,7 +422,7 @@ def next_instalment(debts: list[Debt], today: jdatetime.date) -> dict | None:
     nearest = soonest(debts, today)
     if nearest is None:
         return None
-    return {k: nearest[k] for k in ("amount_label", "title", "date_label", "chip", "days")}
+    return {k: nearest[k] for k in ("amount_label", "title", "date_label", "chip", "days", "overdue_count", "overdue_label")}
 
 
 def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:
@@ -626,6 +626,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         changes=changes,
         income_month_label=monthly["income_month_label"],
         installment_month_label=monthly["installment_month_label"],
+        installment_overdue_label=monthly["installment_overdue_label"],
         expense_month_label=monthly["expense_month_label"],
         monthly_left_label=monthly["monthly_left_label"],
         total_week_chip=changes["7d"],

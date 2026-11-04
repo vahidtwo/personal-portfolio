@@ -201,7 +201,7 @@ def test_monthly_report_toman_after_number_not_ltr_dd(client, no_network):
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
     html = client.get("/dashboard").text
     assert not re.search(r'<dd class="num"[^>]*dir="ltr"', html)
-    assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr">[^<]+</bdi> تومان</dd>', html)
+    assert re.search(r'<dd class="num"[^>]*><bdi dir="ltr"[^>]*>[^<]+</bdi> تومان</dd>', html)
     # Debts v2: «مانده از حقوق» is a tile; the number is an LTR bdi with «تومان» after it, never an LTR block.
     client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": "1000", "due_day": "1", "csrf": _csrf(client, "/profile?tab=debts")})
     debts = client.get("/profile?tab=debts").text

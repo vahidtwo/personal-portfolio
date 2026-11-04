@@ -1,5 +1,5 @@
 // v7 spending page: one-time offer to record spends from SMS (Android app only, v6 spec state 2).
-// Shown only when the app reports the feature is off; «نه، ممنون» or ✕ hide it for good (stored on this device).
+// One-line banner, shown only when the app reports the feature is off; ✕ hides it for good (stored on this device).
 (function () {
   "use strict";
   var KEY = "inventory-sms-offer-dismissed";

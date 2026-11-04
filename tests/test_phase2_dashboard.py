@@ -292,7 +292,8 @@ def test_dashboard_numbers_match_previous_formulas(client, no_network):
     assert f'data-mask="portfolio">{old_net}</span>' in html
     tfoot = html[html.index("<tfoot>"):html.index("</tfoot>")]
     assert old_total in tfoot
-    assert f"title=\"{format_toman(debt)} تومان\"" in html
+    # the exact debt total is no longer in a hover title (it showed while amounts were hidden)
+    assert f"title=\"{format_toman(debt)} تومان\"" not in html and '<dt>جمع بدهی</dt><dd data-mask="portfolio" data-amount>' in html
     assert old_usd == "۲۳۵" and "<bdi dir=\"ltr\">۲۳۵٫۰۰</bdi> <small>دلار آمریکا</small>" in html
     table = html[html.index('id="portfolio-table"'):html.index("</table>")]
     for row in view.rows:

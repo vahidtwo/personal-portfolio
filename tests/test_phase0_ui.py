@@ -241,7 +241,7 @@ def test_new_user_profile_fields_empty_and_saving_empty_means_zero(client, no_ne
     _register(client)
     html = client.get("/assets").text
     for k in ("gold_grams", "btc", "usd", "cash_toman"):
-        assert re.search(rf'<input name="{k}" value="" placeholder="۰"', html), k
+        assert re.search(rf'<input name="{k}" (?:value=""|data-amt-attr="value=input-{k}") placeholder="۰"', html), k
     assert '<input id="f-salary_toman" name="salary_toman" value="" autocomplete="off" inputmode="decimal" dir="ltr" data-thousands' in client.get("/profile").text
     data = {k: "" for k in ("gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram",
                             "silver_grams", "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman")}

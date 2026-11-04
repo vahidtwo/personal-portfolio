@@ -18,10 +18,11 @@ SAME_SITE_FETCH = frozenset({"same-origin", "none"})
 
 
 def _pages():
+    from app.assets_page import assets_page
     from app.dashboard import dashboard
     from app.profile import profile_form
 
-    return {"/dashboard": dashboard, "/profile": profile_form}
+    return {"/dashboard": dashboard, "/profile": profile_form, "/assets": assets_page}
 
 
 def _error(code: str, status: int) -> JSONResponse:

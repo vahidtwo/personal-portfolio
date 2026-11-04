@@ -64,4 +64,5 @@ def test_rendered_pages_have_no_ascii_separator_between_persian_digits(client, n
     for path in ("/dashboard", "/assets", "/profile?tab=debts", "/dashboard?tab=daily"):
         text = re.sub(r"<[^>]+>", " ", client.get(path).text)
         assert not re.search(r"[۰-۹][,.][۰-۹]", text), (path, re.findall(r"[۰-۹]+[,.][۰-۹]+", text)[:5])
-    assert "۸۸۹٬۰۸۸٬۳۵۷" in client.get("/assets").text
+    from tests.amounts_helper import with_amounts
+    assert "۸۸۹٬۰۸۸٬۳۵۷" in with_amounts(client, "/assets")

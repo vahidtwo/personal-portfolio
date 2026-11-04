@@ -8,9 +8,9 @@ from tests.test_debts_v2 import _seed, clock  # noqa: F401
 from tests.test_holdings import _register, no_network  # noqa: F401
 from tests.test_quick_ux_5c import _seed_spends
 
-PAGES = ("/dashboard", "/dashboard?tab=daily", "/profile?tab=debts")
+PAGES = ("/dashboard", "/dashboard?tab=daily", "/profile?tab=debts", "/assets")
 # Fake amounts that appear nowhere else on the pages.
-DEBT, EXPENSE, CASH, SALARY = 2_357_000, 7_130_000, 41_270_000, 93_410_000
+DEBT, EXPENSE, CASH, SALARY, CAR = 2_357_000, 7_130_000, 41_270_000, 93_410_000, 683_150_000
 SPENDS = (450000, 1250000, 99000)
 
 
@@ -24,12 +24,15 @@ def _seed_all(client):
     db = SessionLocal()
     user = db.query(User).filter_by(username="alice").one()
     user.cash_toman = Decimal(CASH)
+    user.sanjeh_token = "fake-token"
+    user.car_toman = Decimal(CAR)
+    user.car_count = 3
     db.commit()
     db.close()
 
 
 def _labels():
-    return [format_toman(Decimal(v)) for v in (DEBT, EXPENSE, CASH, SALARY, DEBT * 12, CASH - DEBT * 12) + SPENDS]
+    return [format_toman(Decimal(v)) for v in (DEBT, EXPENSE, CASH, SALARY, CAR, CASH + CAR, DEBT * 12, CASH + CAR - DEBT * 12) + SPENDS]
 
 
 def test_page_source_has_no_amounts(client, no_network, clock):
@@ -38,7 +41,7 @@ def test_page_source_has_no_amounts(client, no_network, clock):
         html = client.get(url).text
         for label in _labels():
             assert label not in html, (url, label)
-        for raw in (str(DEBT), str(EXPENSE), str(CASH), str(SALARY), "2,357,000", "41270000.0"):
+        for raw in (str(DEBT), str(EXPENSE), str(CASH), str(SALARY), str(CAR), str(CASH + CAR), "2,357,000", "41270000.0"):
             assert raw not in html, (url, raw)
         assert not re.search(r"\sdata-form=['\"]", html)
         assert 'data-sort-value="' not in html and 'data-sort-qty="' not in html
@@ -48,10 +51,16 @@ def test_amounts_fill_every_placeholder(client, no_network, clock):
     _seed_all(client)
     home = with_amounts(client, "/dashboard")
     assert format_toman(Decimal(CASH)) in home and format_toman(Decimal(DEBT)) in home
-    assert format_toman(Decimal(CASH - DEBT * 12)) in home  # net worth
+    assert format_toman(Decimal(CASH + CAR - DEBT * 12)) in home  # net worth
     debts = with_amounts(client, "/profile?tab=debts")
     assert format_toman(Decimal(DEBT)) in debts and format_toman(Decimal(EXPENSE)) in debts
     assert re.search(r"\sdata-form=['\"]", debts)
+    assets = with_amounts(client, "/assets")
+    for v in (CASH, CAR, CASH + CAR):
+        assert format_toman(Decimal(v)) in assets, v
+    assert re.search(r'data-assets-total data-base="%d' % (CASH + CAR), assets)
+    assert "car-count" in amounts_for(client, "/assets") and "car-value-confirm" in amounts_for(client, "/assets")
+    assert 'name="cash_toman_keep"' in client.get("/assets").text
     daily = with_amounts(client, "/dashboard?tab=daily")
     assert format_toman(Decimal(1250000)) in daily
     for url in PAGES:
@@ -90,7 +99,7 @@ def test_api_refuses_cross_site(client, no_network, clock):
 
 def test_api_only_known_pages(client, no_network, clock):
     _seed_all(client)
-    for bad in ("", "/admin", "/assets", "https://evil.example/dashboard", "//evil.example/dashboard", "/api/amounts"):
+    for bad in ("", "/admin", "/assets/car", "https://evil.example/dashboard", "//evil.example/dashboard", "/api/amounts"):
         assert client.get("/api/amounts", params={"path": bad}).status_code == 400, bad
     assert client.post("/api/amounts?path=/dashboard").status_code == 405
 
@@ -104,3 +113,15 @@ def test_static_js_wiring():
     assert "Amounts.refresh" in (static / "debts-page.js").read_text(encoding="utf-8")
     assert "Amounts.refresh" in (static / "spending-page.js").read_text(encoding="utf-8")
     assert "amounts:filled" in (static / "dashboard.js").read_text(encoding="utf-8")
+
+
+def test_cash_left_empty_by_the_page_is_kept_on_save(client, no_network, clock):
+    from tests.test_holdings import _csrf
+    _seed_all(client)
+    tok = _csrf(client, "/assets")
+    client.post("/profile", data={"cash_toman": "", "cash_toman_keep": "1", "btc": "0", "next": "/assets", "csrf": tok})
+    assert format_toman(Decimal(CASH)) in with_amounts(client, "/assets")
+    client.post("/profile", data={"cash_toman": "5000", "cash_toman_keep": "1", "next": "/assets", "csrf": tok})
+    assert amounts_for(client, "/assets")["input-cash_toman"] == format_toman(Decimal(5000))
+    client.post("/profile", data={"cash_toman": "", "next": "/assets", "csrf": tok})  # filled page, cleared by the user
+    assert amounts_for(client, "/assets")["input-cash_toman"] in ("", "۰")

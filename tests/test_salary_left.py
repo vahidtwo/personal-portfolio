@@ -111,3 +111,27 @@ def test_dashboard_month_total_sits_in_monthly_report(client, no_network, clock)
     assert "<dt>جمع اقساط این ماه</dt>" not in stats
     assert report.index("<dt>اقساط باقی‌مانده</dt>") < report.index("<dt>جمع اقساط این ماه</dt>") < report.index("<dt>هزینهٔ ماهانه</dt>")
     assert 'data-mask="portfolio" data-amount data-month-total>۲۰۰٬۰۰۰<' in report
+
+
+def test_final_instalment_paid_this_month_counts():
+    assert ds.this_month_installments([D(0, 1405, 9, 10, 700)], TODAY) == Decimal("700")
+    assert ds.this_month_installments([D(0, 1405, 9, 10, 700)], LAST) == Decimal("700")
+    assert ds.this_month_installments([D(0, 1405, 9, 10, 700)], FIRST) == Decimal("700")
+
+
+def test_other_finished_rows_stay_out():
+    for stored in ((1405, 8), (1405, 10), (1405, 7), (1406, 9)):
+        assert ds.this_month_installments([D(0, *stored, 10, 700)], TODAY) == Decimal("0")
+
+
+def test_final_paid_in_esfand_rolls_to_farvardin():
+    esfand = jdatetime.date(1405, 12, 15)
+    assert ds.this_month_installments([D(0, 1406, 1, 10, 900)], esfand) == Decimal("900")
+    assert ds.this_month_installments([D(0, 1405, 1, 10, 900)], esfand) == Decimal("0")
+    assert ds.this_month_installments([D(0, 1406, 2, 10, 900)], esfand) == Decimal("0")
+
+
+def test_final_paid_not_double_counted_with_active_loans():
+    debts = [D(0, 1405, 9, 10, 700), D(3, 1405, 8, 20, 1000), D(2, 1405, 9, 5, 500)]
+    assert ds.this_month_installments(debts, TODAY) == Decimal("2200")
+    assert ds.month_due(debts, TODAY)[0] == Decimal("1000")

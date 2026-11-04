@@ -1,7 +1,27 @@
+# Throwaway stage: resolve the cloned commit from .git/HEAD and its ref (loose or packed) into one file.
+# Only HEAD, refs/heads and packed-refs reach the build (.dockerignore); anything else, or no .git, gives "unknown".
+FROM python:3.12-slim AS git-sha
+RUN --mount=type=bind,target=/src sh -eu -c '\
+  d=/src/.git; v=""; \
+  if [ -f "$d/HEAD" ]; then \
+    h=$(head -n 1 "$d/HEAD"); \
+    case "$h" in \
+      "ref: refs/heads/"*) r=${h#ref: }; \
+        case "$r" in *..*) r="";; esac; \
+        if [ -n "$r" ] && [ -f "$d/$r" ]; then v=$(head -n 1 "$d/$r"); \
+        elif [ -n "$r" ] && [ -f "$d/packed-refs" ]; then v=$(awk -v r="$r" "\$2 == r { print \$1; exit }" "$d/packed-refs"); fi;; \
+      "ref: "*) ;; \
+      *) v=$h;; \
+    esac; \
+  fi; \
+  mkdir -p /out; \
+  if printf "%s" "$v" | grep -Eqx "[0-9a-f]{40}"; then printf "%s\n" "$v" > /out/GIT_SHA; else echo unknown > /out/GIT_SHA; fi; \
+  echo "git-sha: $(cat /out/GIT_SHA)"'
+
 FROM python:3.12-slim
 
 WORKDIR /app
-# Deployed commit for /health: pass --build-arg GIT_SHA=<commit> (Dokploy: Build Time Arguments).
+# Deployed commit for /health: build-info/GIT_SHA from the git-sha stage; --build-arg GIT_SHA=<commit> overrides it.
 ARG GIT_SHA=
 ENV GIT_SHA=$GIT_SHA
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,6 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
+COPY --from=git-sha /out/GIT_SHA ./build-info/GIT_SHA
 RUN mkdir -p /app/data
 
 EXPOSE 8000

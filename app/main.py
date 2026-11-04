@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -172,15 +173,25 @@ async def no_store_html(request, call_next):
 
 _COMMIT_ENV_VARS = ("GIT_SHA", "SOURCE_COMMIT", "DOKPLOY_COMMIT_SHA", "DOKPLOY_COMMIT_HASH")
 _COMMIT_RE = re.compile(r"[0-9a-fA-F]{7,40}")
+# Written at image build time from the cloned .git (see Dockerfile); the env vars win over it.
+_COMMIT_FILE = Path(__file__).resolve().parent.parent / "build-info" / "GIT_SHA"
+
+
+def _short_commit(value: str) -> str:
+    return value[:7].lower() if _COMMIT_RE.fullmatch(value) else "unknown"
 
 
 def deployed_commit() -> str:
-    """Short SHA of the deployed commit from the first set commit env var; 'unknown' if unset or not hex."""
+    """Short SHA of the deployed commit: first set commit env var, else the build file; 'unknown' if neither is valid."""
     for name in _COMMIT_ENV_VARS:
         value = (os.environ.get(name) or "").strip()
         if value:
-            return value[:7].lower() if _COMMIT_RE.fullmatch(value) else "unknown"
-    return "unknown"
+            return _short_commit(value)
+    try:
+        value = _COMMIT_FILE.read_text(encoding="ascii", errors="replace")[:100].strip()
+    except OSError:
+        return "unknown"
+    return _short_commit(value) if value else "unknown"
 
 
 @app.get("/health")

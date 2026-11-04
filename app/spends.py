@@ -35,13 +35,19 @@ import re as _re
 _SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
 
 
+_SMS_KEY_ANY = _re.compile(r"\[[0-9a-fA-F]{64}\]")
+
+
 def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, str]:
-    """(from_sms, note without the internal key) for one spend."""
+    """(from_sms, note shown to the user) for one spend.
+
+    A note that carries the app's SMS key is the bank SMS text: it is never shown, whatever the category.
+    Any other note is shown as saved, minus a stray key. Stored notes are not changed.
+    """
     note = note or ""
-    m = _SMS_KEY_PREFIX.match(note)
-    if m and category_slug == "sms_bank":
-        return True, note[m.end():]
-    return False, note
+    if _SMS_KEY_PREFIX.match(note):
+        return category_slug == "sms_bank", ""
+    return False, _re.sub(r"\s{2,}", " ", _SMS_KEY_ANY.sub("", note)).strip()
 
 router = APIRouter()
 
@@ -182,7 +188,7 @@ def daily_view(
             "day": str(editing["day"]),
             "parent_id": str(editing["parent_id"]),
             "category_id": str(editing["category_id"]),
-            "note": editing["note"],
+            "note": editing["note_display"],
         }
     if spend_form is None:
         today = tehran_today()
@@ -335,7 +341,8 @@ def _save_daily_spend(
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
-        item.note = form["note"]
+        if form["note"] != sms_spend_parts(item.note, None)[1]:
+            item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
     target = f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}"

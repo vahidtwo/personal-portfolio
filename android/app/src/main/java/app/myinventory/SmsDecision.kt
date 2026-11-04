@@ -6,10 +6,12 @@ import org.json.JSONObject
 /**
  * One decision per received SMS (pure, unit-tested): what to send to the server, or null.
  *
- * Skipped: one-time-password / code messages. Accepted when
- *  A) auto-detect finds exactly one signed amount and the SMS has a «مانده» line, or
- *  C) the sender has a saved template that matches, or
- *  B) the SMS passes the keyword gate (the user's keyword list).
+ * Skipped: one-time-password / code messages and every money-in SMS (plus sign, «واریز», ...).
+ * Only a MINUS-signed amount is ever a spend. Accepted when
+ *  A) auto-detect finds exactly one minus amount and the SMS has a «مانده» line, or
+ *  C) the sender has a saved template that matches and the matched amount carries a minus sign, or
+ *  B) the SMS contains one of the user's keywords AND auto-detect finds exactly one minus amount
+ *     (no «مانده» line needed). The keyword list is an extra filter, never a way around the minus rule.
  * Amounts are rial / 10 unless the SMS labels them «تومان». The server gets only the toman amount and the
  * masked note.
  */
@@ -24,7 +26,7 @@ object SmsDecision {
         keywords: List<String>,
         templates: List<SmsParser.Template> = emptyList(),
     ): Spend? {
-        if (body.isBlank() || SmsParser.isOtp(body)) return null
+        if (body.isBlank() || SmsParser.isOtp(body) || SmsParser.isMoneyIn(body)) return null
         val toman = autoAmount(body)?.let { it to Path.AUTO }
             ?: templateAmount(body, sender, templates)?.let { it to Path.TEMPLATE }
             ?: keywordAmount(body, keywords)?.let { it to Path.KEYWORD }
@@ -42,8 +44,7 @@ object SmsDecision {
 
     private fun keywordAmount(body: String, keywords: List<String>): Long? {
         if (!SmsKeywords.matchesAny(body, keywords)) return null
-        val raw = SmsKeywords.rawAmount(body) ?: return null
-        return SmsParser.amountToman(body, raw).takeIf { it > 0 }
+        return SmsParser.autoDetect(body)?.amountToman?.let { -it }
     }
 
     fun templatesToJson(list: List<SmsParser.Template>): String = JSONArray(list.map { t ->

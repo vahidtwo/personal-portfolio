@@ -26,6 +26,7 @@ from app.config import (
     SECRET_KEY,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE_SECONDS,
+    STATIC_ASSET_VERSION,
 )
 from app.dashboard import router as dashboard_router
 from app.db import init_db
@@ -128,6 +129,28 @@ def is_form_page(path: str, query_params) -> bool:
     if path in FORM_PAGE_PATHS:
         return True
     return path == "/dashboard" and query_params.get("tab") == "daily"  # the daily spend form
+
+
+# Versioned static assets (/static/x.js?v=<STATIC_ASSET_VERSION>) never change under the same URL: a deploy
+# bumps the version and so the URL. Let browsers / the WebView keep them for a year without revalidating,
+# so a tab switch (a full page load) does not re-download or re-check ~15 CSS/JS files every time.
+# Anything else under /static (no or old ?v=) is revalidated on every use (ETag -> cheap 304).
+STATIC_IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+STATIC_REVALIDATE_CACHE_CONTROL = "no-cache"
+
+
+def static_cache_control(query_params) -> str:
+    if query_params.get("v") == STATIC_ASSET_VERSION:
+        return STATIC_IMMUTABLE_CACHE_CONTROL
+    return STATIC_REVALIDATE_CACHE_CONTROL
+
+
+@app.middleware("http")
+async def static_cache_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/") and request.method in ("GET", "HEAD") and response.status_code in (200, 304):
+        response.headers["Cache-Control"] = static_cache_control(request.query_params)
+    return response
 
 
 @app.middleware("http")

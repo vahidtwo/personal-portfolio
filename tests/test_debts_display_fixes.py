@@ -111,12 +111,41 @@ def test_finished_loan_out_of_net_worth():
 
 
 # 4: notes
-def test_sms_note_and_key_never_shown(client, no_network):
-    _register(client)
-    r = client.post("/api/sms-spend", json={"amount_toman": "350000", "note": "خرید از کارت **** مبلغ 350,000", "idempotency_key": "c" * 64})
+KEY = "c" * 64
+
+
+def _sms(client, note, key=KEY):
+    r = client.post("/api/sms-spend", json={"amount_toman": "350000", "note": note, "idempotency_key": key})
     assert r.status_code == 200
+
+
+def _list(client):
     html = client.get("/dashboard?tab=daily").text
-    assert "c" * 64 not in html and "خرید از کارت" not in html
+    return html.split("data-sp-days")[1].split("</ul>")[0]
+
+
+def test_sms_note_keeps_merchant(client, no_network):
+    _register(client)
+    _sms(client, "ملت برداشت 350,000 فروشگاه نمونه 08/12 14:22")
+    rows = _list(client)
+    assert "فروشگاه نمونه" in rows and KEY not in rows
+
+
+def test_sms_note_only_boilerplate_falls_back():
+    from app.spends import sms_note_text, sms_spend_parts
+    body = "بانک ملی برداشت از حساب **** مبلغ 120,000 ریال 1405/08/12 09:05 موجودی 9,876,543"
+    assert sms_note_text(body) == ""
+    assert sms_spend_parts(f"[{KEY}] {body}", "food") == (False, "از پیامک")
+    assert sms_spend_parts(f"[{KEY}] {body}", "sms_bank") == (True, "")
+
+
+def test_sms_note_strips_key_date_time_card_and_balance():
+    from app.spends import sms_spend_parts
+    note = f"[{KEY}] صادرات کارت 6037-9911-2233-4455 خرید رستوران فرضی ۱۴۰۵/۰۸/۱۲ ساعت ۲۱:۰۵:۳۰ مانده: ۵۵۵,۴۴۴,۳۳۳ ریال"
+    shown = sms_spend_parts(note, "sms_bank")[1]
+    assert shown == "رستوران فرضی"
+    for bad in (KEY, "6037", "4455", "۱۴۰۵", "۲۱:۰۵", "۵۵۵", "مانده", "کارت"):
+        assert bad not in shown
 
 
 def test_manual_note_digits_shown_as_typed():

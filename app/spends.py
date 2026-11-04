@@ -38,15 +38,53 @@ _SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
 _SMS_KEY_ANY = _re.compile(r"\[[0-9a-fA-F]{64}\]")
 
 
+_D = "0-9۰-۹٠-٩"
+_SMS_DROP = [
+    _re.compile(r"\[[0-9a-fA-F]{64}\]"),
+    _re.compile(rf"(?:مانده|موجودی|موجود|بالانس)\s*[:：]?[^{_D}]{{0,20}}[{_D}][{_D},٬.]*\s*(?:ریال|تومان)?"),
+    _re.compile(rf"[{_D}]{{1,4}}[/\-.][{_D}]{{1,2}}(?:[/\-.][{_D}]{{1,4}})?"),
+    _re.compile(rf"[{_D}]{{1,2}}[:：][{_D}]{{2}}(?::[{_D}]{{2}})?"),
+    _re.compile(rf"[-+]?[{_D}*][{_D}*,٬.\-]*[{_D}*]\s*[-+]?|\*+|[{_D}]"),
+]
+_SMS_WORDS = set("""بانک ملت ملی صادرات تجارت سامان پاسارگاد رسالت مسکن سپه کشاورزی پارسیان آینده شهر رفاه اقتصاد نوین
+بلو بلوبانک توسعه تعاون پست سینا کارآفرین دی خاورمیانه گردشگری ایران زمین قوامین مهر انصار حکمت
+برداشت برداشت: واریز انتقال کارت حساب شبا مبلغ ریال تومان تاریخ ساعت پایانه کد پیگیری مرجع شماره
+خرید پرداخت مانده موجودی بابت به از در با و ـ : - — + / . ، , ؛ ; ( ) ATM POS پوز خودپرداز""".split())
+_SMS_EDGE = {"به", "از", "در", "با", "و", "بابت"}
+
+
+def sms_note_text(body: str) -> str:
+    """Merchant or description left in an SMS body once bank boilerplate, digits, dates, times and balance go."""
+    s = body or ""
+    for rx in _SMS_DROP:
+        s = rx.sub(" ", s)
+    tokens = [t.strip("،,:;؛()[]-_") for t in s.split()]
+    kept = [t for t in tokens if t and t not in _SMS_WORDS]
+    if not kept:
+        return ""
+    words = [t for t in tokens if t]
+    first = words.index(kept[0])
+    last = len(words) - 1 - words[::-1].index(kept[-1])
+    span = [t for t in words[first:last + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
+    while span and span[0] in _SMS_EDGE:
+        span.pop(0)
+    while span and span[-1] in _SMS_EDGE:
+        span.pop()
+    return " ".join(span)
+
+
 def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, str]:
     """(from_sms, note shown to the user) for one spend.
 
-    A note that carries the app's SMS key is the bank SMS text: it is never shown, whatever the category.
+    A note that carries the app's SMS key is bank SMS text: only its merchant or description part is shown
+    (see sms_note_text), whatever the category.
     Any other note is shown as saved, minus a stray key. Stored notes are not changed.
     """
     note = note or ""
-    if _SMS_KEY_PREFIX.match(note):
-        return category_slug == "sms_bank", ""
+    m = _SMS_KEY_PREFIX.match(note)
+    if m:
+        tagged = category_slug == "sms_bank"
+        return tagged, sms_note_text(note[m.end():]) or ("" if tagged else "از پیامک")
     return False, _re.sub(r"\s{2,}", " ", _SMS_KEY_ANY.sub("", note)).strip()
 
 router = APIRouter()
@@ -341,7 +379,7 @@ def _save_daily_spend(
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
-        if form["note"] != sms_spend_parts(item.note, None)[1]:
+        if form["note"] not in (sms_spend_parts(item.note, None)[1], sms_spend_parts(item.note, "sms_bank")[1]):
             item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()

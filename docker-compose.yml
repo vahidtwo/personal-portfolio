@@ -5,7 +5,7 @@ services:
       - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY:-}
-      HTTPS_ONLY: ${HTTPS_ONLY:-0}
+      HTTPS_ONLY: ${HTTPS_ONLY:-1}
       DATA_DIR: /app/data
       PRICE_REFRESH_HOURS: ${PRICE_REFRESH_HOURS:-1}
       ENABLE_INTERNAL_SCHEDULER: ${ENABLE_INTERNAL_SCHEDULER:-1}

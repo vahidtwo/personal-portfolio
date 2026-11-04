@@ -15,6 +15,8 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # The app refuses to start without a real SECRET_KEY; tests use an explicit fixed test key.
 os.environ.setdefault("SECRET_KEY", "test-secret-key-fixed-for-sessions")
+# HTTPS_ONLY is on by default; the test client talks plain http, so tests turn it off unless they opt in.
+os.environ.setdefault("HTTPS_ONLY", "0")
 
 
 def _purge_app_modules() -> None:

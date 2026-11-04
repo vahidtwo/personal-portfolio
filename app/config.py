@@ -11,7 +11,10 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parent.paren
 ADMIN_USERNAMES = _admin_usernames()
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'inventory.db'}")
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
-HTTPS_ONLY = os.environ.get("HTTPS_ONLY", "0") == "1"
+# On by default: http -> https redirect, HSTS and Secure cookies. Local dev and tests set HTTPS_ONLY=0.
+HTTPS_ONLY = os.environ.get("HTTPS_ONLY", "1") == "1"
+# Modest HSTS lifetime (seconds), no includeSubDomains, no preload.
+HSTS_MAX_AGE = int(os.environ.get("HSTS_MAX_AGE", "86400"))
 SESSION_COOKIE_NAME = "inventory_session"
 # Session cookie lifetime. The service worker's offline copy of the dashboard expires after the same time.
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30

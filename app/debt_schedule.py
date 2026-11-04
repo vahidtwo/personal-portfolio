@@ -168,10 +168,11 @@ def _entered_on(debt) -> jdatetime.date | None:
 
 
 def this_month_installments(debts, today: jdatetime.date | None = None) -> Decimal:
-    """Instalments dated in today's Jalali month for active loans, paid or not; older overdue months are left out.
+    """Instalments dated in today's Jalali month, paid or not; older overdue months are left out.
 
     An unpaid one is the stored month itself. A paid one shows as a stored month exactly one month ahead,
     unless the loan was entered after this month's due date (its first instalment is then next month).
+    A finished loan counts only when its final instalment was this month's.
     """
     today = today or tehran_today()
     following = add_months(today.year, today.month, 1)
@@ -179,6 +180,8 @@ def this_month_installments(debts, today: jdatetime.date | None = None) -> Decim
     for debt in debts:
         nxt = next_due(debt, today)
         if nxt is None:
+            if _final_paid_this_month(debt, following):
+                total += Decimal(debt.monthly_toman)
             continue
         stored = (nxt.year, nxt.month)
         if stored <= (today.year, today.month):
@@ -191,6 +194,16 @@ def this_month_installments(debts, today: jdatetime.date | None = None) -> Decim
         if due_now:
             total += Decimal(debt.monthly_toman)
     return total
+
+
+def _final_paid_this_month(debt, following: tuple[int, int]) -> bool:
+    """A finished loan whose last instalment was dated this month: «پرداخت شد» left its stored month on next month."""
+    if int(debt.months_left or 0) != 0:
+        return False
+    try:
+        return (int(debt.due_year), int(debt.due_month)) == following
+    except (TypeError, ValueError):
+        return False
 
 
 def _months_between(start: tuple[int, int], today: jdatetime.date) -> int:

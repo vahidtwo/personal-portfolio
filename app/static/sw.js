@@ -19,6 +19,7 @@ const MARKER_ID_RE = /^u[A-Za-z0-9_-]{8,64}$/;
 // A cached dashboard is shown first (fast start) while a fresh copy is fetched in the background.
 // Older than this = too stale to show first: wait for the network (still used as the offline copy).
 const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const DEBTS_SHOW_FIRST_MAX_AGE_MS = 60 * 60 * 1000;
 // A form POST (e.g. the price refresh button) answers with a redirect to the dashboard: that next dashboard load
 // must show the server's fresh page (and its flash message), never the cached copy from before the POST.
 const AFTER_POST_WINDOW_MS = 60 * 1000;
@@ -188,10 +189,27 @@ function isCachedPage(url) {
 }
 
 // A page whose amounts are loaded by amounts.js has empty data-amt slots and no amounts in its HTML.
-// Pages added to the cache after the dashboard are stored only in that form.
+// Pages added to the cache after the dashboard are stored only in that form: any money-looking text
+// (grouped digits, a number next to a currency word, a number in a value attribute) keeps it out.
+const DIGIT = "[0-9\u06F0-\u06F9]";
+const LEAKED_AMOUNT = [
+  new RegExp(DIGIT + "{1,3}(?:[,\u066C]" + DIGIT + "{3})+"),
+  new RegExp(DIGIT + "\\s*(?:\u062A\u0648\u0645\u0627\u0646|toman|\\$|usd|btc)", "i"),
+  new RegExp("\\$[ \u00A0]*" + DIGIT),
+  new RegExp("(?:value|data-sort[\\w-]*)=\"[0-9.,\u066C\u06F0-\u06F9]*" + DIGIT + "{5,}|data-form=[^>]*?" + DIGIT + "{4,}"),
+];
+function amountFreeHtml(html) {
+  if (!html.includes("data-amt=")) return false;
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+  // an empty slot stays a separator, so "date <slot> toman" is not read as a number with a currency
+  const visible = text.replace(/<[^>]*\bdata-amt=[^>]*>/g, " | ").replace(/<[^>]*>/g, " ");
+  return !LEAKED_AMOUNT.slice(0, 3).some((re) => re.test(visible)) && !LEAKED_AMOUNT[3].test(text);
+}
 async function amountFree(response) {
   try {
-    return (await response.clone().text()).includes("data-amt=");
+    return amountFreeHtml(await response.clone().text());
   } catch (e) {
     return false;
   }
@@ -327,7 +345,8 @@ async function dashboardNavigation(event) {
   const network = fetch(event.request);
   const fresh = wantsFreshPage(request, now);
   const cached = await freshCachedPage(cache, request, now);
-  if (!fresh && cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
+  const showFirstFor = isDebtsTab(new URL(request.url)) ? DEBTS_SHOW_FIRST_MAX_AGE_MS : SHOW_FIRST_MAX_AGE_MS;
+  if (!fresh && cached && now - cachedAt(cached) < showFirstFor) {
     const clientId = event.resultingClientId || event.clientId;
     event.waitUntil(
       network

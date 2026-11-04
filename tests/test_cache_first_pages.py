@@ -70,3 +70,53 @@ def test_precache_bypasses_http_cache_and_covers_page_scripts():
 
 def test_asset_version_bumped():
     assert STATIC_ASSET_VERSION >= "20261105b"
+
+
+def test_debts_first_paint_is_capped_at_one_hour():
+    r = _sw([
+        {"marker": A, "online": "ok", "body": SLOTS.format("v1"), "go": DEBTS},
+        {"online": "ok", "body": SLOTS.format("v2"), "advance": 59 * 60_000, "go": DEBTS},
+        {"online": "ok", "body": SLOTS.format("v3"), "advance": 62 * 60_000, "go": DEBTS},
+    ])
+    assert "v1" in r[1]["body"]  # under an hour: cached copy first
+    assert "v3" in r[2]["body"] and r[2]["messages"] == []  # over an hour: straight from the network
+    r = _sw([
+        {"marker": A, "online": "ok", "body": "<p>d1</p>", "go": "/dashboard"},
+        {"online": "ok", "body": "<p>d2</p>", "advance": 2 * 3600_000, "go": "/dashboard"},
+    ])
+    assert "d1" in r[1]["body"]  # the dashboard keeps its longer window
+
+
+def test_new_asset_version_drops_cached_pages():
+    r = _sw([
+        {"marker": A, "online": "ok", "body": SLOTS.format("old"), "go": DEBTS},
+        {"online": "ok", "body": "<p>old dash</p>", "go": "/dashboard"},
+        {"new_sw": "next", "activate": True, "online": False, "go": DEBTS},
+        {"go": "/dashboard"},
+    ])
+    assert r[1]["stores"] == ["inventory-vtest-pages-v3-" + A] and len(r[1]["pages"]) == 2
+    assert not any("vtest" in s for s in r[2]["stores"]) and r[2]["pages"] == []
+    assert "old" not in r[2].get("body", "") and "old dash" not in r[3].get("body", "")
+
+
+def test_debts_page_with_slots_but_a_leaked_amount_is_not_cached():
+    leaks = (
+        '<p><span data-amt="debt-total-1"></span> وام ۱۲٬۰۰۰٬۰۰۰ تومان</p>',
+        '<p><span data-amt="debt-total-1"></span> 12,000,000</p>',
+        '<p><span data-amt="debt-total-1"></span> قسط ۵۰۰ تومان</p>',
+        '<p><span data-amt="debt-total-1"></span> $ 120</p>',
+        '<p data-sort-value="30000000"><span data-amt="debt-total-1"></span></p>',
+        '<p data-form=\'{"monthly": 30000000}\'><span data-amt="debt-total-1"></span></p>',
+        '<input name="monthly_toman" value="30000000"><span data-amt="x"></span>',
+    )
+    for body in leaks:
+        r = _sw([{"marker": A, "online": "ok", "body": body, "go": DEBTS}])
+        assert r[0]["pages"] == [], body
+
+
+def test_slots_next_to_dates_and_counts_still_cache():
+    body = ('<input name="csrf" value="a1b2c3"><option value="1406">۱۴۰۶</option>'
+            '<p>۱۰ قسط مانده، تا مرداد ۱۴۰۶ <span data-amt="debt-monthly-1"></span> تومان در ماه</p>'
+            '<p>قسط بعدی: ۱۷ آبان، <span data-amt="next-instalment"></span> تومان ۳ روز دیگر</p>')
+    r = _sw([{"marker": A, "online": "ok", "body": body, "go": DEBTS}])
+    assert r[0]["pages"] == ["https://app.test" + DEBTS]

@@ -1,0 +1,104 @@
+"""Push reminders before an instalment is due, plus one notice when it becomes overdue.
+
+Runs from the hourly job (only while ENABLE_INTERNAL_SCHEDULER is on). Sent through Firebase to the user's
+registered devices (Android app / web push). Each (loan, due date, kind) is sent at most once: a row in
+due_reminders records it, so restarts and hourly runs never repeat it. Paying an instalment moves the due
+date, so the next instalment gets its own reminder. Finished loans (no instalments left) are skipped.
+Push text never contains amounts (masking); dates are Jalali.
+"""
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime, timezone
+
+import jdatetime
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app import debt_schedule as ds
+from app.formatting import TEHRAN, format_jalali_date, persian_digits
+from app.models import Debt, DueReminder
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_DAYS_BEFORE = 3
+KIND_UPCOMING = "upcoming"
+KIND_OVERDUE = "overdue"
+# Hourly runs outside these Tehran hours wait for the next one, so nobody is woken at night.
+SEND_FROM_HOUR, SEND_UNTIL_HOUR = 9, 21
+
+
+def days_before() -> int:
+    try:
+        return max(0, int(os.environ.get("DUE_REMINDER_DAYS", DEFAULT_DAYS_BEFORE)))
+    except ValueError:
+        return DEFAULT_DAYS_BEFORE
+
+
+def _title(debt: Debt) -> str:
+    return (debt.title or "").strip() or "قسط"
+
+
+def upcoming_text(debt: Debt, due: jdatetime.date, days: int) -> tuple[str, str]:
+    when = "امروز" if days == 0 else ("فردا" if days == 1 else f"{persian_digits(str(days))} روز دیگر")
+    return "یادآوری قسط", f"قسط «{_title(debt)}» {when}، {format_jalali_date(due)} سررسید می‌شود."
+
+
+def overdue_text(debt: Debt, due: jdatetime.date) -> tuple[str, str]:
+    return "قسط عقب افتاد", f"قسط «{_title(debt)}» از {format_jalali_date(due)} پرداخت نشده است."
+
+
+def pending(debts, today: jdatetime.date, n_days: int):
+    """(debt, kind, due) that should be notified today, before checking what was already sent."""
+    out = []
+    for debt in debts:
+        if not ds.is_active(debt):  # finished («تسویه شد») or paid off
+            continue
+        due = ds.next_due(debt, today)
+        if due is None:
+            continue
+        days = (due.togregorian() - today.togregorian()).days
+        if days < 0:
+            out.append((debt, KIND_OVERDUE, due, days))
+        elif days <= n_days:
+            out.append((debt, KIND_UPCOMING, due, days))
+    return out
+
+
+def send_due_reminders(db: Session, *, now: datetime | None = None, push=None) -> int:
+    """Send what is due now; returns how many notices were sent. `push` defaults to send_push_to_user."""
+    if push is None:
+        from app.firebase_push import firebase_admin_ready, send_push_to_user
+
+        if not firebase_admin_ready():
+            return 0
+        push = send_push_to_user
+    local = (now or datetime.now(timezone.utc)).astimezone(TEHRAN)
+    if not (SEND_FROM_HOUR <= local.hour < SEND_UNTIL_HOUR):
+        return 0
+    today = jdatetime.date.fromgregorian(date=local.date())
+    sent_keys = {(r.debt_id, r.kind, r.due_date) for r in db.query(DueReminder).all()}
+    count = 0
+    for debt, kind, due, days in pending(db.query(Debt).all(), today, days_before()):
+        key = (debt.id, kind, due.strftime("%Y-%m-%d"))
+        if key in sent_keys:
+            continue
+        title, body = upcoming_text(debt, due, days) if kind == KIND_UPCOMING else overdue_text(debt, due)
+        try:
+            delivered = push(db, debt.user_id, title=title, body=body,
+                             data={"type": f"debt_{kind}", "url": "/dashboard?tab=debts"})
+        except Exception:
+            logger.exception("Due reminder push failed for debt %s", debt.id)
+            continue
+        if not delivered:
+            continue  # no device or not delivered: try again next hour
+        db.add(DueReminder(user_id=debt.user_id, debt_id=debt.id, kind=kind, due_date=key[2]))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            continue
+        sent_keys.add(key)
+        count += 1
+    return count

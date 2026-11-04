@@ -1,4 +1,23 @@
 (function () {
+  // «معادل دلاری» 7-day line: its points and label come from /api/amounts, never from the page HTML.
+  function drawUsdSpark() {
+    const svg = document.querySelector("[data-usd-spark]");
+    const src = document.querySelector('[data-amt-json="usd-spark"]');
+    if (!svg || !src) return;
+    let sp = null;
+    try { sp = JSON.parse(src.textContent || "null"); } catch (e) { sp = null; }
+    if (!sp || !sp.path) { svg.hidden = true; return; }
+    svg.setAttribute("class", "mc " + sp.kind);
+    svg.setAttribute("aria-label", sp.label);
+    svg.querySelector("title").textContent = sp.label;
+    svg.querySelector("path").setAttribute("d", sp.path);
+    const dot = svg.querySelector("circle");
+    dot.setAttribute("cx", sp.x);
+    dot.setAttribute("cy", sp.y);
+    svg.hidden = false;
+  }
+  document.addEventListener("amounts:filled", drawUsdSpark);
+
   const ASSET_COLORS = {
     gold: "#f59e0b",
     coin_emami: "#d97706",

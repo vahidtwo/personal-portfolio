@@ -2995,3 +2995,4 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 .move-notice h2 { margin: 0 0 4px; font-size: 16px; }
 .move-notice p { margin: 0 0 10px; color: var(--text-muted); }
 .move-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+html .stat.stat-usd .mc[hidden],.mc[hidden]{display:none}

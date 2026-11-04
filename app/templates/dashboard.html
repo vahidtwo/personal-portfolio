@@ -57,7 +57,7 @@
   <dl class="stats">
     <div class="stat"><dt>جمع دارایی</dt><dd data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("assets-big", ("≈ " if total_big.approx else "") ~ total_big.label) }}</bdi> <small>{{ amt("assets-unit", total_big.unit) }}</small></dd></div>
     <div class="stat"><dt>جمع بدهی</dt><dd data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("debts-big", ("≈ " if debt_big.approx else "") ~ debt_big.label) }}</bdi> <small>{{ amt("debts-unit", debt_big.unit) }}</small></dd></div>
-    <div class="stat stat-usd"><dt>معادل دلاری</dt><dd><span data-mask="portfolio"><bdi dir="ltr">{{ amt("usd", usd_portfolio_label) }}</bdi> <small>دلار آمریکا</small></span>{% if usd_spark %}<svg class="mc {{ usd_spark.kind }}" viewBox="0 0 64 20" width="64" height="20" role="img" aria-label="{{ usd_spark.label }}" focusable="false"><title>{{ usd_spark.label }}</title><path d="{{ usd_spark.path }}"/><circle cx="{{ usd_spark.end_x }}" cy="{{ usd_spark.end_y }}" r="2.2"/></svg>{% endif %}</dd></div>
+    <div class="stat stat-usd"><dt>معادل دلاری</dt><dd><span data-mask="portfolio"><bdi dir="ltr">{{ amt("usd", usd_portfolio_label) }}</bdi> <small>دلار آمریکا</small></span>{% if usd_spark %}<svg class="mc" viewBox="0 0 64 20" width="64" height="20" role="img" focusable="false" data-usd-spark hidden><title></title><path d=""/><circle r="2.2"/></svg><script type="application/json" data-amt-json="usd-spark">{{ amt_json("usd-spark", {"path": usd_spark.path, "kind": usd_spark.kind, "x": usd_spark.end_x, "y": usd_spark.end_y, "label": usd_spark.label}) }}</script>{% endif %}</dd></div>
   </dl>
   {% if missing_fa %}
   <p class="toast toast-warn">قیمت این دارایی‌ها در دسترس نیست: {{ missing_fa | join('، ') }}</p>

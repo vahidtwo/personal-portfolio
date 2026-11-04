@@ -35,11 +35,76 @@ import re as _re
 _SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
 
 
-def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, str]:
+SMS_COMMISSION_MAX_TOMAN = Decimal("50000")
+SMS_COMMISSION_NAME = "کارمزد"
+SMS_COMMISSION_SLUG = "sms_fee"
+
+
+def is_sms_commission(amount_toman) -> bool:
+    """An SMS spend strictly below SMS_COMMISSION_MAX_TOMAN toman is a bank fee; exactly the limit is not."""
+    return Decimal(amount_toman) < SMS_COMMISSION_MAX_TOMAN
+
+
+def _normalize_category_name(name: str | None) -> str:
+    """Arabic ك/ي to Persian ک/ی, no ZWNJ, no whitespace."""
+    text = (name or "").replace("\u0643", "\u06a9").replace("\u064a", "\u06cc").replace("\u200c", "")
+    return "".join(text.split())
+
+
+def commission_category(db: Session, user: User) -> SpendCategory:
+    """The user's «کارمزد» subcategory: reused when one with exactly that name exists, else created once under «پیامک»."""
+    target = _normalize_category_name(SMS_COMMISSION_NAME)
+    subcategories = (
+        db.query(SpendCategory)
+        .filter(SpendCategory.user_id == user.id, SpendCategory.parent_id.isnot(None))
+        .order_by(SpendCategory.id)
+        .all()
+    )
+    found = next((row for row in subcategories if _normalize_category_name(row.name) == target), None)
+    if found is not None:
+        return found
+    parent = (
+        db.query(SpendCategory)
+        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == "sms")
+        .one()
+    )
+    slug_taken = (
+        db.query(SpendCategory.id)
+        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == SMS_COMMISSION_SLUG)
+        .first()
+        is not None
+    )
+    row = SpendCategory(
+        user_id=user.id,
+        parent_id=parent.id,
+        name=SMS_COMMISSION_NAME,
+        slug=None if slug_taken else SMS_COMMISSION_SLUG,
+        is_seed=False,
+        sort_order=1,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def sms_spend_category(db: Session, user: User, amount_toman) -> SpendCategory | None:
+    """Category for a new SMS spend: «کارمزد» below the limit, otherwise «بانک»."""
+    if is_sms_commission(amount_toman):
+        return commission_category(db, user)
+    return (
+        db.query(SpendCategory)
+        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == "sms_bank")
+        .one_or_none()
+    )
+
+
+def sms_spend_parts(
+    note: str | None, category_slug: str | None, category_name: str | None = None
+) -> tuple[bool, str]:
     """(from_sms, note without the internal key) for one spend."""
     note = note or ""
     m = _SMS_KEY_PREFIX.match(note)
-    if m and category_slug == "sms_bank":
+    if m and (category_slug in ("sms_bank", SMS_COMMISSION_SLUG) or category_name == SMS_COMMISSION_NAME):
         return True, note[m.end():]
     return False, note
 
@@ -139,8 +204,8 @@ def daily_view(
                 "initial": parent_name[:1],
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
-                "from_sms": sms_spend_parts(row.note, child.slug if child else None)[0],
-                "note_display": sms_spend_parts(row.note, child.slug if child else None)[1],
+                "from_sms": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[0],
+                "note_display": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[1],
                 "year": spent.year,
                 "month": spent.month,
                 "day": spent.day,
@@ -498,11 +563,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     if idem:
         note = f"[{idem}] {note}".strip()[:120]
     ensure_spend_categories(db, user)
-    child = (
-        db.query(SpendCategory)
-        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == "sms_bank")
-        .one_or_none()
-    )
+    child = sms_spend_category(db, user, amount)
     if child is None:
         return JSONResponse({"ok": False, "error": "category"}, status_code=500)
     spent_on = sms_spent_on(payload.get("sms_at"), tehran_today().togregorian())

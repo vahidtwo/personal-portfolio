@@ -55,8 +55,8 @@
     {%- else %}<span>سابقهٔ قیمت کافی نیست؛ تغییر از فردا نمایش داده می‌شود</span>{% endif %}
   </p>
   <dl class="stats">
-    <div class="stat"><dt>جمع دارایی</dt><dd data-mask="portfolio" title="{{ total_label }} تومان">{% if total_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ total_big.label }}</bdi> <small>{{ total_big.unit }}</small></dd></div>
-    <div class="stat"><dt>جمع بدهی</dt><dd title="{{ debt_total_label }} تومان">{% if debt_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ debt_big.label }}</bdi> <small>{{ debt_big.unit }}</small></dd></div>
+    <div class="stat"><dt>جمع دارایی</dt><dd data-mask="portfolio" data-amount>{% if total_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ total_big.label }}</bdi> <small>{{ total_big.unit }}</small></dd></div>
+    <div class="stat"><dt>جمع بدهی</dt><dd data-mask="portfolio" data-amount>{% if debt_big.approx %}≈ {% endif %}<bdi dir="ltr">{{ debt_big.label }}</bdi> <small>{{ debt_big.unit }}</small></dd></div>
     <div class="stat stat-usd"><dt>معادل دلاری</dt><dd><span data-mask="portfolio"><bdi dir="ltr">{{ usd_portfolio_label }}</bdi> <small>دلار آمریکا</small></span>{% if usd_spark %}<svg class="mc {{ usd_spark.kind }}" viewBox="0 0 64 20" width="64" height="20" role="img" aria-label="{{ usd_spark.label }}" focusable="false"><title>{{ usd_spark.label }}</title><path d="{{ usd_spark.path }}"/><circle cx="{{ usd_spark.end_x }}" cy="{{ usd_spark.end_y }}" r="2.2"/></svg>{% endif %}</dd></div>
   </dl>
   {% if missing_fa %}
@@ -129,9 +129,9 @@
     </div>
   </div>
   <div class="chart-foot" id="chart-foot" hidden>
-    <span>بیشترین <b id="chart-max"></b></span>
-    <span>کمترین <b id="chart-min"></b></span>
-    <span><span id="chart-change-label">این ماه</span> <b id="chart-change" class="chg-text"></b></span>
+    <span>بیشترین <b id="chart-max" class="mask-sm" data-mask="portfolio" data-amount></b></span>
+    <span>کمترین <b id="chart-min" class="mask-sm" data-mask="portfolio" data-amount></b></span>
+    <span><span id="chart-change-label">این ماه</span> <b id="chart-change" class="chg-text mask-sm" data-mask="portfolio" data-amount></b></span>
   </div>
   <p class="chart-fs-hint">برای بزرگ‌نمایی دو انگشت را باز کنید یا چرخ ماوس را بچرخانید، برای جابه‌جایی بکشید و برای دیدن مقدار هر نقطه، روی نمودار نگه دارید.</p>
   <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/assets">افزودن دارایی</a></p>
@@ -223,7 +223,7 @@
   <a class="tile" href="/profile?tab=debts" id="tile-next-debt">
     <div class="t">{{ ui_icon('cal') }}قسط بعدی</div>
     {% if next_instalment %}
-    <div class="v"><bdi dir="ltr">{{ next_instalment.amount_label }}</bdi> <span class="s">تومان</span></div>
+    <div class="v"><bdi dir="ltr" data-mask="portfolio" data-amount>{{ next_instalment.amount_label }}</bdi> <span class="s">تومان</span></div>
     <div class="s">{{ next_instalment.title }}، {{ next_instalment.date_label }}</div>
     <div class="row"><span class="badge badge-due{% if next_instalment.days <= 3 %} is-soon{% endif %}">{{ next_instalment.chip }}</span></div>
     {% else %}
@@ -233,9 +233,9 @@
   </a>
   <a class="tile" href="/dashboard?tab=daily" id="tile-month-spend">
     <div class="t">{{ ui_icon('spend') }}خرج این ماه</div>
-    <div class="v"><bdi dir="ltr">{{ month_spend.month_label }}</bdi> <span class="s">تومان</span></div>
+    <div class="v"><bdi dir="ltr" data-mask="portfolio" data-amount>{{ month_spend.month_label }}</bdi> <span class="s">تومان</span></div>
     <div class="s">{{ month_spend.month_title }}</div>
-    <div class="row"><span class="badge badge-acc">امروز: <bdi dir="ltr">{{ month_spend.today_label }}</bdi> تومان</span></div>
+    <div class="row"><span class="badge badge-acc">امروز: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ month_spend.today_label }}</bdi> تومان</span></div>
   </a>
 </div>
 <aside class="card dash-pie" id="pie-panel" aria-labelledby="pie-heading">
@@ -265,8 +265,8 @@
     <p class="card-desc">مانده = حقوق − اقساط این ماه − هزینهٔ ماهانه. روی ارزش پرتفوی اثری ندارد.</p>
   </div>
   <dl class="net-line">
-    <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr">{{ installment_month_label }}</bdi> تومان</dd></div>
-    <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr">{{ expense_month_label }}</bdi> تومان</dd></div>
+    <div><dt>اقساط این ماه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ installment_month_label }}</bdi> تومان</dd></div>
+    <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ expense_month_label }}</bdi> تومان</dd></div>
     <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>
   </dl>
 </section>

@@ -1,12 +1,8 @@
-<section class="card sms-offer" id="sms-offer" aria-labelledby="sms-offer-heading" hidden>
+<aside class="sms-offer" id="sms-offer" aria-label="ثبت خودکار خرج از پیامک" hidden>
+  <span class="sms-offer-text">ثبت خودکار خرج از پیامک بانک</span>
+  <button type="button" class="sms-offer-enable" data-sms-offer-enable>فعال کردن</button>
   <button type="button" class="sms-offer-close" data-sms-offer-dismiss aria-label="بستن این پیشنهاد">✕</button>
-  <h2 id="sms-offer-heading">خرج‌ها خودکار ثبت شوند؟</h2>
-  <p class="card-desc">اپ می‌تواند از پیامک‌های تازه‌ای که «برداشت» و یک مبلغ دارند، خرج را خودش ثبت کند. هر وقت بخواهید، از تنظیمات خاموش می‌شود.</p>
-  <div class="sms-offer-actions">
-    <button type="button" class="btn btn-primary" data-sms-offer-enable>فعال کردن</button>
-    <button type="button" class="btn btn-ghost" data-sms-offer-dismiss>نه، ممنون</button>
-  </div>
-</section>
+</aside>
 <script src="/static/sms-offer.js?v={{ static_v }}" defer></script>
 {% set qs = "/dashboard?tab=daily&jy=" ~ daily_year ~ "&jm=" ~ daily_month %}
 {% set e = spend_errors %}
@@ -21,17 +17,17 @@
   {% if daily_has_any %}
   <div class="sp-tiles{% if not daily_is_current_month %} one{% endif %}">
     {% if daily_is_current_month %}
-    <div class="sp-tile"><span>امروز</span><b class="num">{{ daily_today_label }}</b><small>تومان</small></div>
-    <div class="sp-tile"><span>این ماه</span><b class="num">{{ daily_month_label }}</b><small>تومان</small></div>
+    <div class="sp-tile"><span>امروز</span><b class="num" data-mask="portfolio" data-amount>{{ daily_today_label }}</b><small>تومان</small></div>
+    <div class="sp-tile"><span>این ماه</span><b class="num" data-mask="portfolio" data-amount>{{ daily_month_label }}</b><small>تومان</small></div>
     {% else %}
-    <div class="sp-tile"><span>جمع {{ daily_month_name }}</span><b class="num">{{ daily_month_label }}</b><small>تومان</small></div>
+    <div class="sp-tile"><span>جمع {{ daily_month_name }}</span><b class="num" data-mask="portfolio" data-amount>{{ daily_month_label }}</b><small>تومان</small></div>
     {% endif %}
   </div>
   {% endif %}
   {% if daily_top %}
   <ul class="sp-bars" aria-label="خرج این ماه به تفکیک دسته">
     {% for s in daily_top + daily_rest %}
-    <li{% if loop.index > 4 %} hidden data-sp-rest{% endif %}><span>{{ s.label }}</span><span class="v"><b>{{ s.amount_label }}</b> تومان، {{ s.share_label }}</span><span class="bar" aria-hidden="true"><i style="width:{{ [s.share, 2] | max }}%;background:{{ s.color }}"></i></span></li>
+    <li{% if loop.index > 4 %} hidden data-sp-rest{% endif %}><span>{{ s.label }}</span><span class="v"><b class="mask-sm" data-mask="portfolio" data-amount>{{ s.amount_label }}</b> تومان، <b class="mask-sm" data-mask="portfolio" data-amount>{{ s.share_label }}</b></span><span class="bar" aria-hidden="true"><i style="width:{{ [s.share, 2] | max }}%;background:{{ s.color }}"></i></span></li>
     {% endfor %}
   </ul>
   {% if daily_rest %}<button type="button" class="sp-more-cats" aria-expanded="false" data-sp-rest-toggle>{{ daily_rest_label }} دستهٔ دیگر</button>{% endif %}
@@ -46,14 +42,14 @@
   <div class="sp-days" data-sp-days>
     {% for g in daily_groups %}
     <section class="sp-day" aria-label="{{ g.label }}">
-      <div class="sp-dayh"><b>{{ g.label }}</b><span><span class="num">{{ g.total_label }}</span> تومان</span></div>
+      <div class="sp-dayh"><b>{{ g.label }}</b><span><span class="num mask-sm" data-mask="portfolio" data-amount>{{ g.total_label }}</span> تومان</span></div>
       <ul class="sp-rows">
         {% for row in g.rows %}
-        <li class="sp-row" data-sp-row="{{ row.id }}" data-sp-amount="{{ row.amount_label }}" data-sp-name="{{ row.name }}" data-sp-note="{{ row.note_display }}" data-sp-rel="{{ row.rel_label }}">
+        <li class="sp-row" data-sp-row="{{ row.id }}" data-sp-name="{{ row.name }}" data-sp-note="{{ row.note_display }}" data-sp-rel="{{ row.rel_label }}">
           <span class="sp-ic" style="background:{{ row.color }}" aria-hidden="true">{{ row.initial }}</span>
           <span class="t"><b>{{ row.name }}</b><small>{% if row.from_sms %}<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>{% endif %}{{ row.parent_name }}{% if row.note_display %}، {{ row.note_display }}{% endif %}</small></span>
-          <span class="a"><span class="num">{{ row.amount_label }}</span><small>تومان</small></span>
-          <button type="button" class="sp-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های خرج {{ row.amount_label }} تومان، {{ row.name }}" data-sp-dots><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
+          <span class="a"><span class="num mask-sm" data-mask="portfolio" data-amount>{{ row.amount_label }}</span><small>تومان</small></span>
+          <button type="button" class="sp-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های خرج {{ row.name }}، {{ row.rel_label }}" data-sp-dots><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="sp-menu" role="menu" hidden>
             <a role="menuitem" href="{{ qs }}&page={{ daily_page }}&edit_spend={{ row.id }}" data-sp-edit>ویرایش</a>
             <button type="button" role="menuitem" class="d" data-sp-del>حذف…</button>

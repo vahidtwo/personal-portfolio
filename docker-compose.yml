@@ -4,7 +4,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-dokploy}
+      SECRET_KEY: ${SECRET_KEY:-}
       HTTPS_ONLY: ${HTTPS_ONLY:-0}
       DATA_DIR: /app/data
       PRICE_REFRESH_HOURS: ${PRICE_REFRESH_HOURS:-1}

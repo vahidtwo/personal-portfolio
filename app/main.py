@@ -101,7 +101,7 @@ async def lifespan(_app: FastAPI):
 
 
 # Server release (semver). The Android app keeps its own versionName in android_release.json.
-SERVER_VERSION = "12.2.0"
+SERVER_VERSION = "12.1.0"
 app = FastAPI(title="Daraiito", version=SERVER_VERSION, lifespan=lifespan)
 # Added first = runs inside SessionMiddleware, so it sees the final session (see app/session_marker.py).
 app.add_middleware(

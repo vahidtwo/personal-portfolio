@@ -29,15 +29,15 @@
       {% else %}
       <h2 id="dv-sum-h">این ماه</h2>
       <div class="dv-tiles">
-        <div class="dv-tile"><span>اقساط باقی‌مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.installment_label }}</bdi></b><small class="dv-unit">تومان</small>{% if dv.installment_overdue_label %}<small class="dv-unit" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ dv.installment_overdue_label }}</bdi></small>{% endif %}</div>
-        <div class="dv-tile"><span>جمع اقساط این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount data-month-total><bdi dir="ltr">{{ dv.month_total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
-        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.expense_label }}</bdi></b><small class="dv-unit">تومان</small></div>
-        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ dv.total_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>اقساط باقی‌مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("installments-left", dv.installment_label) }}</bdi></b><small class="dv-unit">تومان</small>{% if dv.installment_overdue_label %}<small class="dv-unit" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", dv.installment_overdue_label) }}</bdi></small>{% endif %}</div>
+        <div class="dv-tile"><span>جمع اقساط این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount data-month-total><bdi dir="ltr">{{ amt("installments-month", dv.month_total_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("fixed-monthly", dv.expense_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
+        <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("debts", dv.total_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
 {% include "partials/debts_left_tile.html" %}
       </div>
       <div data-dv-swap="next">
       {% if dv.next %}
-      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num mask-sm" data-mask="portfolio" data-amount>{{ dv.next.amount_label }}</bdi> تومان</span><span class="d{% if dv.next.days < 0 %} late{% endif %}">{{ dv.next.chip }}</span>{% if dv.next.overdue_label %}<span class="d late" data-overdue-loans>{{ dv.next.overdue_label }}</span>{% endif %}</p>
+      <p class="dv-next" id="dv-next"><span>قسط بعدی: <b>{{ dv.next.title }}</b>، {{ dv.next.date_label }}، <bdi class="num mask-sm" data-mask="portfolio" data-amount>{{ amt("next-instalment", dv.next.amount_label) }}</bdi> تومان</span><span class="d{% if dv.next.days < 0 %} late{% endif %}">{{ dv.next.chip }}</span>{% if dv.next.overdue_label %}<span class="d late" data-overdue-loans>{{ dv.next.overdue_label }}</span>{% endif %}</p>
       {% endif %}
       </div>
       <p class="dv-formula">مانده = حقوق − قسط‌ها − هزینهٔ ماهانه. حقوق فقط با دکمهٔ چشم نشان داده می‌شود و ذخیره نمی‌شود.</p>
@@ -54,17 +54,17 @@
         {% for r in dv.rows %}
         <li class="dv-row{% if not r.active %} done{% endif %}" data-dv-row="{{ r.id }}">
           <div class="t"><b>{{ r.display_title }}</b><small>{% if r.active %}{{ r.months_label }} قسط مانده، تا {{ r.end_label }}{% else %}همهٔ قسط‌ها پرداخت شده{% endif %}</small></div>
-          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ r.monthly_label }}</bdi></b><small>تومان در ماه</small></div>
+          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ amt("debt-monthly-" ~ r.id, r.monthly_label) }}</bdi></b><small>تومان در ماه</small></div>
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ r.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta">
             {% if r.overdue %}<span class="dv-badge late">{{ r.overdue_label }}، {{ r.missed | string | fa }} قسط عقب</span>{% endif %}
             {% if r.badge %}<span class="dv-badge {{ r.badge }}">{{ r.badge_label }}</span>{% endif %}
-            {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num mask-sm" data-mask="portfolio" data-amount>{{ r.total_label }}</b> تومان</span>{% else %}<span class="dv-badge paid" data-dv-settled>تسویه شد</span><span>از جمع‌ها بیرون است</span>{% endif %}
+            {% if r.active %}<span>قسط بعدی: <b>{{ r.next_short }}</b></span><span>جمع مانده: <b class="num mask-sm" data-mask="portfolio" data-amount>{{ amt("debt-total-" ~ r.id, r.total_label) }}</b> تومان</span>{% else %}<span class="dv-badge paid" data-dv-settled>تسویه شد</span><span>از جمع‌ها بیرون است</span>{% endif %}
           </div>
           <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ r.display_title }}" hidden data-dv-menu>
             <a role="menuitem" href="/profile?tab=debts&edit={{ r.id }}" data-dv-edit="debt" data-id="{{ r.id }}"
-               data-form='{{ {"title": r.title, "monthly_toman": r.monthly_raw, "months_left": r.months_raw, "due_year": r.due_year, "due_month": r.due_month, "due_day": r.due_day, "orig": r.monthly_orig} | tojson | forceescape }}'>ویرایش</a>
+              {{ amt_attrs(("data-form", "debt-form-" ~ r.id, {"title": r.title, "monthly_toman": r.monthly_raw, "months_left": r.months_raw, "due_year": r.due_year, "due_month": r.due_month, "due_day": r.due_day, "orig": r.monthly_orig})) }}>ویرایش</a>
             {% if r.active %}
             <form method="post" action="/profile/debts/{{ r.id }}/paid" data-dv-action>
               <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="expect" value="{{ r.months_left }}">
@@ -79,7 +79,7 @@
         </li>
         {% endfor %}
       </ul>
-      <p class="dv-sumrow"><span>جمع بدهی مانده</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ dv.total_label }}</bdi> تومان</b></p>
+      <p class="dv-sumrow"><span>جمع بدهی مانده</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ amt("debts", dv.total_label) }}</bdi> تومان</b></p>
       {% else %}
       <div class="dv-empty">
         <h3>وام یا قسطی ثبت نشده است</h3>
@@ -101,13 +101,13 @@
         {% for x in dv.expenses %}
         <li class="dv-row" data-dv-row="x{{ x.id }}">
           <div class="t"><b>{{ x.display_title }}</b><small>روز {{ x.day_label }} هر ماه</small></div>
-          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ x.amount_label }}</bdi></b><small class="dv-unit">تومان</small></div>
+          <div class="a"><b class="num mask-sm" data-mask="portfolio" data-amount><bdi>{{ amt("expense-" ~ x.id, x.amount_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
           <button type="button" class="dv-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های {{ x.display_title }}" data-dv-dots>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="dv-meta"><span>نوبت بعدی: <b>{{ x.next_label }}</b></span></div>
           <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ x.display_title }}" hidden data-dv-menu>
             <a role="menuitem" href="/profile?tab=debts&spend={{ x.id }}" data-dv-edit="expense" data-id="{{ x.id }}"
-               data-form='{{ {"title": x.title, "amount_toman": x.amount_raw, "due_day": x.due_day, "orig": x.amount_orig} | tojson | forceescape }}'>ویرایش</a>
+              {{ amt_attrs(("data-form", "expense-form-" ~ x.id, {"title": x.title, "amount_toman": x.amount_raw, "due_day": x.due_day, "orig": x.amount_orig})) }}>ویرایش</a>
             <button type="button" role="menuitem" class="d" data-dv-del data-action="/profile/expenses/{{ x.id }}/delete"
                     data-title="{{ x.display_title }}" data-body="ماهانه {monthly} تومان از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد."
                     data-body-masked="از هزینهٔ ماهانه برداشته می‌شود. حذف برگشت ندارد." data-hint="">حذف…</button>
@@ -115,7 +115,7 @@
         </li>
         {% endfor %}
       </ul>
-      <p class="dv-sumrow"><span>جمع هزینهٔ ماهانه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ dv.expense_label }}</bdi> تومان</b></p>
+      <p class="dv-sumrow"><span>جمع هزینهٔ ماهانه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount>{{ amt("fixed-monthly", dv.expense_label) }}</bdi> تومان</b></p>
       {% else %}
       <div class="dv-empty">
         <h3>هزینهٔ ماهانه‌ای ثبت نشده است</h3>

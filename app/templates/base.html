@@ -70,6 +70,7 @@
     <p>{% include "partials/price_sources.html" %}</p>
   </footer>
   <script src="/static/privacy.js?v={{ static_v }}" defer></script>
+  {% if user %}<script src="/static/amounts.js?v={{ static_v }}" defer></script>{% endif %}
   <script src="/static/confirm-dialog.js?v={{ static_v }}" defer></script>
   <script src="/static/android-bridge.js?v={{ static_v }}" defer></script>
   {% if user and move_notice %}<script src="/static/move-notice.js?v={{ static_v }}" defer></script>{% endif %}

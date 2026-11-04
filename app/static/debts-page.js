@@ -213,6 +213,7 @@
           return;
         }
         mine.forEach(function (el, i) { el.innerHTML = nums[i].innerHTML; });
+        if (W.Amounts) W.Amounts.refresh(URL_);
         var reveal = $('[data-salary-reveal][aria-pressed="false"]');
         if (reveal) reveal.click(); // مانده changed: mask again (privacy.js re-fetches on the next tap)
         fail.hidden = true;
@@ -277,6 +278,15 @@
     if (t.matches("[data-dv-add]")) {
       show(fillForm(t.getAttribute("data-dv-add"), null), t);
     } else if (t.matches("[data-dv-edit]")) {
+      // the form values come with the amounts: load them first; if that fails the link opens the server form
+      if (!t.getAttribute("data-form")) {
+        if (!W.Amounts) return;
+        ev.preventDefault();
+        W.Amounts.need().then(function () {
+          if (t.getAttribute("data-form")) t.click(); else location.href = t.href;
+        });
+        return;
+      }
       ev.preventDefault();
       var data = JSON.parse(t.getAttribute("data-form"));
       var kind = t.getAttribute("data-dv-edit");

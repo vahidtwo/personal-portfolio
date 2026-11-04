@@ -6,6 +6,7 @@ import json
 import logging
 import secrets
 from decimal import Decimal
+from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -356,6 +357,7 @@ async def profile_save(
     matic: str = Form("0"),
     usd: str = Form("0"),
     cash_toman: str = Form("0"),
+    cash_toman_keep: str = Form(""),
     next_url: str = Form("", alias="next"),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
@@ -364,6 +366,9 @@ async def profile_save(
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
+    if cash_toman_keep == "1" and cash_toman.strip() in ("", "0"):
+        # the page sends cash empty until amounts.js fills it in: empty plus this marker means unchanged
+        cash_toman = format(Decimal(user.cash_toman or 0), "f")
     form = {
         "gold_grams": gold_grams,
         "coin_emami": coin_emami,

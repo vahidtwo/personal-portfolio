@@ -328,6 +328,7 @@
             var nf = $("[data-sp-page]", doc); // hidden jy/jm for the form follow the month
             form.elements.jy.value = $("[name=jy]", nf).value; form.elements.jm.value = $("[name=jm]", nf).value; }
           if (history.replaceState) history.replaceState(null, "", url);
+          if (window.Amounts) window.Amounts.refresh(url);
         })
         .catch(function () {
           clearTimeout(skelTimer);

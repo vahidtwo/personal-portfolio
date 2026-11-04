@@ -7,6 +7,7 @@ import jdatetime
 from app import debt_schedule as ds
 from tests.test_debts_v2 import P, _seed, clock  # noqa: F401
 from tests.test_holdings import _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 
 def D(months, y, m, d, monthly=1000, i=1):
@@ -37,14 +38,14 @@ def test_next_card_counts_overdue_loans(client, no_network, clock):
     _seed([("الف", 100, 5, 1405, 6, 1), ("ب", 100, 5, 1405, 7, 2), ("ج", 100, 5, 1405, 7, 3),
            ("د", 100, 5, 1405, 7, 20), ("ه", 100, 5, 1405, 8, 1), ("و", 100, 0, 1405, 1, 1)])
     assert "۴ وام عقب‌افتاده" in client.get(P).text
-    assert re.search(r'data-overdue-loans>۴ وام عقب‌افتاده<', client.get("/dashboard").text)
+    assert re.search(r'data-overdue-loans>۴ وام عقب‌افتاده<', with_amounts(client, "/dashboard"))
 
 
 def test_no_overdue_label_when_nothing_is_late(client, no_network, clock):
     _register(client)
     _seed([("الف", 100, 5, 1405, 8, 1)])
     assert "وام عقب‌افتاده" not in client.get(P).text
-    assert "وام عقب‌افتاده" not in client.get("/dashboard").text
+    assert "وام عقب‌افتاده" not in with_amounts(client, "/dashboard")
 
 
 # 3: due this Jalali month plus overdue, each instalment once
@@ -73,7 +74,7 @@ def test_month_due_jalali_boundaries():
 def test_month_due_on_pages(client, no_network, clock):
     _register(client)
     _seed([("الف", 1000000, 10, 1405, 5, 1), ("ب", 500000, 5, 1405, 8, 1)])
-    dash = client.get("/dashboard").text
+    dash = with_amounts(client, "/dashboard")
     assert "اقساط باقی‌مانده" in dash and "data-installment-overdue" in dash
     m = re.search(r"<dt>اقساط باقی‌مانده</dt><dd[^>]*><bdi[^>]*data-amount>([^<]+)</bdi>", dash)
     assert m and m.group(1) == "۳٬۰۰۰٬۰۰۰"
@@ -90,7 +91,7 @@ def test_finished_loan_banner_and_exclusions(client, no_network, clock):
     assert "data-dv-settled" not in rows[0]
     assert 'data-mask="portfolio"' in rows[-1]
     assert "قسط بعدی: <b>جاری</b>" in page and "وام عقب‌افتاده" not in page
-    dash = client.get("/dashboard").text
+    dash = with_amounts(client, "/dashboard")
     assert "۹٬۰۰۰٬۰۰۰" not in dash
 
 
@@ -120,7 +121,7 @@ def _sms(client, note, key=KEY):
 
 
 def _list(client):
-    html = client.get("/dashboard?tab=daily").text
+    html = with_amounts(client, "/dashboard?tab=daily")
     return html.split("data-sp-days")[1].split("</ul>")[0]
 
 

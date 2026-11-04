@@ -761,9 +761,22 @@
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => boot(25));
-  } else {
+  // Chart numbers arrive with the other amounts (amounts.js); draw once they are in.
+  function start() {
+    const slot = document.getElementById("chart-data") || document.getElementById("pie-data");
+    if (slot && slot.hasAttribute("data-amt-json") && !slot.hasAttribute("data-amt-filled")) {
+      document.addEventListener("amounts:filled", function once() {
+        document.removeEventListener("amounts:filled", once);
+        boot(25);
+      });
+      return;
+    }
     boot(25);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
   }
 })();

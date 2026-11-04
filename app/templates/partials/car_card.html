@@ -28,7 +28,7 @@
         {% else %}آخرین قیمت معتبر: {{ car_ago or "نامشخص" }}{% endif %}
       </div>
     </div>
-    <div class="val"><bdi class="num">{{ car_value_label }}</bdi><small>تومان، {{ car_count_label }} خودرو</small></div>
+    <div class="val"><bdi class="num">{{ amt("car-value", car_value_label) }}</bdi><small>تومان، {{ amt("car-count", car_count_label) }} خودرو</small></div>
   </div>
   {% if car_state == "fetchfail" %}
   <div class="note warn" role="status"><b>سنجه فعلاً پاسخ نمی‌دهد</b>همان قیمت قبلی در جمع دارایی‌ها حساب شده است. بعداً خودکار دوباره تلاش می‌کنیم.</div>

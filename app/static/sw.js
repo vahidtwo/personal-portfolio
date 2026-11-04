@@ -60,6 +60,7 @@ const PRECACHE = [
   "/static/style.css",
   "/static/theme.js",
   "/static/privacy.js",
+  "/static/amounts.js",
   "/static/number-format.js",
   "/static/dashboard.js",
   "/static/amount-input.js",

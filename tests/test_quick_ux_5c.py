@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tests.test_debts_v2 import _seed, clock  # noqa: F401
 from tests.test_holdings import _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "app" / "static"
@@ -87,9 +88,9 @@ def test_every_amount_on_home_spends_and_debts_is_masked(client, no_network, clo
     _seed([("وام نمونه", 2350000, 12, 1405, 8, 5)], expenses=[("اجاره نمونه", 7100000, 1)])
     _seed_spends()
     pages = {
-        "home": client.get("/dashboard").text,
-        "spends": client.get("/dashboard?tab=daily").text,
-        "debts": client.get("/profile?tab=debts").text,
+        "home": with_amounts(client, "/dashboard"),
+        "spends": with_amounts(client, "/dashboard?tab=daily"),
+        "debts": with_amounts(client, "/profile?tab=debts"),
     }
     for name, html in pages.items():
         assert _scan(html).unmasked_amounts() == [], name
@@ -111,7 +112,7 @@ def test_small_masks_use_small_stars():
 
 def test_sms_offer_is_a_one_line_banner_and_dismiss_persists(client, no_network):
     _register(client)
-    html = client.get("/dashboard?tab=daily").text
+    html = with_amounts(client, "/dashboard?tab=daily")
     banner = html.split('id="sms-offer"', 1)[1].split("</aside>", 1)[0]
     assert "<h2" not in banner and "<p" not in banner and "card-desc" not in banner
     assert "data-sms-offer-enable" in banner and "data-sms-offer-dismiss" in banner
@@ -174,7 +175,7 @@ class _SvgText(HTMLParser):
 def test_chart_text_is_masked_axis_footer_and_svg(client, no_network, clock):
     _register(client)
     _seed([("وام نمونه", 2350000, 12, 1405, 8, 5)])
-    home = client.get("/dashboard").text
+    home = with_amounts(client, "/dashboard")
     # footer: max, min and the change for the range all sit inside a small mask
     foot = home.split('id="chart-foot"', 1)[1].split("</div>", 1)[0]
     for el in ("chart-max", "chart-min", "chart-change"):
@@ -235,7 +236,7 @@ def test_no_amount_in_aria_labels_titles_or_data_attributes(client, no_network, 
                 assert not AMOUNT_ATTR.search(value), (url, tag, name, value)
         assert "data-sp-amount" not in html
     # the row menu is named by the spend and day, not its amount
-    daily = client.get("/dashboard?tab=daily").text
+    daily = with_amounts(client, "/dashboard?tab=daily")
     assert re.search(r'aria-label="گزینه‌های خرج [^"]+"', daily)
     assert not re.search(r'aria-label="گزینه‌های خرج [^"]*[0-9۰-۹]{2}[^"]*تومان', daily)
 
@@ -243,7 +244,7 @@ def test_no_amount_in_aria_labels_titles_or_data_attributes(client, no_network, 
 def test_category_share_percent_is_masked(client, no_network, clock):
     _register(client)
     _seed_spends()
-    html = _main(client.get("/dashboard?tab=daily").text)
+    html = _main(with_amounts(client, "/dashboard?tab=daily"))
     p = _AmountScan()
     p.feed(html)
     percents = [(t, m) for t, m, skip in p.chunks if not skip and "٪" in t and DIGIT.search(t)]

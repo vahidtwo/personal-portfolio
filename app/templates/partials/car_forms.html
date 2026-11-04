@@ -30,7 +30,7 @@
 <div class="car-scrim" id="car-confirm" data-car-confirm {% if car_open != "confirm" %}hidden{% endif %}>
   <div class="car-sheet" role="alertdialog" aria-modal="true" aria-labelledby="car-confirm-title" aria-describedby="car-confirm-body">
     <h2 id="car-confirm-title">اتصال سنجه قطع شود؟</h2>
-    <p id="car-confirm-body">توکن پاک می‌شود و ارزش خودرو (<bdi class="num">{{ car_value_label or "۰" }}</bdi> تومان) از جمع دارایی‌ها و نمودارها حذف می‌شود. هر وقت خواستید می‌توانید دوباره وصل شوید.</p>
+    <p id="car-confirm-body">توکن پاک می‌شود و ارزش خودرو (<bdi class="num">{{ amt("car-value-confirm", car_value_label or "۰") }}</bdi> تومان) از جمع دارایی‌ها و نمودارها حذف می‌شود. هر وقت خواستید می‌توانید دوباره وصل شوید.</p>
     <form method="post" action="/assets/car/disconnect" data-car-form class="acts">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <a class="btn btn-ghost" href="/assets#group-car" data-car-close>انصراف</a>

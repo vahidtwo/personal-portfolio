@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from jinja2 import pass_context
+from markupsafe import Markup
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -23,6 +25,41 @@ templates.env.filters["toman"] = format_toman
 templates.env.filters["when"] = format_when
 templates.env.filters["fa"] = persian_digits  # digits only (years, ids, input values)
 templates.env.filters["num"] = format_number  # THE display number formatter
+
+
+# Amounts are never written into page HTML. Templates mark each one with amt()/amt_attrs()/amt_json(),
+# which emit an empty placeholder; GET /api/amounts renders the same page with a collector and
+# returns the values as JSON, and amounts.js fills the placeholders.
+@pass_context
+def _amt(ctx, key, value):
+    bag = ctx.get("_amounts")
+    if bag is not None:
+        bag[str(key)] = "" if value is None else str(value)
+    return Markup('<span data-amt="%s"></span>') % (str(key),)
+
+
+@pass_context
+def _amt_attrs(ctx, *pairs):
+    bag = ctx.get("_amounts")
+    names = []
+    for attr, key, value in pairs:
+        if bag is not None:
+            bag[str(key)] = value if isinstance(value, (dict, list)) else ("" if value is None else str(value))
+        names.append(f"{attr}={key}")
+    return Markup(' data-amt-attr="%s"') % (" ".join(names),)
+
+
+@pass_context
+def _amt_json(ctx, key, value):
+    bag = ctx.get("_amounts")
+    if bag is not None:
+        bag[str(key)] = value
+    return Markup("null")
+
+
+templates.env.globals["amt"] = _amt
+templates.env.globals["amt_attrs"] = _amt_attrs
+templates.env.globals["amt_json"] = _amt_json
 # Signup rules shown as hints come from the real validator constants.
 from app.security import PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH  # noqa: E402
 
@@ -70,6 +107,9 @@ def page_url_for(name: str, context: dict) -> str | None:
     return None
 
 
+AMOUNTS_NO_STORE = {"Cache-Control": "no-store, private", "Pragma": "no-cache", "Vary": "Cookie"}
+
+
 def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
     if request.method == "POST" and "page_url" not in context:
         context["page_url"] = page_url_for(name, context)
@@ -88,6 +128,11 @@ def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
             "firebase_web_config_json": json.dumps(push_cfg, ensure_ascii=False) if push_cfg else "",
         }
     )
+    collect = getattr(request.state, "amounts_collect", None)
+    if collect is not None:
+        context["_amounts"] = collect
+        templates.get_template(name).render(context)
+        return JSONResponse({"v": collect}, headers=AMOUNTS_NO_STORE)
     return templates.TemplateResponse(request, name, context)
 
 

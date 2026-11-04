@@ -74,10 +74,10 @@ def test_month_due_on_pages(client, no_network, clock):
     _register(client)
     _seed([("الف", 1000000, 10, 1405, 5, 1), ("ب", 500000, 5, 1405, 8, 1)])
     dash = client.get("/dashboard").text
-    assert "اقساط این ماه و عقب‌افتاده" in dash and "data-installment-overdue" in dash
-    m = re.search(r"<dt>اقساط این ماه و عقب‌افتاده</dt><dd[^>]*><bdi[^>]*data-amount>([^<]+)</bdi>", dash)
+    assert "اقساط باقی‌مانده" in dash and "data-installment-overdue" in dash
+    m = re.search(r"<dt>اقساط باقی‌مانده</dt><dd[^>]*><bdi[^>]*data-amount>([^<]+)</bdi>", dash)
     assert m and m.group(1) == "۳٬۰۰۰٬۰۰۰"
-    assert "قسط‌های این ماه و عقب‌افتاده" in client.get(P).text
+    assert "اقساط باقی‌مانده" in client.get(P).text
 
 
 # 5: finished loans

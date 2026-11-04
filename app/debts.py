@@ -167,6 +167,7 @@ def debts_page(
         "active_count": sum(1 for r in rows if r["active"]),
         "total_label": format_toman(total),
         "installment_label": format_toman(installment),
+        "month_total_label": format_toman(ds.this_month_installments(debts, today)),
         "installment_overdue_label": format_toman(installment_overdue) if installment_overdue else None,
         "expense_label": format_toman(expense_total),
         "next": nearest,

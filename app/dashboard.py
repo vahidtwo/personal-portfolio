@@ -626,6 +626,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         changes=changes,
         income_month_label=monthly["income_month_label"],
         installment_month_label=monthly["installment_month_label"],
+        month_total_label=monthly["month_total_label"],
         installment_overdue_label=monthly["installment_overdue_label"],
         expense_month_label=monthly["expense_month_label"],
         monthly_left_label=monthly["monthly_left_label"],

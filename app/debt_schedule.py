@@ -12,12 +12,13 @@ triple like 1405/08/31 is therefore allowed and every reader goes through `clamp
 
 from __future__ import annotations
 
+from datetime import timezone
 from decimal import Decimal
 
 import jdatetime
 
 from app.daily_spend import JALALI_MONTHS
-from app.formatting import format_toman, persian_digits, tehran_today
+from app.formatting import TEHRAN, format_toman, persian_digits, tehran_today
 
 
 def month_length(year: int, month: int) -> int:
@@ -155,6 +156,50 @@ def month_due(debts, today: jdatetime.date | None = None) -> tuple[Decimal, Deci
                 overdue += amount
             y, m = add_months(y, m, 1)
     return total, overdue
+
+
+def _entered_on(debt) -> jdatetime.date | None:
+    created = getattr(debt, "created_at", None)
+    if created is None:
+        return None
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return jdatetime.date.fromgregorian(date=created.astimezone(TEHRAN).date())
+
+
+def this_month_installments(debts, today: jdatetime.date | None = None) -> Decimal:
+    """Instalments dated in today's Jalali month for active loans, paid or not; older overdue months are left out.
+
+    An unpaid one is the stored month itself. A paid one shows as a stored month exactly one month ahead,
+    unless the loan was entered after this month's due date (its first instalment is then next month).
+    """
+    today = today or tehran_today()
+    following = add_months(today.year, today.month, 1)
+    total = Decimal("0")
+    for debt in debts:
+        nxt = next_due(debt, today)
+        if nxt is None:
+            continue
+        stored = (nxt.year, nxt.month)
+        if stored <= (today.year, today.month):
+            due_now = int(debt.months_left) > _months_between(stored, today)
+        elif stored == following:
+            entered = _entered_on(debt)
+            due_now = entered is None or entered <= clamp(today.year, today.month, debt.due_day)
+        else:
+            due_now = False
+        if due_now:
+            total += Decimal(debt.monthly_toman)
+    return total
+
+
+def _months_between(start: tuple[int, int], today: jdatetime.date) -> int:
+    return (today.year * 12 + today.month) - (start[0] * 12 + start[1])
+
+
+def salary_left(salary, debts, fixed_monthly, today: jdatetime.date | None = None) -> Decimal:
+    """«مانده از حقوق»: salary − this month's instalments of active loans − fixed monthly costs."""
+    return Decimal(salary or 0) - this_month_installments(debts, today) - Decimal(fixed_monthly or 0)
 
 
 def overdue_count(debts, today: jdatetime.date | None = None) -> int:

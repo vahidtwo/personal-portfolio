@@ -84,9 +84,9 @@ function html(body, status = 200, extra = {}) {
   return r;
 }
 
-async function dispatch(path, { method = "GET", mode = "navigate" } = {}) {
+async function dispatch(path, { method = "GET", mode = "navigate", cache = "default" } = {}) {
   const url = new URL(path, "https://app.test").href;
-  const request = { url, method, mode, clone() { return this; } };
+  const request = { url, method, mode, cache, clone() { return this; } };
   let responded = null;
   const waits = [];
   listeners.fetch({ request, resultingClientId: "client-" + path, respondWith: (p) => (responded = p), waitUntil: (p) => waits.push(p) });

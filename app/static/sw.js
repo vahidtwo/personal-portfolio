@@ -19,6 +19,20 @@ const MARKER_ID_RE = /^u[A-Za-z0-9_-]{8,64}$/;
 // A cached dashboard is shown first (fast start) while a fresh copy is fetched in the background.
 // Older than this = too stale to show first: wait for the network (still used as the offline copy).
 const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+// A form POST (e.g. the price refresh button) answers with a redirect to the dashboard: that next dashboard load
+// must show the server's fresh page (and its flash message), never the cached copy from before the POST.
+const AFTER_POST_WINDOW_MS = 60 * 1000;
+let formPostAt = 0;
+
+// The user asked for fresh data: a reload, or the page that follows a form POST.
+function wantsFreshPage(request, now) {
+  if (request.cache === "reload" || request.cache === "no-cache" || request.cache === "no-store") return true;
+  if (formPostAt && now - formPostAt >= 0 && now - formPostAt < AFTER_POST_WINDOW_MS) {
+    formPostAt = 0;
+    return true;
+  }
+  return false;
+}
 
 async function sessionId() {
   try {
@@ -276,8 +290,9 @@ async function dashboardNavigation(event) {
   const cache = await caches.open(pageCacheName(id));
   const now = Date.now();
   const network = fetch(event.request);
+  const fresh = wantsFreshPage(request, now);
   const cached = await freshCachedPage(cache, request, now);
-  if (cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
+  if (!fresh && cached && now - cachedAt(cached) < SHOW_FIRST_MAX_AGE_MS) {
     const clientId = event.resultingClientId || event.clientId;
     event.waitUntil(
       network
@@ -333,6 +348,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.method !== "GET") {
+    if (request.mode === "navigate") formPostAt = Date.now();
     // Form POSTs are left to the browser (an expired session redirects them to /login, handled below).
     if (url.pathname.startsWith("/api/")) event.respondWith(watchSession(request));
     return;

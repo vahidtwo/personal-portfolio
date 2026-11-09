@@ -101,7 +101,7 @@ object SmsKeywords {
     private val BALANCE = Regex("""(?:مانده|موجودی)[^$D]{0,20}[$D][$D,٬.]*(?:\s*(?:ریال|تومان|rial|toman))?""", RegexOption.IGNORE_CASE)
     private val RUN = Regex("""[$D*][$D*\-\s.]*[$D*]|[$D*]""")
     private val CURRENCY_AFTER = Regex("""^\s*(?:ریال|تومان|rial|toman)""", RegexOption.IGNORE_CASE)
-    private val ACCOUNT_BEFORE = Regex("""(?:کارت|حساب|card|acc(?:ount)?|شبا|iban)[^$D*]{0,12}$""", RegexOption.IGNORE_CASE)
+    private val ACCOUNT_BEFORE = Regex("""(?:کارت|حساب|حساو|card|acc(?:ount)?|شبا|iban)[^$D*]{0,12}$""", RegexOption.IGNORE_CASE)
 
     /**
      * The note sent to the server: balance segment removed, card/account digit runs → "****",

@@ -12,11 +12,13 @@ import org.json.JSONObject
  *  C) the sender has a saved template that matches and the matched amount carries a minus sign, or
  *  B) the SMS contains one of the user's keywords AND auto-detect finds exactly one minus amount
  *     (no «مانده» line needed). The keyword list is an extra filter, never a way around the minus rule.
+ *  W) the SMS contains one of the user's keywords AND writes «برداشت» directly against one unsigned
+ *     amount («برداشت260,000,700»), checked only after A, C and B find nothing.
  * Amounts are rial / 10 unless the SMS labels them «تومان». The server gets only the toman amount and the
  * masked note.
  */
 object SmsDecision {
-    enum class Path { AUTO, TEMPLATE, KEYWORD }
+    enum class Path { AUTO, TEMPLATE, KEYWORD, WITHDRAW }
 
     data class Spend(val amountToman: String, val note: String, val path: Path)
 
@@ -30,6 +32,7 @@ object SmsDecision {
         val toman = autoAmount(body)?.let { it to Path.AUTO }
             ?: templateAmount(body, sender, templates)?.let { it to Path.TEMPLATE }
             ?: keywordAmount(body, keywords)?.let { it to Path.KEYWORD }
+            ?: withdrawAmount(body, keywords)?.let { it to Path.WITHDRAW }
             ?: return null
         return Spend(toman.first.toString(), SmsKeywords.cleanNote(body), toman.second)
     }
@@ -45,6 +48,11 @@ object SmsDecision {
     private fun keywordAmount(body: String, keywords: List<String>): Long? {
         if (!SmsKeywords.matchesAny(body, keywords)) return null
         return SmsParser.autoDetect(body)?.amountToman?.let { -it }
+    }
+
+    private fun withdrawAmount(body: String, keywords: List<String>): Long? {
+        if (!SmsKeywords.matchesAny(body, keywords)) return null
+        return SmsParser.withdrawGluedResult(body)?.amountToman?.let { -it }
     }
 
     fun templatesToJson(list: List<SmsParser.Template>): String = JSONArray(list.map { t ->

@@ -143,4 +143,42 @@ class SmsDecisionTest {
         assertFalse(SmsParser.isOtp("کد پیگیری 778812"))
         assertFalse(SmsParser.isOtp("کد شعبه 12"))
     }
+
+    private val glued = "حساو1234567890\nبرداشت260,000,700\nمانده9,876,543\n05/08/18-19:45"
+
+    @Test fun gluedWithdrawSampleEndToEnd() {
+        val s = d.decide(glued, "BANK", kw)!!
+        assertEquals("26000070", s.amountToman)
+        assertEquals(SmsDecision.Path.WITHDRAW, s.path)
+        assertFalse(s.note.contains("1234567890"))
+        assertFalse(s.note.contains("9,876,543") || s.note.contains("9876543") || s.note.contains("987654"))
+        assertFalse(s.note.contains("مانده"))
+        assertTrue(s.note.startsWith("حساو**** برداشت"))
+    }
+
+    @Test fun gluedWithdrawVariantsEndToEnd() {
+        val fa = "حساو۱۲۳۴۵۶۷۸۹۰\nبرداشت۲۶۰٬۰۰۰٬۷۰۰\nمانده۹٬۸۷۶٬۵۴۳\n۰۵/۰۸/۱۸-۱۹:۴۵"
+        val s = d.decide(fa, "BANK", kw)!!
+        assertEquals("26000070", s.amountToman)
+        assertFalse(s.note.contains("۱۲۳۴۵۶۷۸۹۰") || s.note.contains("۹٬۸۷۶٬۵۴۳"))
+        val marked = "\u200Fحساو1234567890\n\u202Bبرداشت\u200E260,000,700\u202C\nمانده\u200E9,876,543\n05/08/18-19:45"
+        assertEquals("26000070", d.decide(marked, "BANK", kw)!!.amountToman)
+        assertFalse(d.decide(marked, "BANK", kw)!!.note.contains("1234567890"))
+    }
+
+    @Test fun gluedDepositIsNeverASpend() {
+        assertNull(d.decide("حساو1234567890\nواریز260,000,700\nمانده9,876,543\n05/08/18-19:45", "BANK", kw))
+        assertNull(d.decide("حساو1234567890\nواریز260,000,700\nمانده9,876,543", "BANK", listOf("برداشت", "واریز")))
+    }
+
+    @Test fun gluedWithdrawStillNeedsAKeyword() {
+        assertNull(d.decide(glued, "BANK", listOf("خرید")))
+        assertEquals(SmsDecision.Path.WITHDRAW, d.decide(glued, "BANK", listOf("خرید", "برداشت"))!!.path)
+    }
+
+    @Test fun minusRuleStillWinsOverGlued() {
+        val s = d.decide("برداشت120,000-\nمانده9,876,543", "BANK", kw)!!
+        assertEquals(SmsDecision.Path.AUTO, s.path)
+        assertEquals("12000", s.amountToman)
+    }
 }

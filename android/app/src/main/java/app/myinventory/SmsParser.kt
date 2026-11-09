@@ -7,8 +7,9 @@ package app.myinventory
  * before or after it. The number after «مانده»/«موجودی» is the balance, never the amount. A user template
  * is used only when auto-detect finds no candidate or more than one. SMS amounts are in rial; results
  * are in toman (rial / 10, rounded down).
- * Only a number with a minus sign is a spend, on every path. Money in (a plus sign next to a number, or
- * «واریز», «افزایش», «بستانکار», «انتقال به حساب شما») is never a spend: see [isMoneyIn].
+ * Only a number with a minus sign is a spend, on every path, with one narrow exception: «برداشت» written
+ * directly against its amount (e.g. «برداشت260,000,700», see [withdrawGlued]). Money in (a plus sign next to a
+ * number, or «واریز», «افزایش», «بستانکار», «انتقال به حساب شما») is never a spend: see [isMoneyIn].
  */
 object SmsParser {
     enum class Source { AUTO, TEMPLATE }
@@ -36,6 +37,7 @@ object SmsParser {
     private val MINUS_AFTER = Regex("""(?<![\d.])(\d+)\s?-(?![\d\-])""")
     private val IN_WORDS = listOf("واریز", "افزایش", "بستانکار", "انتقال به حساب شما", "دریافتی")
     private val PLUS_NUMBER = Regex("""\+\s?\d|\d\s?\+""")
+    private val WITHDRAW_GLUED = Regex("""(?<![\p{L}\-])(?<!قابل )برداشت(\d+)(?![\d.\-])""")
 
     /** True for any money-in SMS: a plus-signed number or a money-in word. Such an SMS is never a spend. */
     fun isMoneyIn(body: String): Boolean {
@@ -105,6 +107,29 @@ object SmsParser {
         val c = minusCandidates(body)
         if (c.size != 1) return null
         val toman = amountToman(body, c[0])
+        if (toman <= 0) return null
+        return Result(-toman, balanceToman(body), Source.AUTO)
+    }
+
+    /**
+     * Rial value when the SMS writes «برداشت» immediately followed by its amount, with no space and no
+     * sign (e.g. «برداشت260,000,700» above a «مانده4,088,152» line). Null for none or several, for any
+     * money-in SMS and when the SMS also has a minus-signed amount (that one is the minus rule's).
+     * The balance segment is blanked first, so «مانده» is never the amount.
+     */
+    fun withdrawGlued(body: String): Long? {
+        if (isMoneyIn(body)) return null
+        if (minusCandidates(body).isNotEmpty()) return null
+        val text = BALANCE.replace(normalize(body)) { " ".repeat(it.value.length) }
+        val found = WITHDRAW_GLUED.findAll(text).toList()
+        if (found.size != 1) return null
+        return found[0].groupValues[1].toLongOrNull()?.takeIf { it > 0 }
+    }
+
+    /** [withdrawGlued] in toman as a spend, or null. */
+    fun withdrawGluedResult(body: String): Result? {
+        val rial = withdrawGlued(body) ?: return null
+        val toman = amountToman(body, rial)
         if (toman <= 0) return null
         return Result(-toman, balanceToman(body), Source.AUTO)
     }

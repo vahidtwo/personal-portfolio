@@ -22,17 +22,52 @@ const SHOW_FIRST_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const DEBTS_SHOW_FIRST_MAX_AGE_MS = 60 * 60 * 1000;
 // A form POST (e.g. the price refresh button) answers with a redirect to the dashboard: that next dashboard load
 // must show the server's fresh page (and its flash message), never the cached copy from before the POST.
-const AFTER_POST_WINDOW_MS = 60 * 1000;
+// The price refresh can keep the server busy for a minute or more (chande, then the car value), and an idle worker
+// may be stopped meanwhile: the POST time is also kept in the cache storage, and the window covers a slow answer.
+const AFTER_POST_WINDOW_MS = 3 * 60 * 1000;
+const META_CACHE = VERSION + "-meta";
+const FORM_POST_KEY = "/__sw/form-post-at";
 let formPostAt = 0;
 
-// The user asked for fresh data: a reload, or the page that follows a form POST.
-function wantsFreshPage(request, now) {
-  if (request.cache === "reload" || request.cache === "no-cache" || request.cache === "no-store") return true;
-  if (formPostAt && now - formPostAt >= 0 && now - formPostAt < AFTER_POST_WINDOW_MS) {
-    formPostAt = 0;
-    return true;
+async function markFormPost(now) {
+  formPostAt = now;
+  try {
+    const cache = await caches.open(META_CACHE);
+    await cache.put(FORM_POST_KEY, new Response(String(now)));
+  } catch (e) {}
+}
+
+// The POST time, used once: read from memory or, after a worker restart, from the cache storage.
+async function takeFormPost() {
+  let at = formPostAt;
+  formPostAt = 0;
+  try {
+    const cache = await caches.open(META_CACHE);
+    const stored = await cache.match(FORM_POST_KEY);
+    if (stored) {
+      at = Math.max(at, Number(await stored.text()) || 0);
+      await cache.delete(FORM_POST_KEY);
+    }
+  } catch (e) {}
+  return at;
+}
+
+// A notification tap (the Android app's SMS spend notice) opens the page with src=notification: always the
+// server's copy, so a spend saved a moment ago is on it, and that URL is never stored.
+function fromNotification(request) {
+  try {
+    return new URL(request.url).searchParams.get("src") === "notification";
+  } catch (e) {
+    return false;
   }
-  return false;
+}
+
+// The user asked for fresh data: a reload, a notification tap, or the page that follows a form POST.
+async function wantsFreshPage(request, now) {
+  if (request.cache === "reload" || request.cache === "no-cache" || request.cache === "no-store") return true;
+  if (fromNotification(request)) return true;
+  const at = await takeFormPost();
+  return Boolean(at && now - at >= 0 && now - at < AFTER_POST_WINDOW_MS);
 }
 
 async function sessionId() {
@@ -313,6 +348,7 @@ async function storeDashboard(request, response, id) {
     return "ended";
   }
   const type = response.headers.get("content-type") || "";
+  if (fromNotification(request)) return "skip";
   if (isDebtsTab(new URL(request.url)) && !(await amountFree(response))) return "skip";
   // The account may have changed while the request was in flight: store only under the current id.
   if (response.ok && type.includes("text/html") && id && (await sessionId()) === id) {
@@ -343,7 +379,7 @@ async function dashboardNavigation(event) {
   const cache = await caches.open(pageCacheName(id));
   const now = Date.now();
   const network = fetch(event.request);
-  const fresh = wantsFreshPage(request, now);
+  const fresh = await wantsFreshPage(request, now);
   const cached = await freshCachedPage(cache, request, now);
   const showFirstFor = isDebtsTab(new URL(request.url)) ? DEBTS_SHOW_FIRST_MAX_AGE_MS : SHOW_FIRST_MAX_AGE_MS;
   if (!fresh && cached && now - cachedAt(cached) < showFirstFor) {
@@ -403,7 +439,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.method !== "GET") {
-    if (request.mode === "navigate") formPostAt = Date.now();
+    if (request.mode === "navigate") event.waitUntil(markFormPost(Date.now()));
     // Form POSTs are left to the browser (an expired session redirects them to /login, handled below).
     if (url.pathname.startsWith("/api/")) event.respondWith(watchSession(request));
     return;

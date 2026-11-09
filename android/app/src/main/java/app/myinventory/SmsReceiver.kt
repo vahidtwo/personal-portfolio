@@ -52,7 +52,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                 }
                 when (outcome) {
                     ServerAddress.SmsOutcome.SAVED -> {
-                        notifySaved(context, amount)
+                        notifySaved(context, amount, NotificationTarget.DAILY)
                         // The server is reachable again: retry spends queued after earlier failures.
                         flushQueued(context)
                     }
@@ -61,21 +61,23 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                         runCatching { SmsQueue.add(context, entry) }.onFailure { Log.w(TAG, "sms: queue failed", it) }
                         // Shown in the app on next open too, in case notifications are off.
                         prefs.edit().putBoolean(KEY_LOGIN_NEEDED, true).apply()
-                        notify(context, "خرج پیامک", LOGIN_MESSAGE, HomeActivity::class.java)
+                        notify(context, "خرج پیامک", LOGIN_MESSAGE, NotificationTarget.DAILY)
                     }
                     ServerAddress.SmsOutcome.FAILED -> if (ServerAddress.retryLater(code)) {
                         // Network error or 5xx: kept in the same encrypted queue (bound to the user, 7-day expiry,
                         // deduped by idempotency key) and retried by flushQueued with the same key.
                         val queued = runCatching { SmsQueue.add(context, entry) }
                             .onFailure { Log.w(TAG, "sms: queue failed", it) }.isSuccess
-                        notifyError(context, if (queued) RETRY_MESSAGE else "ذخیره نشد — سرور در دسترس نیست")
-                    } else notifyError(context, "ذخیره نشد — سرور در دسترس نیست")
+                        notifyError(context, if (queued) RETRY_MESSAGE else "ذخیره نشد — سرور در دسترس نیست",
+                            if (queued) NotificationTarget.DAILY else NotificationTarget.ADD)
+                    } else notifyError(context, "ذخیره نشد — سرور در دسترس نیست", NotificationTarget.ADD)
                 }
             } catch (t: Throwable) {
                 // Never die silently in the background thread (that crashed the process with no notice).
                 Log.w(TAG, "sms: unexpected", t)
-                runCatching { SmsQueue.add(context, entry) }
-                runCatching { notifyError(context, "ذخیره نشد — سرور در دسترس نیست") }
+                val queued = runCatching { SmsQueue.add(context, entry) }.isSuccess
+                runCatching { notifyError(context, "ذخیره نشد — سرور در دسترس نیست",
+                    if (queued) NotificationTarget.DAILY else NotificationTarget.ADD) }
             } finally {
                 pending.finish()
             }
@@ -123,7 +125,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
                     Log.i(TAG, "sms: flushed $saved")
                     if (saved > 0) {
                         prefs.edit().putBoolean(KEY_LOGIN_NEEDED, false).apply()
-                        notify(app, "خرج‌های پیامکی ذخیره شد", "$saved خرج بعد از ورود ذخیره شد", null)
+                        notify(app, "خرج‌های پیامکی ذخیره شد", "$saved خرج بعد از ورود ذخیره شد", NotificationTarget.DAILY)
                     }
                 }.onFailure { Log.w(TAG, "sms: flush failed", it) }
             }
@@ -141,7 +143,16 @@ class SmsReceiver : android.content.BroadcastReceiver() {
             return cookie
         }
 
-        internal fun notify(context: Context, title: String, text: String, tap: Class<*>?) {
+        /** Tap opens the app on [path] (see NotificationTarget): signed in, after login, or the open app. */
+        internal fun tapIntent(context: Context, path: String): android.app.PendingIntent {
+            val open = android.content.Intent(context, HomeActivity::class.java)
+                .addFlags(NotificationTarget.FLAGS)
+                .putExtra(NotificationTarget.EXTRA, path)
+            return android.app.PendingIntent.getActivity(context, path.hashCode(), open,
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+
+        internal fun notify(context: Context, title: String, text: String, tapPath: String?) {
             if (Build.VERSION.SDK_INT >= 33 &&
                 ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -155,12 +166,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
             val b = NotificationCompat.Builder(context, "sms-spend")
                 .setSmallIcon(android.R.drawable.stat_notify_more)
                 .setContentTitle(title).setContentText(text).setAutoCancel(true)
-            if (tap != null) {
-                val pi = android.app.PendingIntent.getActivity(context, 0,
-                    android.content.Intent(context, tap).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
-                b.setContentIntent(pi)
-            }
+            if (tapPath != null) b.setContentIntent(tapIntent(context, tapPath))
             manager.notify(text.hashCode(), b.build())
         }
     }
@@ -182,7 +188,7 @@ class SmsReceiver : android.content.BroadcastReceiver() {
     }
 
 
-    private fun notifySaved(context: Context, amount: String) {
+    private fun notifySaved(context: Context, amount: String, tapPath: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -199,11 +205,13 @@ class SmsReceiver : android.content.BroadcastReceiver() {
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle("خرج روزانه ذخیره شد")
             .setContentText(amount)
+            .setAutoCancel(true)
+            .setContentIntent(tapIntent(context, tapPath))
             .build()
         manager.notify(amount.hashCode(), notification)
     }
 
-    private fun notifyError(context: Context, message: String) {
+    private fun notifyError(context: Context, message: String, tapPath: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ActivityCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS)
             != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -220,6 +228,8 @@ class SmsReceiver : android.content.BroadcastReceiver() {
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle("خرج پیامک")
             .setContentText(message)
+            .setAutoCancel(true)
+            .setContentIntent(tapIntent(context, tapPath))
             .build()
         manager.notify(message.hashCode(), notification)
     }

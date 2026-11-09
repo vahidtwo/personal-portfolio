@@ -365,6 +365,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.getStringExtra(EXTRA_PATH)?.let { NotificationTarget.safePath(it) }?.let { loadRemote(NativeSession.BASE, it) }
     }
 
     /** Launcher shortcut «تنظیمات اتصال»: open setup with the address box already open. */

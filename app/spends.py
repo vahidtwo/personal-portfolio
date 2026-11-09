@@ -386,6 +386,7 @@ def daily_view(
         "spend_form": spend_form,
         "editing_spend_id": editing["id"] if editing else editing_spend_id,
         "spend_orig_amount": _orig_amount(db, user, editing["id"] if editing else editing_spend_id),
+        "spend_open_add": request.query_params.get("add") == "1",
     }
 
 

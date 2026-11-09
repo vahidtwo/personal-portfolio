@@ -30,7 +30,6 @@
       <h2 id="dv-sum-h">این ماه</h2>
       <div class="dv-tiles">
         <div class="dv-tile"><span>اقساط باقی‌مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("installments-left", dv.installment_label) }}</bdi></b><small class="dv-unit">تومان</small>{% if dv.installment_overdue_label %}<small class="dv-unit" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", dv.installment_overdue_label) }}</bdi></small>{% endif %}</div>
-        <div class="dv-tile"><span>جمع اقساط این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount data-month-total><bdi dir="ltr">{{ amt("installments-month", dv.month_total_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
         <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("fixed-monthly", dv.expense_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
         <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("debts", dv.total_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
 {% include "partials/debts_left_tile.html" %}
@@ -50,6 +49,7 @@
       <div data-dv-swap="debts">
       {% if dv.has_debts %}
       <p class="dv-cdesc">به ترتیب نزدیک‌ترین قسط.</p>
+      <p class="dv-sumrow lead" data-month-total-row><span>جمع اقساط این ماه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount data-month-total>{{ amt("installments-month", dv.month_total_label) }}</bdi> تومان</b></p>
       <ul class="dv-rows" aria-label="وام و قسط">
         {% for r in dv.rows %}
         <li class="dv-row{% if not r.active %} done{% endif %}" data-dv-row="{{ r.id }}">

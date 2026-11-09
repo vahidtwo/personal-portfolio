@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app import rate_limit
 from app.amounts_api import same_origin
-from app.config import FIREBASE_VAPID_KEY, firebase_android_config, firebase_web_config
+from app.config import FIREBASE_VAPID_KEY, firebase_web_config
+from app.firebase_android import android_push_config
 from app.db import get_db
 from app.firebase_push import (
     device_counts,
@@ -35,7 +36,7 @@ def _json(payload: dict, status_code: int = 200, headers: dict | None = None) ->
 @router.get("/api/push/config")
 def push_config():
     cfg = firebase_web_config()
-    android = firebase_android_config()
+    android = android_push_config()
     if cfg is None and android is None:
         return JSONResponse({"enabled": False})
     return JSONResponse(
@@ -106,7 +107,7 @@ def push_status(request: Request, db: Session = Depends(get_db)):
             "ok": True,
             "server": firebase_admin_ready(),
             "web": firebase_web_config() is not None,
-            "android": firebase_android_config() is not None,
+            "android": android_push_config() is not None,
             "devices": device_counts(db, user.id),
         }
     )

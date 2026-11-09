@@ -39,6 +39,7 @@ from app.db import init_db
 from app.db_admin import router as db_admin_router
 from app.debts import router as debts_router
 from app.expenses import router as expenses_router
+from app.firebase_android import start_background_resolution, stop_background_resolution
 from app.firebase_push import validate_firebase_admin_at_startup
 from app.jobs import run_hourly_job
 from app.mcp_http import router as mcp_router
@@ -94,6 +95,7 @@ def warn_scheduler_off() -> None:
 async def lifespan(_app: FastAPI):
     init_db()
     validate_firebase_admin_at_startup()
+    start_background_resolution()
     await run_hourly_job(take_snapshots=False, send_reminders=False)
     if ENABLE_INTERNAL_SCHEDULER:
         start_hourly_scheduler()
@@ -101,6 +103,7 @@ async def lifespan(_app: FastAPI):
     else:
         warn_scheduler_off()
     yield
+    stop_background_resolution()
     await stop_hourly_scheduler()
 
 

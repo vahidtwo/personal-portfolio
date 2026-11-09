@@ -83,8 +83,10 @@ def test_dedup_matches_old_layout_rows(client, no_network):
     from datetime import date
 
     with SessionLocal() as db:
+        from app.models import User
+
         cat = db.query(SpendCategory).filter(SpendCategory.slug == "sms_bank").one()
-        old = DailySpend(user_id=cat.user_id, category_id=cat.id, amount_toman=125000,
+        old = DailySpend(user_id=db.query(User).one().id, category_id=cat.id, amount_toman=125000,
                          spent_on=date(2026, 11, 1), note=f"[{KEY}] بانک ملت برداشت")
         db.add(old)
         db.commit()

@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.datastructures import FormData
 
 from app.db import get_db
-from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, utcnow
+from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, category_name_key, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER
 from app.number_input import parse_int_text
 from app.security import (
@@ -62,6 +64,16 @@ def _require_admin(request: Request, db: Session) -> User | RedirectResponse:
     if not is_admin(user):
         ui.flash(request, "دسترسی مدیریت ندارید.", error=True)
         return RedirectResponse("/dashboard", status_code=303)
+    return user
+
+
+def _require_admin_write(request: Request, db: Session) -> User | RedirectResponse | PlainTextResponse:
+    """Writes: signed out -> login; signed in without admin rights -> 403."""
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return redirect_to_login(request)
+    if not is_admin(user):
+        return PlainTextResponse("forbidden", status_code=403)
     return user
 
 
@@ -288,14 +300,14 @@ def catalog(db: Session) -> list[dict]:
         {
             "slug": "spend-categories",
             "label": "دسته‌های خرج",
-            "description": "گروه و زیردسته خرج روزانه",
+            "description": "گروه و زیردسته خرج روزانه، مشترک برای همه کاربران",
             "count": _ui().persian_digits(str(db.query(SpendCategory).count())),
         },
     ]
 
 
 # Vahid's rule (Oct 13 2026): user data is never removed or overwritten from the DB editor.
-READ_ONLY_SLUGS = frozenset({"snapshots", "spend-categories"})
+READ_ONLY_SLUGS = frozenset({"snapshots"})
 READ_ONLY_ERROR = "این جدول دادهٔ کاربران است و در ویرایشگر فقط‌خواندنی است."
 
 
@@ -352,35 +364,37 @@ def list_view(db: Session, slug: str, query: str) -> dict:
         }
     if slug == "spend-categories":
         rows = (
-            db.query(SpendCategory, User.username)
-            .join(User, User.id == SpendCategory.user_id)
-            .order_by(User.username.asc(), SpendCategory.parent_id.asc(), SpendCategory.sort_order.asc(), SpendCategory.id.asc())
+            db.query(SpendCategory)
+            .order_by(SpendCategory.parent_id.asc(), SpendCategory.sort_order.asc(), SpendCategory.id.asc())
             .all()
         )
-        names = {row.id: row.name for row, _username in rows}
+        names = {row.id: row.name for row in rows}
+        used = dict(
+            db.query(DailySpend.category_id, func.count(DailySpend.id)).group_by(DailySpend.category_id).all()
+        )
         if needle:
             rows = [
-                pair
-                for pair in rows
-                if needle in pair[1].lower()
-                or needle in pair[0].name.lower()
-                or needle in names.get(pair[0].parent_id, "").lower()
+                row
+                for row in rows
+                if needle in row.name.lower() or needle in names.get(row.parent_id, "").lower()
             ]
         return {
             "label": "دسته‌های خرج",
-            "columns": ["شناسه", "کاربر", "نام", "والد", "نوع"],
+            "columns": ["شناسه", "نام", "والد", "نوع", "ترتیب", "خرج‌ها", "وضعیت"],
             "rows": [
                 {
                     "pk": str(row.id),
                     "cells": [
                         ui.persian_digits(str(row.id)),
-                        username,
                         row.name,
                         names.get(row.parent_id, "—"),
                         "زیردسته" if row.parent_id else "گروه",
+                        ui.persian_digits(str(row.sort_order)),
+                        ui.persian_digits(str(used.get(row.id, 0))),
+                        "بایگانی" if row.archived else "فعال",
                     ],
                 }
-                for row, username in rows
+                for row in rows
             ],
         }
     rows = (
@@ -520,83 +534,67 @@ def _save_snapshot(db: Session, row: PortfolioSnapshot | None, form: FormData) -
     return None
 
 
+CATEGORY_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+# SMS spends are saved into these by slug; deleting them would break SMS saving.
+SYSTEM_CATEGORY_SLUGS = frozenset({"sms", "sms_bank"})
+CATEGORY_IN_USE_ERROR = "این دسته خرج یا زیردسته دارد و حذف نمی‌شود؛ به‌جای حذف بایگانی‌اش کنید."
+
+
 def _category_fields(db: Session, row: SpendCategory | None, form: FormData | None) -> list[dict]:
     def val(name: str, current: str) -> str:
         if form is not None and name in form:
             return _posted(form, name)
         return current
 
-    users = db.query(User).order_by(User.username.asc()).all()
-    user_options = [{"value": str(account.id), "label": account.username} for account in users]
-    user_id = val("user_id", str(row.user_id) if row else (user_options[0]["value"] if user_options else ""))
     parents = (
         db.query(SpendCategory)
         .filter(SpendCategory.parent_id.is_(None))
-        .order_by(SpendCategory.name.asc())
+        .order_by(SpendCategory.sort_order.asc(), SpendCategory.id.asc())
         .all()
     )
-    usernames = {account.id: account.username for account in users}
     parent_options = [{"value": "", "label": "بدون والد (گروه)"}]
     for parent in parents:
         if row is not None and parent.id == row.id:
             continue
-        owner = usernames.get(parent.user_id, str(parent.user_id))
-        parent_options.append({"value": str(parent.id), "label": f"{owner} — {parent.name}"})
-    fields = []
-    if row is None:
-        fields.append(_field("user_id", "کاربر", user_id, kind="select", options=user_options))
-    else:
-        fields.append(_field("user_label", "کاربر", usernames.get(row.user_id, str(row.user_id)), kind="readonly"))
-    fields.append(
-        _field(
-            "name",
-            "نام",
-            val("name", row.name if row else ""),
-            text_dir="rtl",
-        )
-    )
-    fields.append(
+        label = parent.name + (" (بایگانی)" if parent.archived else "")
+        parent_options.append({"value": str(parent.id), "label": label})
+    archived_options = [{"value": "0", "label": "فعال"}, {"value": "1", "label": "بایگانی (در انتخاب‌گر دیده نمی‌شود)"}]
+    return [
+        _field("name", "نام", val("name", row.name if row else ""), text_dir="rtl"),
         _field(
             "parent_id",
             "والد",
             val("parent_id", str(row.parent_id) if row and row.parent_id else ""),
             kind="select",
             options=parent_options,
-            hint="خالی یعنی گروه اصلی. والد باید مال همان کاربر باشد.",
-        )
-    )
-    fields.append(
+            hint="خالی یعنی گروه اصلی.",
+        ),
+        _field("icon", "آیکن", val("icon", (row.icon or "") if row else ""), hint="یک نماد کوتاه؛ خالی یعنی حرف اول نام گروه."),
+        _field("color", "رنگ", val("color", (row.color or "") if row else ""), hint="مثل ‎#1d4ed8؛ خالی یعنی رنگ پیش‌فرض."),
+        _field("sort_order", "ترتیب", val("sort_order", str(row.sort_order) if row else "0"), kind="int"),
         _field(
-            "sort_order",
-            "ترتیب",
-            val("sort_order", str(row.sort_order) if row else "0"),
-            kind="int",
-        )
-    )
-    if row is not None:
-        fields.append(_field("seed_label", "دسته آماده", "بله" if row.is_seed else "خیر", kind="readonly"))
-    return fields
+            "archived",
+            "وضعیت",
+            val("archived", "1" if row is not None and row.archived else "0"),
+            kind="select",
+            options=archived_options,
+            hint="دسته بایگانی در فرم خرج نیست ولی نامش روی خرج‌های قبلی می‌ماند.",
+        ),
+    ] + ([_field("seed_label", "دسته آماده", "بله" if row.is_seed else "خیر", kind="readonly")] if row is not None else [])
 
 
 def _save_category(db: Session, row: SpendCategory | None, form: FormData) -> str | None:
-    name = _posted(form, "name").strip()[:64]
+    name = " ".join(_posted(form, "name").split())[:64]
     if not name:
         return "نام دسته را بنویسید."
-    if row is None:
-        user_raw = _posted(form, "user_id").strip()
-        if not user_raw.isdigit() or db.get(User, int(user_raw)) is None:
-            return "کاربر را انتخاب کنید"
-        user_id = int(user_raw)
-    else:
-        user_id = row.user_id
     parent_raw = _posted(form, "parent_id").strip()
     parent_id = None
     if parent_raw:
         if not parent_raw.isdigit():
             return "والد نامعتبر است"
         parent = db.get(SpendCategory, int(parent_raw))
-        if parent is None or parent.user_id != user_id or parent.parent_id is not None:
-            return "والد باید یک گروه از همین کاربر باشد"
+        if parent is None or parent.parent_id is not None:
+            return "والد باید یک گروه باشد"
         if row is not None and parent.id == row.id:
             return "دسته نمی‌تواند والد خودش باشد"
         parent_id = parent.id
@@ -604,24 +602,32 @@ def _save_category(db: Session, row: SpendCategory | None, form: FormData) -> st
         has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == row.id).first() is not None
         if has_child:
             return "این گروه زیردسته دارد و نمی‌تواند زیر گروه دیگری برود"
+    key = category_name_key(name)
+    same = db.query(SpendCategory).filter(SpendCategory.name_key == key)
+    same = same.filter(SpendCategory.parent_id.is_(None)) if parent_id is None else same.filter(SpendCategory.parent_id == parent_id)
+    if any(other.id != (row.id if row else None) for other in same.all()):
+        return "دسته‌ای با همین نام در همین گروه هست."
+    icon = _posted(form, "icon").strip()
+    if len(icon) > 16:
+        return "آیکن حداکثر ۱۶ نویسه است."
+    color = _posted(form, "color").strip()
+    if color and not CATEGORY_COLOR_RE.match(color):
+        return "رنگ را به شکل ‎#RRGGBB بنویسید."
+    archived_raw = _posted(form, "archived").strip() or "0"
+    if archived_raw not in ("0", "1"):
+        return "وضعیت نامعتبر است"
     sort_order, sort_error = _parse_int(_posted(form, "sort_order"), field="ترتیب")
     if sort_error:
         return sort_error
     if row is None:
-        db.add(
-            SpendCategory(
-                user_id=user_id,
-                parent_id=parent_id,
-                name=name,
-                slug=None,
-                is_seed=False,
-                sort_order=sort_order or 0,
-            )
-        )
-    else:
-        row.name = name
-        row.parent_id = parent_id
-        row.sort_order = sort_order or 0
+        row = SpendCategory(slug=None, is_seed=False)
+        db.add(row)
+    row.name = name
+    row.parent_id = parent_id
+    row.icon = icon or None
+    row.color = color or None
+    row.sort_order = sort_order or 0
+    row.archived = archived_raw == "1"
     return None
 
 
@@ -645,15 +651,13 @@ def delete_record(db: Session, slug: str, obj, actor_id: int) -> str | None:
             return USER_HAS_DATA_ERROR
         db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == obj.id).delete(synchronize_session=False)
         db.query(DailySpend).filter(DailySpend.user_id == obj.id).delete(synchronize_session=False)
-        db.query(SpendCategory).filter(
-            SpendCategory.user_id == obj.id, SpendCategory.parent_id.is_not(None)
-        ).delete(synchronize_session=False)
-        db.query(SpendCategory).filter(SpendCategory.user_id == obj.id).delete(synchronize_session=False)
     if slug == "spend-categories":
         has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == obj.id).first() is not None
         has_spend = db.query(DailySpend.id).filter(DailySpend.category_id == obj.id).first() is not None
         if has_child or has_spend:
-            return "این دسته خرج یا زیردسته دارد و حذف نمی‌شود."
+            return CATEGORY_IN_USE_ERROR
+        if obj.slug in SYSTEM_CATEGORY_SLUGS:
+            return "این دسته برای خرج‌های پیامکی لازم است و حذف نمی‌شود؛ می‌توانید بایگانی‌اش کنید."
     db.delete(obj)
     return None
 
@@ -722,8 +726,8 @@ async def admin_db_new(slug: str, request: Request, db: Session = Depends(get_db
 
 @router.post("/admin/db/{slug}/new")
 async def admin_db_create(slug: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)
@@ -783,8 +787,8 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
 
 @router.post("/admin/db/{slug}/{pk}")
 async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)
@@ -819,8 +823,8 @@ async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depe
 
 @router.post("/admin/db/{slug}/{pk}/delete")
 async def admin_db_delete(slug: str, pk: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)

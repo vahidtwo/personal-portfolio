@@ -67,7 +67,7 @@ def test_existing_category_with_exact_name_is_reused(client, no_network):
     client.get(DAILY)
     with SessionLocal() as db:
         parent = db.query(SpendCategory).filter(SpendCategory.slug == "bills").one()
-        mine = SpendCategory(user_id=parent.user_id, parent_id=parent.id, name="کارمزد", sort_order=9)
+        mine = SpendCategory(parent_id=parent.id, name="کارمزد", sort_order=9)
         db.add(mine)
         db.commit()
         mine_id = mine.id
@@ -119,7 +119,7 @@ def test_variant_names_are_reused(client, no_network, name):
     client.get(DAILY)
     with SessionLocal() as db:
         parent = db.query(SpendCategory).filter(SpendCategory.slug == "bills").one()
-        mine = SpendCategory(user_id=parent.user_id, parent_id=parent.id, name=name, sort_order=9)
+        mine = SpendCategory(parent_id=parent.id, name=name, sort_order=9)
         db.add(mine)
         db.commit()
         mine_id = mine.id

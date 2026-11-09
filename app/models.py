@@ -1,8 +1,9 @@
+import re
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship
+from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship, validates
 
 from app.db import Base
 from app.token_crypto import EncryptedToken
@@ -50,7 +51,6 @@ class User(Base):
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
     debts: Mapped[list["Debt"]] = relationship(back_populates="user")
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(back_populates="user")
-    spend_categories: Mapped[list["SpendCategory"]] = relationship(back_populates="user")
     daily_spends: Mapped[list["DailySpend"]] = relationship(back_populates="user")
     push_tokens: Mapped[list["PushDeviceToken"]] = relationship(back_populates="user")
     holdings: Mapped[dict[str, "Holding"]] = relationship(
@@ -168,22 +168,39 @@ class MonthlyExpense(Base):
 
 
 class SpendCategory(Base):
-    """Parent or subcategory for one-off daily spends. Seed rows stay; users may add more."""
+    """Global parent or subcategory for one-off daily spends, shared by every user; only admins change it.
+
+    Archived rows are hidden from pickers but old spends still show their name.
+    (COALESCE(parent_id, 0), name_key) is unique through an index created by the migration.
+    """
 
     __tablename__ = "spend_categories"
-    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_spend_category_user_slug"),)
+    __table_args__ = (UniqueConstraint("slug", name="uq_spend_categories_slug"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("spend_categories.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(64))
+    name_key: Mapped[str] = mapped_column(String(64), default="", server_default="")
     slug: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_seed: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    icon: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    user: Mapped[User] = relationship(back_populates="spend_categories")
     parent: Mapped["SpendCategory | None"] = relationship(remote_side="SpendCategory.id")
+
+    @validates("name")
+    def _keep_name_key(self, _key, value):
+        self.name_key = category_name_key(value)
+        return value
+
+
+def category_name_key(name: str | None) -> str:
+    """Matching key for category names: Arabic ي/ك as Persian ی/ک, no ZWNJ, spaces collapsed, case-folded."""
+    text = (name or "").replace("\u064a", "\u06cc").replace("\u0643", "\u06a9").replace("\u200c", "")
+    return re.sub(r"\s+", " ", text).strip().casefold()
 
 
 class DailySpend(Base):

@@ -7,9 +7,11 @@ import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
+import app.config as config
 from app.config import (
     FIREBASE_CLIENT_EMAIL,
     FIREBASE_PRIVATE_KEY,
@@ -158,12 +160,15 @@ def remove_device_token(db: Session, user: User, token: str) -> None:
 
 
 def service_worker_firebase_snippet() -> str:
+    """Prepended to /sw.js: the click owner first, then the Firebase SDK, before any other worker code."""
+    click = """// Registered before the Firebase SDK so this handler, not the SDK's, opens every push tap.
+self.addEventListener("notificationclick", onPushNotificationClick);
+"""
     cfg = firebase_web_config()
     if cfg is None:
-        return ""
+        return click
     cfg_json = json.dumps(cfg, ensure_ascii=False)
-    return f"""
-
+    return click + f"""
 // Firebase is optional here: if gstatic cannot load, offline caching must still work.
 let firebaseMessaging = null;
 try {{
@@ -174,18 +179,44 @@ try {{
 }} catch (err) {{
   firebaseMessaging = null;
 }}
-// The server sends data-only messages; a message with a notification part is shown by the SDK itself.
+// One display owner: a message with a notification part is shown by the SDK, so it is never shown here too.
 if (firebaseMessaging) firebaseMessaging.onBackgroundMessage(function (payload) {{
   if (payload.notification) return;
   return showPushNotification(payload.data || {{}});
 }});
-// Without the SDK (gstatic blocked), still show what arrives instead of a generic browser notice.
+// Without the SDK (gstatic blocked) nothing else shows the message: show it once here.
 if (!firebaseMessaging) self.addEventListener("push", function (event) {{
   let msg = {{}};
   try {{ msg = event.data ? event.data.json() : {{}}; }} catch (err) {{ msg = {{}}; }}
-  event.waitUntil(showPushNotification(msg.data || msg || {{}}));
+  event.waitUntil(showPushNotification(pushMessageData(msg)));
 }});
+
 """
+
+
+def push_link_base() -> str:
+    """Absolute https origin for web push links: PUBLIC_BASE_URL, else the main public host."""
+    base = (config.PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if not base.startswith("https://"):
+        base = config.MOVE_NEW_URL.rstrip("/")
+    return base
+
+
+def push_app_hosts() -> list[str]:
+    """Hosts this app answers on (the public host, the main host, the old host kept for older installs)."""
+    hosts: list[str] = []
+    for url in (push_link_base(), config.MOVE_NEW_URL, "https://" + config.MOVE_NOTICE_OLD_HOST):
+        host = urlsplit(url).netloc.lower()
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+def push_link(path: str | None) -> str:
+    p = (path or "").strip()
+    if not p.startswith("/") or p.startswith("//") or "\\" in p or any(c.isspace() for c in p):
+        p = "/dashboard"
+    return push_link_base() + p
 
 
 PLATFORMS = ("web", "android")
@@ -211,8 +242,11 @@ def _push_data(title: str, body: str, data: dict[str, str] | None) -> dict[str, 
     return out
 
 
+WEB_ICON = "/static/icons/icon-192.png"
+
+
 def build_message(token: str, platform: str, *, title: str, body: str, data: dict[str, str] | None):
-    """Data-only message: the Android app and the web worker show it themselves (same text, tap target)."""
+    """Android: data-only, the app shows it. Web: a webpush notification the Firebase SDK shows, plus a link."""
     from firebase_admin import messaging
 
     payload = _push_data(title, body, data)
@@ -225,7 +259,16 @@ def build_message(token: str, platform: str, *, title: str, body: str, data: dic
     return messaging.Message(
         token=token,
         data=payload,
-        webpush=messaging.WebpushConfig(headers={"Urgency": "high", "TTL": str(24 * 60 * 60)}),
+        webpush=messaging.WebpushConfig(
+            headers={"Urgency": "high", "TTL": str(24 * 60 * 60)},
+            notification=messaging.WebpushNotification(
+                title=title,
+                body=body,
+                icon=WEB_ICON,
+                tag=payload.get("type") or None,
+            ),
+            fcm_options=messaging.WebpushFCMOptions(link=push_link(payload.get("url"))),
+        ),
     )
 
 

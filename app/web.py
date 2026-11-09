@@ -125,7 +125,7 @@ def render(request: Request, name: str, db: Session, **context) -> HTMLResponse:
             # Domain-move notice: server-side host check (the JS checks the host again and never runs in the app).
             "move_notice": (request.url.hostname or "").lower() == _config.MOVE_NOTICE_OLD_HOST,
             "move_new_url": _config.MOVE_NEW_URL,
-            "firebase_web_config_json": json.dumps(push_cfg, ensure_ascii=False) if push_cfg else "",
+            "firebase_web_config": push_cfg or {},
         }
     )
     collect = getattr(request.state, "amounts_collect", None)

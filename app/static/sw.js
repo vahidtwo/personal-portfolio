@@ -493,14 +493,44 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Push (Firebase data-only messages): title, body and a same-origin path to open on tap.
+// Push: title, body and a same-origin path to open on tap.
 const PUSH_DEFAULT_TITLE = "دارایی‌تو";
 const PUSH_DEFAULT_PATH = "/dashboard";
+// This app's public hosts: a link to one of them opens the same path on the host this worker serves.
+const PUSH_APP_HOSTS = "__PUSH_APP_HOSTS__".split(",").filter(Boolean);
 
 function pushTargetPath(raw) {
   const p = typeof raw === "string" ? raw.trim() : "";
   if (!p.startsWith("/") || p.startsWith("//") || p.includes("\\") || /\s/.test(p)) return PUSH_DEFAULT_PATH;
   return p;
+}
+
+// Path of an absolute or relative link, only when it points at this app; otherwise null.
+function pushLinkPath(link) {
+  if (typeof link !== "string" || !link.trim()) return null;
+  let url;
+  try {
+    url = new URL(link.trim(), self.location.origin);
+  } catch (e) {
+    return null;
+  }
+  const own = url.origin === self.location.origin;
+  if (!own && !(url.protocol === "https:" && PUSH_APP_HOSTS.includes(url.host))) return null;
+  return pushTargetPath(url.pathname + url.search + url.hash);
+}
+
+// The payload as sent (FCM: {data, notification}) or already flat; title/body/url/type for display.
+function pushMessageData(msg) {
+  const m = msg || {};
+  const data = m.data && typeof m.data === "object" ? m.data : m;
+  const note = m.notification && typeof m.notification === "object" ? m.notification : {};
+  const link = m.fcmOptions && m.fcmOptions.link;
+  return {
+    title: note.title || data.title,
+    body: note.body || data.body,
+    url: data.url || pushLinkPath(link) || undefined,
+    type: data.type,
+  };
 }
 
 function showPushNotification(data) {
@@ -514,21 +544,41 @@ function showPushNotification(data) {
   });
 }
 
-self.addEventListener("notificationclick", (event) => {
+// Where a tap goes: the SDK's notification (FCM_MSG: link, then data.url) or ours (data.url); else the dashboard.
+function pushClickPath(data) {
+  const d = data || {};
+  const fcm = d.FCM_MSG;
+  if (fcm && typeof fcm === "object") {
+    const link = (fcm.fcmOptions && fcm.fcmOptions.link) || (fcm.notification && fcm.notification.click_action);
+    const fromLink = pushLinkPath(link);
+    if (fromLink) return fromLink;
+    if (fcm.data && fcm.data.url) return pushTargetPath(fcm.data.url);
+    return PUSH_DEFAULT_PATH;
+  }
+  return pushTargetPath(d.url);
+}
+
+async function openPushTarget(target) {
+  const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of all) {
+    if (new URL(client.url).origin !== self.location.origin) continue;
+    try {
+      const focused = await client.focus();
+      if (client.url === target) return focused || client;
+      if ("navigate" in client) {
+        const moved = await client.navigate(target);
+        if (moved) return moved;
+      }
+    } catch (e) {}
+  }
+  return self.clients.openWindow(target);
+}
+
+// Owns every push tap (registered before the Firebase SDK, which would skip other hosts and not navigate).
+function onPushNotificationClick(event) {
   const data = (event.notification && event.notification.data) || {};
-  if (data.FCM_MSG) return;
-  event.notification.close();
-  const target = new URL(pushTargetPath(data.url), self.location.origin).href;
-  event.waitUntil((async () => {
-    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of all) {
-      if (new URL(client.url).origin !== self.location.origin) continue;
-      try {
-        await client.focus();
-        if (client.url !== target && "navigate" in client) await client.navigate(target);
-        return;
-      } catch (e) {}
-    }
-    await self.clients.openWindow(target);
-  })());
-});
+  if (data.FCM_MSG && typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+  if (event.notification) event.notification.close();
+  const target = new URL(pushClickPath(data), self.location.origin).href;
+  event.waitUntil(openPushTarget(target));
+}

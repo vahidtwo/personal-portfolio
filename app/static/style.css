@@ -1515,6 +1515,7 @@ html[data-show-salary="1"] [data-mask="salary"]::after {
 }
 .toast-ok { background: var(--success-bg); color: var(--success); }
 .toast-warn { background: var(--warn-bg); color: var(--warn); }
+.push-code { display: block; margin-top: 4px; font-size: 0.75em; opacity: 0.8; font-family: ui-monospace, monospace; unicode-bidi: isolate; overflow-wrap: anywhere; }
 
 .auth-card {
   width: min(440px, 100%);

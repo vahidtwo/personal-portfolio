@@ -119,44 +119,21 @@ JALALI_MONTHS = (
 )
 
 
-def ensure_spend_categories(db: Session, user: User) -> None:
-    existing = {
-        row.slug: row
-        for row in db.query(SpendCategory).filter(SpendCategory.user_id == user.id).all()
-        if row.slug
-    }
-    changed = False
+def ensure_spend_categories(db: Session, user: User | None = None) -> None:
+    """Categories are global: the default tree is added once, only when there are no categories at all."""
+    if db.query(SpendCategory.id).first() is not None:
+        return
     for parent_index, (parent_slug, parent_name, children) in enumerate(DAILY_SPEND_TREE):
-        parent = existing.get(parent_slug)
-        if parent is None:
-            parent = SpendCategory(
-                user_id=user.id,
-                parent_id=None,
-                name=parent_name,
-                slug=parent_slug,
-                is_seed=True,
-                sort_order=parent_index,
-            )
-            db.add(parent)
-            db.flush()
-            existing[parent_slug] = parent
-            changed = True
+        parent = SpendCategory(parent_id=None, name=parent_name, slug=parent_slug, is_seed=True, sort_order=parent_index)
+        db.add(parent)
+        db.flush()
         for child_index, (child_slug, child_name) in enumerate(children):
-            if child_slug in existing:
-                continue
             db.add(
                 SpendCategory(
-                    user_id=user.id,
-                    parent_id=parent.id,
-                    name=child_name,
-                    slug=child_slug,
-                    is_seed=True,
-                    sort_order=child_index,
+                    parent_id=parent.id, name=child_name, slug=child_slug, is_seed=True, sort_order=child_index
                 )
             )
-            changed = True
-    if changed:
-        db.commit()
+    db.commit()
 
 
 def shift_jalali_month(year: int, month: int, delta: int) -> tuple[int, int]:
@@ -180,21 +157,34 @@ def jalali_month_bounds(year: int, month: int) -> tuple[date, date]:
 
 
 def _color_for(parent: SpendCategory, index: int) -> str:
+    if parent.color:
+        return parent.color
     if parent.slug and parent.slug in PARENT_COLORS:
         return PARENT_COLORS[parent.slug]
     return _EXTRA_COLORS[index % len(_EXTRA_COLORS)]
 
 
-def categories_for_user(db: Session, user: User) -> tuple[list[SpendCategory], list[SpendCategory]]:
+def categories_for_user(db: Session, user: User | None = None) -> tuple[list[SpendCategory], list[SpendCategory]]:
+    """Every global category, archived ones included, so old spends keep their names."""
     rows = (
         db.query(SpendCategory)
-        .filter(SpendCategory.user_id == user.id)
         .order_by(SpendCategory.sort_order.asc(), SpendCategory.id.asc())
         .all()
     )
     parents = [row for row in rows if row.parent_id is None]
     children = [row for row in rows if row.parent_id is not None]
     return parents, children
+
+
+def picker_categories(
+    parents: list[SpendCategory], children: list[SpendCategory], keep_id: int | None = None
+) -> tuple[list[SpendCategory], list[SpendCategory]]:
+    """Pickers hide archived categories; keep_id (the spend being edited) stays selectable with its parent."""
+    keep_parent = next((c.parent_id for c in children if c.id == keep_id), None)
+    active_parents = {p.id for p in parents if not p.archived}
+    shown_children = [c for c in children if c.id == keep_id or (not c.archived and c.parent_id in active_parents)]
+    shown_parents = [p for p in parents if p.id in active_parents or p.id == keep_parent]
+    return shown_parents, shown_children
 
 
 def month_chart(db: Session, user: User, year: int, month: int) -> tuple[list[dict], Decimal]:

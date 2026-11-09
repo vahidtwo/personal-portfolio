@@ -24,10 +24,10 @@ def _seed(client, monkeypatch):
              for n in ("boss", "boss2", "alice", "bob", "carol")}
     db.add_all(users.values()); db.commit()
     now = datetime.now(timezone.utc)
+    parent = SpendCategory(name="p", is_seed=True); db.add(parent); db.flush()
+    child = SpendCategory(name="c", parent_id=parent.id); db.add(child); db.flush()
     for n in ("alice", "bob"):
         uid = users[n].id
-        parent = SpendCategory(user_id=uid, name="p", is_seed=True); db.add(parent); db.flush()
-        child = SpendCategory(user_id=uid, name="c", parent_id=parent.id); db.add(child); db.flush()
         db.add_all([
             PortfolioSnapshot(user_id=uid, taken_at=now, total_toman=Decimal("5"), breakdown_json="{}"),
             Holding(user_id=uid, asset_key="btc", quantity=Decimal("0.5"), updated_at=now),
@@ -92,10 +92,12 @@ def test_batch_delete_happy_path_counts_backup_audit(client, monkeypatch):
                  "daily_spends": 0, "push_device_tokens": 0, "spend_categories": 0,
                  "due_reminders": 0}
     for c in shown.values():
+        assert not any(k.startswith("spend_categories") for k in c)
         for k, v in c.items():
-            per_table["spend_categories" if k.startswith("spend_categories") else k] += v
+            per_table[k] += v
     for t, n in per_table.items():
         assert before[t] - after[t] == n, t
+    assert after["spend_categories"] == before["spend_categories"]  # global categories stay
     assert before["users"] - after["users"] == 2
     from app.user_delete import backup_dir
     assert (backup_dir() / backup).exists()
@@ -196,7 +198,7 @@ def test_restore_one_user_from_backup_brings_back_all_rows(client, monkeypatch):
     _, expected, backup = _confirm(client, [uid])
     from app.user_delete import backup_dir
     tables = ("portfolio_snapshots", "holdings", "debts", "monthly_expenses", "daily_spends",
-              "push_device_tokens", "spend_categories")
+              "push_device_tokens")
     live = sqlite3.connect(_db_path())
     orig = {t: sorted(live.execute(f"select * from {t} where user_id=?", (uid,)).fetchall()) for t in tables}
     orig_user = live.execute("select * from users where id=?", (uid,)).fetchall()
@@ -207,7 +209,6 @@ def test_restore_one_user_from_backup_brings_back_all_rows(client, monkeypatch):
     live = sqlite3.connect(_db_path())
     live.execute("ATTACH DATABASE ? AS bk", (str(backup_dir() / backup),))
     live.execute("INSERT INTO users SELECT * FROM bk.users WHERE id=?", (uid,))
-    live.execute("INSERT INTO spend_categories SELECT * FROM bk.spend_categories WHERE user_id=? AND parent_id IS NULL", (uid,))
     for t in tables:
         live.execute(f"INSERT OR IGNORE INTO {t} SELECT * FROM bk.{t} WHERE user_id=?", (uid,))
     live.commit()

@@ -78,8 +78,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `ENABLE_INTERNAL_SCHEDULER` | `1` | Set `0` if you run `scripts/create_snapshot.py` via cron instead |
 | `ADMIN_USERNAMES` | *(empty)* | Comma-separated usernames that can open `/admin` (user list + market prices) |
 | `FIREBASE_*` (client) | *(empty)* | Web push: `FIREBASE_API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `MESSAGING_SENDER_ID`, `APP_ID`, `VAPID_KEY` |
-| `FIREBASE_ANDROID_APP_ID` | *(empty)* | Android push: App ID of the `app.myinventory` Android app in the same Firebase project (`1:<sender>:android:<hex>`). The app reads it from `/api/push/config`; the APK has no `google-services.json` |
-| `FIREBASE_ANDROID_API_KEY` | *(empty)* | Optional Android API key (`current_key` in that app's `google-services.json`); defaults to `FIREBASE_API_KEY` |
+| `FIREBASE_ANDROID_APP_ID` | *(empty)* | Optional override. When empty, the server finds the `app.myinventory` Android app with the service account (Firebase Management API; creates it if missing) in the background and caches it in `DATA_DIR/firebase_android.json`. The app reads it from `/api/push/config`; the APK has no `google-services.json` |
+| `FIREBASE_ANDROID_API_KEY` | *(empty)* | Optional Android API key. When empty: the key from the Android app's config (Management API), else `FIREBASE_API_KEY` |
 | `FIREBASE_CLIENT_EMAIL` | *(empty)* | **Server only** — FCM Admin service account email |
 | `FIREBASE_PRIVATE_KEY` | *(empty)* | **Server only** — PEM on one line; use `\n` for newlines |
 | `FIREBASE_PRIVATE_KEY_ID` | *(empty)* | Optional service account key id |

@@ -75,7 +75,8 @@
   <script src="/static/android-bridge.js?v={{ static_v }}" defer></script>
   {% if user and move_notice %}<script src="/static/move-notice.js?v={{ static_v }}" defer></script>{% endif %}
   {% if user and push_enabled %}
-  <script id="firebase-config" type="application/json">{{ firebase_web_config_json }}</script>
+  {# tojson, not autoescape: script text is not entity-decoded, so &#34; would break JSON.parse. #}
+  <script id="firebase-config" type="application/json">{{ firebase_web_config|tojson }}</script>
   <script src="/static/push.js?v={{ static_v }}" defer></script>
   {% endif %}
   <script src="/static/pwa.js?v={{ static_v }}" defer></script>

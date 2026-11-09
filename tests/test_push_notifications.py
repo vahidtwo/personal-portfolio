@@ -241,7 +241,7 @@ def test_due_reminder_sender_still_returns_a_count(client, monkeypatch):
 
 def test_service_worker_shows_data_messages_and_opens_same_origin_path(web_push):
     sw = web_push.get("/sw.js").text
-    assert 'addEventListener("notificationclick"' in sw
+    assert 'addEventListener("notificationclick", onPushNotificationClick)' in sw
     assert "function showPushNotification" in sw and "pushTargetPath" in sw
     assert "if (payload.notification) return;" in sw
     assert 'if (!firebaseMessaging) self.addEventListener("push"' in sw

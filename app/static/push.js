@@ -1,12 +1,15 @@
 (function () {
   var configEl = document.getElementById("firebase-config");
-  if (!configEl || !configEl.textContent) return;
+  if (!configEl) return;
 
-  var firebaseConfig;
+  // A broken config must not stop the buttons from working: they report it instead.
+  var firebaseConfig = null;
+  var configError = "";
   try {
-    firebaseConfig = JSON.parse(configEl.textContent);
+    firebaseConfig = JSON.parse(configEl.textContent || "");
+    if (!firebaseConfig || typeof firebaseConfig !== "object" || !firebaseConfig.apiKey) configError = "config-missing";
   } catch (e) {
-    return;
+    configError = "config-parse";
   }
 
   var DEFAULT_TITLE = "دارایی‌تو";
@@ -37,13 +40,35 @@
     });
   }
 
-  function setStatus(text, isError) {
+  function setStatus(text, isError, code) {
     var el = document.getElementById("push-status");
     if (!el) return;
     el.textContent = text;
+    if (code) {
+      el.appendChild(document.createTextNode(" "));
+      var small = document.createElement("small");
+      small.className = "push-code";
+      small.dir = "ltr";
+      small.textContent = code;
+      el.appendChild(small);
+    }
     el.hidden = !text;
     el.classList.toggle("toast-warn", !!isError);
     el.classList.toggle("toast-ok", !isError && !!text);
+  }
+
+  function stepError(step, detail) {
+    var err = new Error(step);
+    err.step = step;
+    err.detail = String(detail || "");
+    return err;
+  }
+
+  function errDetail(err) {
+    if (!err) return "";
+    var code = String(err.code || err.name || "");
+    var msg = String(err.message || "");
+    return code && msg && code !== msg ? code + ": " + msg : code || msg;
   }
 
   function postJson(url, body) {
@@ -53,7 +78,13 @@
       credentials: "same-origin",
       body: JSON.stringify(body),
     }).then(function (response) {
-      return response.json().catch(function () { return { ok: false, error: "http-" + response.status }; });
+      return response.json().then(
+        function (data) {
+          if (data && typeof data === "object" && !data.ok && !data.status) data.status = response.status;
+          return data;
+        },
+        function () { return { ok: false, error: "http-" + response.status, status: response.status }; }
+      );
     });
   }
 
@@ -67,34 +98,85 @@
     return String(n).replace(/[0-9]/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[d]; });
   }
 
+  var REGISTER_ERROR_TEXT = {
+    origin: "سرور درخواست ثبت را از این آدرس نپذیرفت. سایت را از آدرس اصلی باز کنید.",
+    login: "نشست شما تمام شده است. دوباره وارد شوید.",
+    invalid: "سرور درخواست ثبت را نفهمید. صفحه را تازه کنید.",
+    token: "توکن اعلان نامعتبر بود. دوباره امتحان کنید.",
+  };
+
   function webErrorText(err) {
-    var code = String((err && (err.code || err.name)) || "");
-    var msg = String((err && err.message) || "");
-    if (code.indexOf("permission-blocked") >= 0 || code.indexOf("permission-default") >= 0) {
-      return "اجازهٔ اعلان در مرورگر بسته است. از تنظیمات سایت در مرورگر آن را باز کنید.";
+    var step = (err && err.step) || "";
+    var detail = (err && err.detail) || errDetail(err);
+    if (step === "config-parse" || step === "config-missing") {
+      return ["پیکربندی اعلان در این صفحه خراب است. صفحه را تازه کنید.", step];
     }
-    if (msg === "sdk-load") return "کتابخانهٔ اعلان (gstatic.com) بار نشد. اتصال اینترنت یا فیلترشکن را بررسی کنید.";
-    if (msg === "push-unsupported") return "این مرورگر از اعلان پشتیبانی نمی‌کند.";
-    if (code === "AbortError" || /push service|token-subscribe|installations/i.test(code + " " + msg)) {
-      return "سرویس اعلان گوگل در دسترس نیست (" + (code || msg) + "). با فیلترشکن یا شبکهٔ دیگر دوباره امتحان کنید.";
+    if (step === "unsupported") return ["این مرورگر از اعلان پشتیبانی نمی‌کند.", "push-unsupported"];
+    if (step === "insecure") return ["اعلان مرورگر فقط روی HTTPS کار می‌کند.", "insecure-context"];
+    if (step === "permission") {
+      return ["اجازهٔ اعلان داده نشد. از تنظیمات سایت در مرورگر آن را باز کنید.", "permission-" + detail];
     }
-    return "فعال‌سازی اعلان ممکن نشد (" + (code || msg || "unknown") + ")";
+    if (step === "sdk-load") {
+      return ["کتابخانهٔ اعلان (gstatic.com) بار نشد. اتصال اینترنت یا فیلترشکن را بررسی کنید.", "sdk-load " + detail];
+    }
+    if (step === "config-fetch") return ["تنظیمات اعلان از سرور گرفته نشد.", "config-fetch " + detail];
+    if (step === "config-disabled") return ["اعلان مرورگر روی سرور تنظیم نشده است.", "config-disabled"];
+    if (step === "sw-register") return ["سرویس‌ورکر سایت ثبت نشد. صفحه را تازه کنید.", "sw-register " + detail];
+    if (step === "sw-ready") return ["سرویس‌ورکر سایت فعال نشد. صفحه را تازه کنید.", "sw-ready " + detail];
+    if (step === "token") {
+      if (/permission-blocked|permission-default/.test(detail)) {
+        return ["اجازهٔ اعلان در مرورگر بسته است. از تنظیمات سایت در مرورگر آن را باز کنید.", "token " + detail];
+      }
+      if (/AbortError|push service|token-subscribe|installations|token-unsubscribe/i.test(detail)) {
+        return ["سرویس اعلان گوگل توکن نداد. با فیلترشکن یا شبکهٔ دیگر دوباره امتحان کنید.", "token " + detail];
+      }
+      return ["توکن اعلان از گوگل گرفته نشد.", "token " + detail];
+    }
+    if (step === "token-empty") return ["گوگل توکن خالی برگرداند. دوباره امتحان کنید.", "token-empty"];
+    if (step === "register-network") return ["اتصال به سرور برای ثبت دستگاه قطع شد.", "register " + detail];
+    if (step === "register") {
+      var code = detail.split(" ")[0];
+      return [REGISTER_ERROR_TEXT[code] || "ثبت این مرورگر روی سرور ناموفق بود.", "register " + detail];
+    }
+    return ["فعال‌سازی اعلان ممکن نشد.", detail || "unknown"];
+  }
+
+  function withTimeout(promise, ms, step) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(stepError(step, "timeout")); }, ms);
+      promise.then(
+        function (v) { clearTimeout(timer); resolve(v); },
+        function (e) { clearTimeout(timer); reject(e); }
+      );
+    });
   }
 
   function initMessaging() {
+    if (configError) return Promise.reject(stepError(configError));
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      return Promise.reject(new Error("push-unsupported"));
+      return Promise.reject(stepError("unsupported"));
     }
+    if (window.isSecureContext === false) return Promise.reject(stepError("insecure"));
+    var messaging;
+    var cfg;
     return loadScript(SDK + "firebase-app-compat.js")
       .then(function () { return loadScript(SDK + "firebase-messaging-compat.js"); })
+      .then(null, function () { throw stepError("sdk-load", "gstatic"); })
       .then(function () {
-        if (!window.firebase) throw new Error("sdk-load");
+        if (!window.firebase || typeof firebase.messaging !== "function") throw stepError("sdk-load", "no-firebase");
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        return fetch("/api/push/config").then(function (r) { return r.json(); });
+        return fetch("/api/push/config", { credentials: "same-origin", cache: "no-store" }).then(
+          function (r) {
+            if (!r.ok) throw stepError("config-fetch", "http-" + r.status);
+            return r.json();
+          },
+          function (e) { throw stepError("config-fetch", errDetail(e)); }
+        );
       })
-      .then(function (cfg) {
-        if (!cfg.enabled) return null;
-        var messaging = firebase.messaging();
+      .then(function (c) {
+        cfg = c || {};
+        if (!cfg.enabled) throw stepError("config-disabled");
+        messaging = firebase.messaging();
         messaging.onMessage(function (payload) {
           var data = payload.data || {};
           var note = payload.notification || {};
@@ -113,45 +195,64 @@
           }
           setStatus(body || title, false);
         });
-        return navigator.serviceWorker
-          .register("/sw.js", { updateViaCache: "none" })
-          .then(function () { return navigator.serviceWorker.ready; })
-          .then(function (registration) {
-            var options = { serviceWorkerRegistration: registration };
-            if (cfg.vapidKey) options.vapidKey = cfg.vapidKey;
-            return messaging.getToken(options);
-          })
-          .then(function (token) {
-            if (!token) return null;
-            return postJson("/api/push/register", { token: token, platform: "web" }).then(function (res) {
-              if (!res || !res.ok) throw new Error("register-" + ((res && res.error) || "failed"));
-              return token;
-            });
-          });
+        return navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(null, function (e) {
+          throw stepError("sw-register", errDetail(e));
+        });
+      })
+      .then(function () { return withTimeout(navigator.serviceWorker.ready, 15000, "sw-ready"); })
+      .then(function (registration) {
+        var options = { serviceWorkerRegistration: registration };
+        if (cfg.vapidKey) options.vapidKey = cfg.vapidKey;
+        return messaging.getToken(options).then(null, function (e) { throw stepError("token", errDetail(e)); });
+      })
+      .then(function (token) {
+        if (!token) throw stepError("token-empty");
+        return postJson("/api/push/register", { token: token, platform: "web" }).then(
+          function (res) {
+            if (!res || !res.ok) {
+              throw stepError("register", ((res && res.error) || "failed") + " " + ((res && res.status) || ""));
+            }
+            return token;
+          },
+          function (e) {
+            if (e && e.step) throw e;
+            throw stepError("register-network", errDetail(e));
+          }
+        );
       });
   }
 
+  function showWebError(err) {
+    if (window.console) console.error("push enable failed", (err && err.step) || "", (err && err.detail) || err);
+    var t = webErrorText(err);
+    setStatus(t[0], true, t[1].trim());
+  }
+
   function enableWeb() {
+    if (configError) {
+      showWebError(stepError(configError));
+      return;
+    }
     if (!("Notification" in window)) {
-      setStatus("این مرورگر از اعلان پشتیبانی نمی‌کند.", true);
+      showWebError(stepError("unsupported"));
       return;
     }
     setStatus("در حال فعال‌سازی…", false);
-    Notification.requestPermission().then(function (perm) {
-      if (perm !== "granted") {
-        setStatus("اجازهٔ اعلان داده نشد. از تنظیمات سایت در مرورگر آن را باز کنید.", true);
-        return;
-      }
-      initMessaging()
-        .then(function (token) {
-          if (token) setStatus("اعلان‌های این مرورگر فعال شد. «ارسال اعلان آزمایشی» را بزنید.", false);
-          else setStatus("توکن اعلان دریافت نشد. دوباره امتحان کنید.", true);
-        })
-        .catch(function (err) {
-          if (window.console) console.error("push init failed", err);
-          setStatus(webErrorText(err), true);
-        });
-    });
+    var asked;
+    try {
+      asked = Promise.resolve(Notification.requestPermission());
+    } catch (e) {
+      asked = Promise.reject(e);
+    }
+    asked
+      .then(function (perm) {
+        if (perm !== "granted") throw stepError("permission", perm || "default");
+        return initMessaging();
+      }, function (e) { throw stepError("permission", errDetail(e)); })
+      .then(function () {
+        setStatus("اعلان‌های این مرورگر فعال شد. «ارسال اعلان آزمایشی» را بزنید.", false);
+      })
+      .catch(showWebError);
   }
 
   var APP_STATE_TEXT = {
@@ -258,9 +359,10 @@
       .catch(function () {});
   }
 
-  if (!inApp && typeof Notification !== "undefined" && Notification.permission === "granted" && "serviceWorker" in navigator) {
+  if (!inApp && !configError && typeof Notification !== "undefined" && Notification.permission === "granted" && "serviceWorker" in navigator) {
     initMessaging().catch(function (err) {
-      if (window.console) console.warn("push refresh failed", err);
+      if (window.console) console.warn("push refresh failed", (err && err.step) || "", (err && err.detail) || err);
+      if (document.getElementById("push-settings")) showWebError(err);
     });
   }
 })();

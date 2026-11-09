@@ -10,6 +10,15 @@
   }
 
   var DEFAULT_TITLE = "دارایی‌تو";
+  var DEFAULT_PATH = "/dashboard";
+
+  // Same rule as sw.js: only this site's own paths; anything else opens the dashboard.
+  function pushTargetPath(raw) {
+    var p = typeof raw === "string" ? raw.trim() : "";
+    if (p.indexOf("/") !== 0 || p.indexOf("//") === 0 || p.indexOf("\\") >= 0 || /\s/.test(p)) return DEFAULT_PATH;
+    return p;
+  }
+
   var SDK = "https://www.gstatic.com/firebasejs/11.6.0/";
   var bridge = window.AndroidBridge;
   var inApp = !!(bridge && typeof bridge.isAndroidApp === "function");
@@ -92,7 +101,15 @@
           var title = note.title || data.title || DEFAULT_TITLE;
           var body = note.body || data.body || "";
           if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            try { new Notification(title, { body: body, icon: "/static/icons/icon-192.png" }); } catch (e) {}
+            var url = pushTargetPath(data.url);
+            try {
+              var shown = new Notification(title, { body: body, icon: "/static/icons/icon-192.png", data: { url: url } });
+              shown.onclick = function () {
+                shown.close();
+                window.focus();
+                window.location.assign(new URL(url, window.location.origin).href);
+              };
+            } catch (e) {}
           }
           setStatus(body || title, false);
         });

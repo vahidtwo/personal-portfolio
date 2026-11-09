@@ -268,3 +268,49 @@ def test_release_json_matches_gradle_version():
     rel = json.loads((ROOT / "app" / "android_release.json").read_text(encoding="utf-8"))
     gradle = (ROOT / "android" / "app" / "build.gradle.kts").read_text(encoding="utf-8")
     assert f'?.toInt() ?: {rel["versionCode"]}' in gradle and f'?: "{rel["versionName"]}"' in gradle
+
+
+def _js_function(src: str, name: str) -> str:
+    start = src.index(f"function {name}(")
+    depth, i = 0, src.index("{", start)
+    while True:
+        depth += {"{": 1, "}": -1}.get(src[i], 0)
+        i += 1
+        if depth == 0:
+            return src[start:i]
+
+
+def test_foreground_notification_opens_its_own_path_on_click():
+    js = (ROOT / "app" / "static" / "push.js").read_text(encoding="utf-8")
+    on_message = js[js.index("messaging.onMessage("):js.index("return navigator.serviceWorker")]
+    assert "var url = pushTargetPath(data.url);" in on_message
+    assert "data: { url: url }" in on_message
+    assert "shown.onclick = function" in on_message
+    assert "window.location.assign(new URL(url, window.location.origin).href)" in on_message
+
+
+def test_foreground_and_worker_use_the_same_path_rule():
+    import shutil
+    import subprocess
+
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    page = _js_function((ROOT / "app" / "static" / "push.js").read_text(encoding="utf-8"), "pushTargetPath")
+    worker = _js_function((ROOT / "app" / "static" / "sw.js").read_text(encoding="utf-8"), "pushTargetPath")
+    cases = ["/dashboard?tab=debts", "/profile#push-settings", "https://evil.example/x", "//evil.example/x",
+             "/\\\\evil.example", "javascript:alert(1)", "/a b", "", None, 42]
+    code = (
+        "const cases = JSON.parse(process.argv[1]);"
+        "const page = (function(){ var DEFAULT_PATH = '/dashboard';" + page + " return pushTargetPath; })();"
+        "const worker = (function(){ const PUSH_DEFAULT_PATH = '/dashboard';" + worker + " return pushTargetPath; })();"
+        "console.log(JSON.stringify([cases.map(page), cases.map(worker)]));"
+    )
+    out = subprocess.run(["node", "-e", code, json.dumps(cases)], capture_output=True, text=True, check=True).stdout
+    page_out, worker_out = json.loads(out)
+    assert page_out == worker_out
+    assert page_out == ["/dashboard?tab=debts", "/profile#push-settings"] + ["/dashboard"] * 8
+
+
+def test_register_endpoints_explain_why_no_csrf():
+    src = (ROOT / "app" / "push_routes.py").read_text(encoding="utf-8")
+    assert src.count("# No CSRF token: the Android app posts JSON without one; the same-origin check guards") == 2

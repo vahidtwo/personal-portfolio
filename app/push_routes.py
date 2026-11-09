@@ -58,6 +58,7 @@ async def _json_body(request: Request) -> dict | None:
 
 @router.post("/api/push/register")
 async def push_register(request: Request, db: Session = Depends(get_db)):
+    # No CSRF token: the Android app posts JSON without one; the same-origin check guards this endpoint.
     if not same_origin(request):
         return _json({"ok": False, "error": "origin"}, 403)
     user = get_current_user(request, db)
@@ -77,6 +78,7 @@ async def push_register(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/api/push/unregister")
 async def push_unregister(request: Request, db: Session = Depends(get_db)):
+    # No CSRF token: the Android app posts JSON without one; the same-origin check guards this endpoint.
     if not same_origin(request):
         return _json({"ok": False, "error": "origin"}, 403)
     user = get_current_user(request, db)

@@ -70,7 +70,7 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": toman_raw, "due_day": "۵", "csrf": _csrf(client)})
     client.get("/dashboard?tab=daily")
     db, alice = _alice()
-    child = db.query(SpendCategory).filter(SpendCategory.user_id == alice.id, SpendCategory.parent_id.is_not(None)).first()
+    child = db.query(SpendCategory).filter(SpendCategory.parent_id.is_not(None)).order_by(SpendCategory.id).first()
     parent_id, child_id = child.parent_id, child.id
     db.close()
     # Spends are whole toman (spending v2 spec): a decimal amount is rejected at the field, not rounded.

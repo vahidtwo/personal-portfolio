@@ -11,9 +11,12 @@ Usage (inside the container, or anywhere with access to the DB file):
 What it does, in ONE transaction (BEGIN IMMEDIATE; all or nothing):
 - refuses if the user id OR username already exists in the live DB
 - copies the users row with its original id
-- copies spend_categories (parents first, then children), then every other table
-  in the backup that has a user_id column (holdings, snapshots, debts, monthly
-  expenses, daily spends, push tokens, ...), keeping original ids
+- copies every table in the backup that has a user_id column (holdings, snapshots,
+  debts, monthly expenses, daily spends, push tokens, ...), keeping original ids
+- categories are global in the live DB: each category the user's spends use is matched
+  to a live category (same slug, else same parent and name) and the spends are pointed
+  to it; a category with no match is added to the global list. An older backup with
+  per-user categories works the same way.
 - only columns present in both DBs are copied; aborts if any row id already exists
 - runs PRAGMA foreign_key_check and integrity_check before COMMIT
 Take a fresh backup of the live DB before running it on prod.
@@ -36,6 +39,64 @@ def _user_tables(conn: sqlite3.Connection, schema: str) -> list[str]:
 
 def _cols(conn, schema, table):
     return [r[1] for r in conn.execute(f'PRAGMA {schema}.table_info("{table}")')]
+
+
+def _name_key(name):
+    text = (name or "").replace("\u064a", "\u06cc").replace("\u0643", "\u06a9").replace("\u200c", "")
+    return " ".join(text.split()).casefold()
+
+
+def _live_category(conn, slug, name, parent_id):
+    if slug:
+        row = conn.execute("SELECT id FROM main.spend_categories WHERE slug=?", (slug,)).fetchone()
+        if row:
+            return row[0]
+    key = _name_key(name)
+    for cid, other in conn.execute(
+            "SELECT id, name FROM main.spend_categories WHERE parent_id IS ? ORDER BY archived, id", (parent_id,)):
+        if _name_key(other) == key:
+            return cid
+    taken = slug and conn.execute("SELECT 1 FROM main.spend_categories WHERE slug=?", (slug,)).fetchone()
+    conn.execute(
+        "INSERT INTO main.spend_categories (parent_id, name, name_key, slug, is_seed, sort_order, archived, created_at) "
+        "VALUES (?, ?, ?, ?, 0, 0, 0, datetime('now'))",
+        (parent_id, name, key, None if taken else slug))
+    return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+
+def _map_categories(conn, user_id, done) -> dict[int, int]:
+    """backup category id -> live global category id, for every category the user's backup spends use."""
+    if "user_id" in _cols(conn, "main", "spend_categories"):
+        raise SystemExit("live DB still has per-user categories; run the app migrations first")
+    before = conn.execute("SELECT count(*) FROM main.spend_categories").fetchone()[0]
+    used = [r[0] for r in conn.execute(
+        "SELECT DISTINCT category_id FROM bk.daily_spends WHERE user_id=?", (user_id,))]
+    mapping: dict[int, int] = {}
+    for cid in used:
+        row = conn.execute("SELECT parent_id, name, slug FROM bk.spend_categories WHERE id=?", (cid,)).fetchone()
+        if row is None:
+            raise SystemExit(f"backup spend category {cid} is missing")
+        parent_live = None
+        if row[0] is not None:
+            parent = conn.execute("SELECT name, slug FROM bk.spend_categories WHERE id=?", (row[0],)).fetchone()
+            parent_live = _live_category(conn, parent[1], parent[0], None)
+        mapping[cid] = _live_category(conn, row[2], row[1], parent_live)
+    added = conn.execute("SELECT count(*) FROM main.spend_categories").fetchone()[0] - before
+    if added:
+        done["spend_categories"] = added
+    return mapping
+
+
+def _copy_spends(conn, user_id, mapping, done) -> None:
+    cols = [c for c in _cols(conn, "bk", "daily_spends") if c in set(_cols(conn, "main", "daily_spends"))]
+    rows = conn.execute(
+        f'SELECT {",".join(cols)} FROM bk.daily_spends WHERE user_id=? ORDER BY rowid', (user_id,)).fetchall()
+    at = cols.index("category_id")
+    for r in rows:
+        r = list(r)
+        r[at] = mapping[r[at]]
+        conn.execute(f'INSERT INTO main.daily_spends ({",".join(cols)}) VALUES ({",".join("?" * len(cols))})', r)
+    done["daily_spends"] = len(rows)
 
 
 def restore_user(backup: str, user_id: int, db_path: str, dry_run: bool = False) -> dict[str, int]:
@@ -66,10 +127,12 @@ def restore_user(backup: str, user_id: int, db_path: str, dry_run: bool = False)
                 done[table] = done.get(table, 0) + n
 
             copy("users", "id=?")
-            copy("spend_categories", "user_id=? AND parent_id IS NULL")
-            copy("spend_categories", "user_id=? AND parent_id IS NOT NULL")
+            category_map = _map_categories(conn, user_id, done)
             for t in _user_tables(conn, "bk"):
                 if t == "spend_categories":
+                    continue
+                if t == "daily_spends" and t in live_tables:
+                    _copy_spends(conn, user_id, category_map, done)
                     continue
                 if t not in live_tables:
                     print(f"skip {t}: not in live DB", file=sys.stderr)

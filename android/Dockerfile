@@ -45,8 +45,7 @@ COPY app/static ./app/static
 
 RUN --mount=type=secret,id=keystore_properties,target=/run/secrets/signing/keystore.properties \
     --mount=type=secret,id=release_jks,target=/run/secrets/signing/release.jks \
-    if [ ! -f android/app/google-services.json ]; then cp android/app/google-services.json.example android/app/google-services.json; fi \
-    && printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
+    printf 'sdk.dir=%s\n' "${ANDROID_HOME}" > android/local.properties \
     && chmod +x android/gradlew \
     && if [ -s /run/secrets/signing/keystore.properties ]; then export MY_INVENTORY_KEYSTORE_PROPERTIES=/run/secrets/signing/keystore.properties; fi \
     && cd android && ./gradlew testDirectReleaseUnitTest testStoreReleaseUnitTest assembleDirectRelease assembleStoreRelease --no-daemon \

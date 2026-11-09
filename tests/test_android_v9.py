@@ -9,7 +9,7 @@ SRC = ROOT / "android/app/src/main/java/app/myinventory"
 
 def test_version_9_in_gradle_and_release_json():
     gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
-    assert re.search(r"\?\.toInt\(\) \?: (9|1\d)\b", gradle)
+    assert re.search(r"\?\.toInt\(\) \?: (9|[1-9]\d)\b", gradle)
     rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
     assert rel["versionCode"] >= 9
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"

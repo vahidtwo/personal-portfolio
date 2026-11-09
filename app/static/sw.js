@@ -492,3 +492,43 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(watchSession(request));
   }
 });
+
+// Push (Firebase data-only messages): title, body and a same-origin path to open on tap.
+const PUSH_DEFAULT_TITLE = "دارایی‌تو";
+const PUSH_DEFAULT_PATH = "/dashboard";
+
+function pushTargetPath(raw) {
+  const p = typeof raw === "string" ? raw.trim() : "";
+  if (!p.startsWith("/") || p.startsWith("//") || p.includes("\\") || /\s/.test(p)) return PUSH_DEFAULT_PATH;
+  return p;
+}
+
+function showPushNotification(data) {
+  const d = data || {};
+  return self.registration.showNotification(d.title || PUSH_DEFAULT_TITLE, {
+    body: d.body || "",
+    icon: "/static/icons/icon-192.png",
+    badge: "/static/icons/icon-192.png",
+    tag: d.type || undefined,
+    data: { url: pushTargetPath(d.url), type: d.type || "" },
+  });
+}
+
+self.addEventListener("notificationclick", (event) => {
+  const data = (event.notification && event.notification.data) || {};
+  if (data.FCM_MSG) return;
+  event.notification.close();
+  const target = new URL(pushTargetPath(data.url), self.location.origin).href;
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of all) {
+      if (new URL(client.url).origin !== self.location.origin) continue;
+      try {
+        await client.focus();
+        if (client.url !== target && "navigate" in client) await client.navigate(target);
+        return;
+      } catch (e) {}
+    }
+    await self.clients.openWindow(target);
+  })());
+});

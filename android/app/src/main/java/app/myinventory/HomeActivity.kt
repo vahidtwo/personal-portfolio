@@ -159,7 +159,10 @@ class HomeActivity : AppCompatActivity() {
         super.onResume()
         // A web logout (settings tab) clears the shared cookies: drop the native copy too.
         if (screen == Screen.HOME && !NativeSession.signedIn()) signOutLocal()
-        else if (NativeSession.signedIn()) SmsReceiver.flushQueued(this)
+        else if (NativeSession.signedIn()) {
+            SmsReceiver.flushQueued(this)
+            PushRegistrar.registerFcmToken(this)
+        }
     }
 
     override fun onDestroy() {

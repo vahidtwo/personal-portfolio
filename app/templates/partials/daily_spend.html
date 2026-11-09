@@ -6,7 +6,7 @@
 <script src="/static/sms-offer.js?v={{ static_v }}" defer></script>
 {% set qs = "/dashboard?tab=daily&jy=" ~ daily_year ~ "&jm=" ~ daily_month %}
 {% set e = spend_errors %}
-<div class="sp-page" data-sp-page{% if e or editing_spend_id %} data-sp-open{% endif %}>
+<div class="sp-page" data-sp-page{% if e or editing_spend_id or spend_open_add %} data-sp-open{% endif %}>
 <section class="card sp-sum" aria-labelledby="sp-h" data-sp-sum>
   <h1 id="sp-h">خرج‌ها</h1>
   <div class="sp-mnav">

@@ -25,12 +25,13 @@ object NativeSession {
     fun signedIn(): Boolean = cookie(MARKER) == "1"
 
     @Throws(IOException::class)
-    fun request(method: String, path: String, body: JSONObject? = null, withCsrf: Boolean = false): Response {
+    fun request(method: String, path: String, body: JSONObject? = null, withCsrf: Boolean = false,
+                timeoutMs: Int = TIMEOUT_MS): Response {
         val conn = URL(BASE + path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
             conn.connectTimeout = TIMEOUT_MS
-            conn.readTimeout = TIMEOUT_MS
+            conn.readTimeout = timeoutMs
             conn.instanceFollowRedirects = false
             conn.useCaches = false
             conn.setRequestProperty("Accept", "application/json")
@@ -68,12 +69,12 @@ object NativeSession {
 
     /** POST with the session-bound CSRF token; a stale token (400) is refreshed once. */
     @Throws(IOException::class)
-    fun post(path: String, body: JSONObject): Response {
+    fun post(path: String, body: JSONObject, timeoutMs: Int = TIMEOUT_MS): Response {
         if (csrf == null) refreshCsrf()
-        var r = request("POST", path, body, withCsrf = true)
+        var r = request("POST", path, body, withCsrf = true, timeoutMs = timeoutMs)
         if (r.status == 400 && r.json.optString("result").isEmpty()) {
             refreshCsrf()
-            r = request("POST", path, body, withCsrf = true)
+            r = request("POST", path, body, withCsrf = true, timeoutMs = timeoutMs)
         }
         return r
     }

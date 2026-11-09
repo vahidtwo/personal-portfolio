@@ -29,6 +29,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
@@ -76,6 +77,9 @@ class HomeActivity : AppCompatActivity() {
     private var lastHome: JSONObject? = null
     private var lastSavedAt = 0L
     private var homeLoadedOnline = false
+    private var refreshing = false
+    /** Page a notification tap asked for; opened once signed in (now or after login). */
+    private var pendingTarget: String? = null
 
     enum class Screen { LOGIN, HOME }
 
@@ -93,7 +97,9 @@ class HomeActivity : AppCompatActivity() {
             typedUsername = it.getString("typed_username", "")
             step = it.getString("step", "a")
             lockEndAt = it.getLong("lock_end_at", 0L)
+            pendingTarget = it.getString("pending_target")
         }
+        if (savedInstanceState == null) pendingTarget = NotificationTarget.safePath(intent?.getStringExtra(NotificationTarget.EXTRA))
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
@@ -145,6 +151,7 @@ class HomeActivity : AppCompatActivity() {
         }
 
         if (NativeSession.signedIn()) showHome() else showLogin()
+        openPendingTarget()
         Log.i(StartupGate.TAG, "native ${screen.name.lowercase()} +${SystemClock.uptimeMillis() - createdAt}ms")
     }
 
@@ -353,6 +360,25 @@ class HomeActivity : AppCompatActivity() {
         outState.putString("typed_username", typedUsername)
         outState.putString("step", step)
         outState.putLong("lock_end_at", lockEndAt)
+        outState.putString("pending_target", pendingTarget)
+    }
+
+    /** A notification tap while the app is open (singleTop + clearTop): the WebView pages above were closed. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val path = NotificationTarget.safePath(intent.getStringExtra(NotificationTarget.EXTRA)) ?: return
+        pendingTarget = path
+        if (!NativeSession.signedIn() && screen == Screen.HOME) signOutLocal()
+        openPendingTarget()
+    }
+
+    private fun openPendingTarget() {
+        val path = pendingTarget
+        when (NotificationTarget.action(path, NativeSession.signedIn())) {
+            NotificationTarget.Action.OPEN -> { pendingTarget = null; intent?.removeExtra(NotificationTarget.EXTRA); openWeb(path!!) }
+            NotificationTarget.Action.AFTER_LOGIN, NotificationTarget.Action.NONE -> Unit
+        }
     }
 
     private fun startLock(button: Button, seconds: Int) {
@@ -429,6 +455,7 @@ class HomeActivity : AppCompatActivity() {
                 SmsReceiver.rememberUser(this, res.optString("username"))
                 showHome()
                 SmsReceiver.flushQueued(this)
+                openPendingTarget()
             }
             "stepb" -> { step = "b"; showLogin() }
             "expired", "taken" -> { step = "a"; typedUsername = res.optString("username", typedUsername); showLogin(res) }
@@ -475,6 +502,25 @@ class HomeActivity : AppCompatActivity() {
                     }
                     else -> if (lastHome == null) renderHomeError() else renderHome(lastHome!!, lastSavedAt, fromCache = true, offline = true)
                 }
+            }
+        }
+    }
+
+    /** Server fetches market prices now (5-minute cooldown), then the home is read again with the new values. */
+    private fun refreshPrices(button: Button) {
+        if (refreshing) return
+        refreshing = true
+        button.isEnabled = false
+        button.text = PriceRefresh.BUSY_LABEL
+        thread {
+            val r = call { NativeSession.post(PriceRefresh.PATH, JSONObject(), PriceRefresh.TIMEOUT_MS) }
+            main.post {
+                refreshing = false
+                if (isFinishing || screen != Screen.HOME) return@post
+                val outcome = PriceRefresh.outcome(r?.status, r?.json)
+                if (outcome.next == PriceRefresh.Next.SIGN_OUT) { signOutLocal(); return@post }
+                if (outcome.message.isNotEmpty()) Toast.makeText(this, outcome.message, Toast.LENGTH_LONG).show()
+                fetchHome()
             }
         }
     }
@@ -601,11 +647,18 @@ class HomeActivity : AppCompatActivity() {
         if (priceText.isNotEmpty()) {
             val pl = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
             pl.addView(text(priceText, 13f, if (state == "fresh") c.muted else c.warn), LinearLayout.LayoutParams(0, -2, 1f))
+            val wait = PriceRefresh.waitLabel(price)
             pl.addView(Button(this).apply {
-                text = if (state == "error") "تلاش دوباره" else "به‌روزرسانی"
-                isAllCaps = false; textSize = 13f; setTextColor(c.accent); typeface = bold
+                text = when {
+                    refreshing -> PriceRefresh.BUSY_LABEL
+                    wait != null -> wait
+                    state == "error" -> "تلاش دوباره"
+                    else -> "به‌روزرسانی"
+                }
+                isEnabled = !refreshing && wait == null
+                isAllCaps = false; textSize = 13f; setTextColor(if (isEnabled) c.accent else c.muted); typeface = bold
                 background = bg(c.surface2, 999); minHeight = dp(48); minimumHeight = dp(48); setPadding(dp(14), 0, dp(14), 0)
-                setOnClickListener { fetchHome() }
+                setOnClickListener { refreshPrices(this) }
             }, LinearLayout.LayoutParams(-2, dp(48)).apply { marginStart = dp(8) })
             content.addView(pl, lp(10))
         }

@@ -90,7 +90,7 @@ async function dispatch(path, { method = "GET", mode = "navigate", cache = "defa
   let responded = null;
   const waits = [];
   listeners.fetch({ request, resultingClientId: "client-" + path, respondWith: (p) => (responded = p), waitUntil: (p) => waits.push(p) });
-  if (!responded) return { handled: false };
+  if (!responded) { await Promise.all(waits); return { handled: false }; }
   try {
     const res = await responded;
     await Promise.all(waits);

@@ -6,6 +6,7 @@ to the session (`GET /api/auth/csrf`) sent back in the `X-CSRF-Token` header. `/
 """
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from decimal import Decimal
 
@@ -17,8 +18,9 @@ from app import rate_limit, security
 from app import dashboard as dash
 from app import unified_auth as ua
 from app.db import get_db
+from app.config import PRICE_MANUAL_REFRESH_MINUTES
 from app.debts import debt_rows
-from app.formatting import format_toman, format_usd, format_share_label, format_qty, tehran_today
+from app.formatting import format_toman, format_usd, format_share_label, format_qty, persian_digits, tehran_today
 from app.models import Debt, PortfolioSnapshot, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices
 from app.security import (
@@ -35,6 +37,7 @@ from app.security import (
 )
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 NO_STORE = {"Cache-Control": "no-store"}
 
@@ -170,6 +173,35 @@ async def api_logout(request: Request):
     return attach_session_cookie_deletion(response)
 
 
+def _refresh_wait(db: Session) -> dict:
+    wait = dash.market_price_refresh_wait_seconds(db)
+    label = f"دوباره تا {persian_digits(str(max(1, (wait + 59) // 60)))} دقیقه" if wait > 0 else ""
+    return {"wait_sec": wait, "wait_label": label}
+
+
+@router.post("/home/refresh-prices")
+async def api_home_refresh_prices(request: Request, db: Session = Depends(get_db)):
+    """The native home «به‌روزرسانی» button: fetch market prices now (same cooldown as the web button)."""
+    _check_csrf(request)
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return _json({"error": "login required"}, status_code=401)
+    wait = _refresh_wait(db)
+    if wait["wait_sec"] > 0:
+        minutes = max(1, wait["wait_sec"] // 60)
+        message = (
+            f"حداقل {persian_digits(str(PRICE_MANUAL_REFRESH_MINUTES))} دقیقه بعد از آخرین به‌روزرسانی باید بگذرد. "
+            f"حدود {persian_digits(str(minutes))} دقیقه دیگر دوباره تلاش کنید."
+        )
+        return _json({"result": "wait", "message": message, **wait}, status_code=429, retry_after=wait["wait_sec"])
+    try:
+        await dash.refresh_market_prices_for_user(user.id)
+    except Exception:
+        logger.exception("Native price refresh failed for user %s", user.id)
+        return _json({"result": "error", "message": "قیمت تازه از چنده نرسید", **_refresh_wait(db)})
+    return _json({"result": "ok", "message": "قیمت بازار و پرتفوی به‌روز شد", **_refresh_wait(db)})
+
+
 def _s(value) -> str | None:
     return None if value is None else str(value)
 
@@ -224,6 +256,7 @@ async def api_home(request: Request, db: Session = Depends(get_db)):
     windows = [{"key": w["key"], "period": w["period"], "kind": w["kind"], "label": w["label"]}
                for w in changes["windows"]]
     price = dash.price_status(view.prices_fetched_at, now)
+    price.update(_refresh_wait(db))
     return _json({
         "username": user.username,
         "net": {"label": format_toman(view.total_toman - debt_total), "big": dash.big_toman(view.total_toman - debt_total)},

@@ -17,10 +17,14 @@ from app.debts import debt_rows, page_context_for_get
 from app.expenses import expense_form_for_request
 from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
+from app import rate_limit
 from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
 from app.models import Debt, User, utcnow
 from app.sanjeh import SanjehAuthError
+from app.push_routes import TEST_BODY as PUSH_TEST_BODY
+from app.push_routes import TEST_LIMIT as PUSH_TEST_LIMIT
+from app.push_routes import TEST_WINDOW_SECONDS as PUSH_TEST_WINDOW_SECONDS
 from app.number_input import FIELD_ERROR_SHORT_FA, field_error_message, quantity_error, to_latin_digits
 from app.security import (
     get_authenticated_user,
@@ -145,12 +149,17 @@ async def push_test_notification(
     if not firebase_admin_ready():
         flash(request, "Firebase پیکربندی نشده است.", error=True)
         return RedirectResponse("/profile", status_code=303)
+    key = f"push-test:{user.id}"
+    if rate_limit.is_limited(key, PUSH_TEST_LIMIT, PUSH_TEST_WINDOW_SECONDS):
+        flash(request, "چند ثانیه دیگر دوباره امتحان کنید.", error=True)
+        return RedirectResponse("/profile", status_code=303)
+    rate_limit.record(key, PUSH_TEST_WINDOW_SECONDS)
     sent = send_push_to_user(
         db,
         user.id,
         title="دارایی‌تو",
-        body="اعلان آزمایشی",
-        data={"type": "test"},
+        body=PUSH_TEST_BODY,
+        data={"type": "test", "url": "/profile#push-settings"},
     )
     if sent:
         flash(request, f"اعلان به {sent} دستگاه ارسال شد.")

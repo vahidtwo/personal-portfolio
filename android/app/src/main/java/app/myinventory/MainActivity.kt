@@ -103,6 +103,12 @@ class MainActivity : AppCompatActivity() {
                 this,
                 onServerConfigured = { base -> runOnUiThread { onBridgeServerUrl(base) } },
                 onRetry = { runOnUiThread { retryLast() } },
+                onEnablePush = {
+                    runOnUiThread {
+                        askNotificationPermission()
+                        PushRegistrar.registerFcmToken(this, force = true)
+                    }
+                },
             ),
             "AndroidBridge",
         )

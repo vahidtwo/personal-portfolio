@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 
@@ -30,7 +31,7 @@ PRICE_REFRESH_HOURS = int(os.environ.get("PRICE_REFRESH_HOURS", "1"))
 PRICE_MANUAL_REFRESH_MINUTES = int(os.environ.get("PRICE_MANUAL_REFRESH_MINUTES", "5"))
 ENABLE_INTERNAL_SCHEDULER = os.environ.get("ENABLE_INTERNAL_SCHEDULER", "1") == "1"
 # Bump when static JS/CSS change so browsers and the service worker pick up new assets.
-STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20261109a")
+STATIC_ASSET_VERSION = os.environ.get("STATIC_ASSET_VERSION", "20261109d")
 # Public origin shown to users (e.g. MCP URL). Empty = use the request's own base URL.
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 
@@ -45,6 +46,10 @@ FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
 FIREBASE_MESSAGING_SENDER_ID = os.environ.get("FIREBASE_MESSAGING_SENDER_ID", "")
 FIREBASE_APP_ID = os.environ.get("FIREBASE_APP_ID", "")
 FIREBASE_VAPID_KEY = os.environ.get("FIREBASE_VAPID_KEY", "")
+# Android app of the same Firebase project (public client values, read by the app at runtime, so the APK
+# needs no google-services.json). The API key falls back to the web key when no Android key is set.
+FIREBASE_ANDROID_APP_ID = os.environ.get("FIREBASE_ANDROID_APP_ID", "")
+FIREBASE_ANDROID_API_KEY = os.environ.get("FIREBASE_ANDROID_API_KEY", "")
 # Server-only (FCM Admin SDK). Never expose in templates or static assets.
 FIREBASE_CLIENT_EMAIL = os.environ.get("FIREBASE_CLIENT_EMAIL", "")
 FIREBASE_PRIVATE_KEY = os.environ.get("FIREBASE_PRIVATE_KEY", "")
@@ -68,3 +73,18 @@ def firebase_web_config() -> dict[str, str] | None:
         "messagingSenderId": FIREBASE_MESSAGING_SENDER_ID,
         "appId": FIREBASE_APP_ID,
     }
+
+
+ANDROID_APP_ID_RE = re.compile(r"^1:[0-9]+:android:[0-9a-f]+$")
+
+
+def firebase_android_config() -> dict[str, str] | None:
+    app_id = FIREBASE_ANDROID_APP_ID.strip()
+    api_key = (FIREBASE_ANDROID_API_KEY or FIREBASE_API_KEY).strip()
+    project_id = FIREBASE_PROJECT_ID.strip()
+    sender_id = FIREBASE_MESSAGING_SENDER_ID.strip()
+    if not (app_id and api_key and project_id and sender_id) or not ANDROID_APP_ID_RE.match(app_id):
+        return None
+    if app_id.split(":")[1] != sender_id:
+        return None
+    return {"appId": app_id, "apiKey": api_key, "projectId": project_id, "senderId": sender_id}

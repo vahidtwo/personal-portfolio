@@ -8,12 +8,6 @@ PY="${PYTHON:-python}"
 LOG="$(mktemp -d)"
 start=$(date +%s%N)
 
-gs="$ROOT/android/app/google-services.json"
-made_gs=0
-if [ ! -f "$gs" ]; then cp "$ROOT/android/app/google-services.json.example" "$gs"; made_gs=1; fi
-cleanup() { [ "$made_gs" = 1 ] && rm -f "$gs"; }
-trap cleanup EXIT
-
 ( cd "$ROOT/android" && ./gradlew -q ${GRADLE_ARGS:-} --daemon --parallel --build-cache \
     testDirectReleaseUnitTest testStoreReleaseUnitTest >"$LOG/android.txt" 2>&1; echo $? >"$LOG/android.rc" ) &
 ( cd "$ROOT" && "$PY" -m pytest -q -n auto -p no:cacheprovider >"$LOG/web.txt" 2>&1; echo $? >"$LOG/web.rc" ) &

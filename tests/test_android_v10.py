@@ -10,7 +10,7 @@ MAIN = ROOT / "android/app/src/main/java/app/myinventory/MainActivity.kt"
 
 def test_version_10():
     gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
-    assert __import__("re").search(r'\?\.toInt\(\) \?: 1\d\b', gradle)  # v10 or later (v11)
+    assert __import__("re").search(r'\?\.toInt\(\) \?: [1-9]\d\b', gradle)  # v10 or later
     assert 'applicationId = "app.myinventory"' in gradle
     rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
     assert rel["versionCode"] >= 10

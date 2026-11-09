@@ -1,4 +1,4 @@
-"""The public source link: landing footer + Settings, new tab on the web, external browser in the app."""
+"""The public source link: landing footer only; Settings no longer shows it."""
 import re
 from pathlib import Path
 
@@ -6,7 +6,7 @@ from tests.test_holdings import _register, no_network  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = "https://github.com/vahidtwo/personal-portfolio"
-COPY = "دارایی\u200cتو متن\u200cباز است"
+COPY = "دارایی‌تو متن‌باز است"
 
 
 def _links(html):
@@ -27,15 +27,18 @@ def test_landing_footer_has_source_link(client, no_network):
     html = client.get("/").text
     footer = html[html.index("<footer"):html.index("</footer>")]
     _assert_one_safe_link(footer)
+    assert 'id="open-source"' in footer
 
 
-def test_settings_page_has_source_link(client, no_network):
+def test_settings_page_has_no_open_source_section(client, no_network):
     _register(client)
     r = client.get("/profile?section=settings")
     assert r.status_code == 200
-    section = r.text[r.text.index('id="open-source"'):]
-    section = section[:section.index("</section>")]
-    _assert_one_safe_link(section)
+    assert 'id="v2-oss"' not in r.text
+    assert 'aria-labelledby="v2-oss"' not in r.text
+    assert 'id="open-source"' not in r.text
+    assert "متن‌باز" not in r.text
+    assert URL not in r.text
 
 
 def test_every_github_link_in_templates_is_the_exact_url_and_safe():

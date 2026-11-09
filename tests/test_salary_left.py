@@ -95,7 +95,8 @@ def test_pages_split_remaining_and_month_total(client, no_network, clock):  # no
     total = re.search(r"<dt>جمع اقساط این ماه</dt><dd[^>]*><bdi[^>]*data-mask=\"portfolio\" data-amount data-month-total>([^<]+)</bdi>", dash)
     assert left.group(1) == "۲٬۲۰۰٬۰۰۰" and total.group(1) == "۱٬۷۰۰٬۰۰۰"
     tab = with_amounts(client, P)
-    assert re.search(r'<span>جمع اقساط این ماه</span><b class="num" data-dv-num data-mask="portfolio" data-amount data-month-total><bdi dir="ltr">۱٬۷۰۰٬۰۰۰<', tab)
+    assert re.search(r'<p class="dv-sumrow lead" data-month-total-row><span>جمع اقساط این ماه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount data-month-total>۱٬۷۰۰٬۰۰۰</bdi>', tab)
+    assert "جمع اقساط این ماه" not in tab[tab.index("dv-tiles"):tab.index("data-month-total-row")]
     assert re.search(r"<span>اقساط باقی‌مانده</span><b[^>]*data-mask=\"portfolio\"[^>]*><bdi dir=\"ltr\">۲٬۲۰۰٬۰۰۰<", tab)
     assert client.get("/api/salary").json()["left"] == "۷٬۳۰۰٬۰۰۰"
 

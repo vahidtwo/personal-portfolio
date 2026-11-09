@@ -140,4 +140,39 @@ class SmsParserTest {
         assertFalse(p.isMoneyIn("-1,000\nمانده 5"))
         assertNull(p.autoDetect("+50,000\n-1,000\nمانده 5"))
     }
+
+    private val glued = "حساو1234567890\nبرداشت260,000,700\nمانده9,876,543\n05/08/18-19:45"
+
+    @Test fun gluedWithdrawIsTheAmountNotTheBalance() {
+        assertEquals(260000700L, p.withdrawGlued(glued))
+        val r = p.withdrawGluedResult(glued)!!
+        assertEquals(-26000070L, r.amountToman)
+        assertEquals(987654L, r.balanceToman)
+        assertNull(p.autoDetect(glued))  // the minus rule is unchanged: no signed number here
+    }
+
+    @Test fun gluedWithdrawPersianDigitsSeparatorsAndMarks() {
+        val fa = "حساو۱۲۳۴۵۶۷۸۹۰\nبرداشت۲۶۰٬۰۰۰٬۷۰۰\nمانده۹٬۸۷۶٬۵۴۳\n۰۵/۰۸/۱۸-۱۹:۴۵"
+        assertEquals(260000700L, p.withdrawGlued(fa))
+        val marked = "\u200Fحساو1234567890\n\u202Bبرداشت\u200E260,000,700\u202C\nمانده\u200E9,876,543\n\u200E05/08/18-19:45"
+        assertEquals(260000700L, p.withdrawGlued(marked))
+        assertEquals(260000700L, p.withdrawGlued("حساو1234567890\nبر\u200Cداشت260,000,700\nمانده9,876,543"))
+        assertEquals(260000700L, p.withdrawGlued("حساو1234567890\nبرداشت260٬000٬700\nمانده9٬876٬543"))
+    }
+
+    @Test fun gluedWithdrawTomanLabel() {
+        assertEquals(-260000700L, p.withdrawGluedResult("برداشت260,000,700 تومان\nمانده9,876,543")!!.amountToman)
+    }
+
+    @Test fun gluedWithdrawNarrowCases() {
+        assertNull(p.withdrawGlued("حساو1234567890\nواریز260,000,700\nمانده9,876,543\n05/08/18-19:45"))
+        assertNull(p.withdrawGlued("حساو1234567890\nمانده9,876,543\n05/08/18-19:45"))  // balance only
+        assertNull(p.withdrawGlued("برداشت 260,000,700\nمانده9,876,543"))  // space: not this format
+        assertNull(p.withdrawGlued("برداشت-260,000,700\nمانده9,876,543"))  // minus: the minus rule's
+        assertNull(p.withdrawGlued("برداشت260,000,700-\nمانده9,876,543"))
+        assertNull(p.withdrawGlued("برداشت260,000,700\nبرداشت1,000\nمانده9,876,543"))  // two: not confident
+        assertNull(p.withdrawGlued("قابل برداشت260,000,700"))
+        assertNull(p.withdrawGlued("برداشت+260,000,700\nمانده9,876,543"))
+        assertNull(p.withdrawGlued("حساو1234567890\nمانده9,876,543\nبرداشت"))  // «مانده» is never the amount
+    }
 }

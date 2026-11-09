@@ -2738,7 +2738,7 @@ html.dv-locked .dv-wrap{backdrop-filter:none;-webkit-backdrop-filter:none}
 html.dv-locked{overflow:hidden}
 .dv-sub{color:var(--text-muted);margin:0 0 16px;line-height:1.8;font-size:14px}
 .dv-grid{display:grid;gap:16px;padding-bottom:24px}
-@media (min-width:900px){.dv-grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}.dv-sum{grid-column:1/-1}}
+@media (min-width:900px){.dv-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch}.dv-sum{grid-column:1/-1}.dv-card:not(.dv-sum){display:flex;flex-direction:column}.dv-card:not(.dv-sum) > [data-dv-swap]{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}.dv-card:not(.dv-sum) .dv-sumrow{margin-top:auto}.dv-card:not(.dv-sum) .dv-empty{flex:1 1 auto;justify-content:center}}
 .dv-card{border:1px solid var(--border-subtle,var(--border));border-radius:18px;padding:16px;background:color-mix(in srgb,var(--text) 2%,transparent);min-width:0}
 .dv-card h2{font-size:17px;margin:0;display:flex;align-items:center;gap:8px}
 .dv-chead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}.dv-chead h2{flex:1}

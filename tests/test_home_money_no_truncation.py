@@ -40,6 +40,23 @@ def test_phones_wrap_boxes_that_cannot_fit():
     assert CSS.index("@media (max-width: 899px) {\n  .stats, .dash-tiles") > CSS.index(".tiles { display: grid;")
 
 
-def test_revealed_hero_uses_the_small_phone_size():
-    small = _media("max-width: ?380px")
-    assert 'html[data-show-portfolio="1"].dash-hero[data-mask="portfolio"].total-num{font-size:clamp(26px,8vw,40px)!important;}' in small
+REVEALED_HERO = 'html[data-show-portfolio="1"].dash-hero[data-mask="portfolio"].total-num{'
+
+
+def test_revealed_hero_scales_with_its_card_on_phones():
+    assert any("container-type:inline-size" in body for body in _rules(r"\.dash-hero"))
+    mobile = _media("max-width: ?899px")
+    assert REVEALED_HERO + "font-size:clamp(22px,11cqi,40px)!important;}" in mobile
+    assert REVEALED_HERO not in _media("max-width: ?380px")  # a later phone rule would override the card-based size
+    assert mobile.index(REVEALED_HERO) < mobile.index(".dash-hero.total-num{white-space:normal;overflow-wrap:anywhere;}")
+
+
+def test_report_amount_drops_under_its_label_instead_of_spilling():
+    assert any("display:flex" in b for b in _rules(r"\.net-line div"))
+    shown = _rules(r'html\[data-show-portfolio="1"\] \.net-line div')
+    assert shown and "flex-wrap:wrap" in shown[0]
+    base = re.search(r"^\.net-line div \{([^{}]*)\}", CSS, re.M)
+    assert base and "flex-wrap" not in base.group(1)  # hidden rows keep their old layout
+    body = "".join(_rules(r"\.net-line dd\.num"))
+    assert "min-width:min-content" in body and "margin-inline-start:auto" in body
+    assert any(r.startswith(".net-line dd.num") and "white-space: nowrap" in r for r in re.findall(r"^[^{}\n]*\{[^{}]*\}", CSS, re.M))

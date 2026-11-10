@@ -2817,7 +2817,7 @@ html.dv-locked{overflow:hidden}
 .dv-preview[hidden],.dv-fail[hidden],.dv-summary[hidden]{display:none}
 .dv-err{display:block;color:var(--danger-text);font-size:12.5px;line-height:1.6;margin-top:4px}
 .dv-err:empty{display:none}
-.dv-sheet input[aria-invalid=true]{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
+.dv-sheet :is(input,select)[aria-invalid=true]{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
 .dv-fail{margin:0;padding:10px 14px;border-radius:12px;border:1px solid var(--danger-text);line-height:1.7;font-size:14px}
 .dv-summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 10px;padding:8px 14px;border-radius:12px;border:1px solid var(--danger-text);line-height:1.7}
 .dv-summary strong{flex-basis:100%}

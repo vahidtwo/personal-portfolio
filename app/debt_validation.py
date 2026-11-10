@@ -18,10 +18,12 @@ MONTHS_MSG = "دست‌کم ۱ قسط باید مانده باشد"
 YEAR_MSG = "سال را چهاررقمی بنویسید"
 MONTH_MSG = "ماه بین ۱ تا ۱۲ است"
 EXP_DAY_MSG = "روز بین ۱ تا ۳۱ است"
+REMINDER_MSG = "یکی از گزینه‌های یادآوری قسط را انتخاب کنید"
+REMINDER_CHOICES = (-1, 0, 1, 2, 3, 7)  # off, same day, then days before
 DEBT_FIELDS = ("monthly_toman", "months_left", "due_year", "due_month", "due_day")
 EXPENSE_FIELDS = ("amount_toman", "due_day")
 FIELD_SHORT = {"monthly_toman": "مبلغ هر قسط", "months_left": "تعداد قسط مانده", "due_year": "سال", "due_month": "ماه",
-               "due_day": "روز", "amount_toman": "مبلغ"}
+               "due_day": "روز", "amount_toman": "مبلغ", "reminder_days_before": "یادآوری قسط"}
 
 
 def day_msg(n: int) -> str:
@@ -77,6 +79,23 @@ def validate_debt(monthly: str, months: str, year: str, month: str, day: str, ex
         errors["due_day"] = day_msg(31)
     ordered = {f: errors[f] for f in DEBT_FIELDS if f in errors}
     return ordered, {"monthly": amount, "months": n, "year": y, "month": m, "day": d}
+
+
+def reminder_error(raw: str | None) -> tuple[str | None, int | None]:
+    """«یادآوری قسط»: '' means the default (stored as NULL); otherwise one of REMINDER_CHOICES."""
+    try:
+        text = normalize_number_text(raw)
+    except ValueError:
+        return REMINDER_MSG, None
+    if text == "":
+        return None, None
+    try:
+        value = int(text)
+    except ValueError:
+        return REMINDER_MSG, None
+    if value not in REMINDER_CHOICES:
+        return REMINDER_MSG, None
+    return None, value
 
 
 def validate_expense(amount_raw: str, day_raw: str, existing: Decimal | None = None):

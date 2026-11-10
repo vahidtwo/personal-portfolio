@@ -4,6 +4,9 @@ Runs from the hourly job (only while ENABLE_INTERNAL_SCHEDULER is on). Sent thro
 registered devices (Android app / web push). Each (loan, due date, kind) is sent at most once: a row in
 due_reminders records it, so restarts and hourly runs never repeat it. Paying an instalment moves the due
 date, so the next instalment gets its own reminder. Finished loans (no instalments left) are skipped.
+Each loan picks how early its upcoming reminder goes out (debts.reminder_days_before): NULL = the default
+(DUE_REMINDER_DAYS, else 1 day), 0 = on the due day, -1 = off (the overdue notice still goes out).
+A loan added or changed inside its window still gets that one reminder on the next allowed run.
 Push text never contains amounts (masking); dates are Jalali.
 """
 from __future__ import annotations
@@ -22,7 +25,7 @@ from app.models import Debt, DueReminder
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DAYS_BEFORE = 3
+DEFAULT_DAYS_BEFORE = 1
 KIND_UPCOMING = "upcoming"
 KIND_OVERDUE = "overdue"
 # Hourly runs outside these Tehran hours wait for the next one, so nobody is woken at night.
@@ -34,6 +37,20 @@ def days_before() -> int:
         return max(0, int(os.environ.get("DUE_REMINDER_DAYS", DEFAULT_DAYS_BEFORE)))
     except ValueError:
         return DEFAULT_DAYS_BEFORE
+
+
+def loan_days_before(debt: Debt, default: int) -> int | None:
+    """Days before the due date this loan's upcoming reminder starts; None when it is off."""
+    value = getattr(debt, "reminder_days_before", None)
+    if value is None:
+        return default
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return default
+    if value < 0:
+        return None
+    return value
 
 
 def _title(debt: Debt) -> str:
@@ -50,7 +67,10 @@ def overdue_text(debt: Debt, due: jdatetime.date) -> tuple[str, str]:
 
 
 def pending(debts, today: jdatetime.date, n_days: int):
-    """(debt, kind, due) that should be notified today, before checking what was already sent."""
+    """(debt, kind, due) that should be notified today, before checking what was already sent.
+
+    `n_days` is the default for loans without their own setting.
+    """
     out = []
     for debt in debts:
         if not ds.is_active(debt):  # finished («تسویه شد») or paid off
@@ -61,8 +81,10 @@ def pending(debts, today: jdatetime.date, n_days: int):
         days = (due.togregorian() - today.togregorian()).days
         if days < 0:
             out.append((debt, KIND_OVERDUE, due, days))
-        elif days <= n_days:
-            out.append((debt, KIND_UPCOMING, due, days))
+        else:
+            window = loan_days_before(debt, n_days)
+            if window is not None and days <= window:
+                out.append((debt, KIND_UPCOMING, due, days))
     return out
 
 

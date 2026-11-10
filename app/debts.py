@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app import debt_schedule as ds
 from app.db import get_db
-from app.debt_validation import FIELD_SHORT, summary_fa, validate_debt, validate_expense
+from app.debt_validation import FIELD_SHORT, reminder_error, summary_fa, validate_debt, validate_expense
 from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, persian_digits, tehran_today
 from app.models import Debt, DueReminder, MonthlyExpense, User
 from app.security import get_authenticated_user, redirect_to_login, require_csrf
@@ -24,7 +24,16 @@ from app.web import flash, pop_flash, render
 
 router = APIRouter()
 DEBTS_URL = "/profile?tab=debts"
-EMPTY_DEBT_FORM = {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""}
+EMPTY_DEBT_FORM = {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": "",
+                   "reminder_days_before": "1"}
+# «یادآوری قسط» options (value, label); NULL in the database shows as the default «۱ روز قبل».
+REMINDER_OPTIONS = (("-1", "خاموش"), ("0", "همان روز"), ("1", "۱ روز قبل"), ("2", "۲ روز قبل"), ("3", "۳ روز قبل"),
+                    ("7", "۱ هفته قبل"))
+
+
+def reminder_value(debt) -> str:
+    value = getattr(debt, "reminder_days_before", None)
+    return "1" if value is None else str(int(value))
 EMPTY_EXPENSE_FORM = {"title": "", "amount_toman": "", "due_day": ""}
 
 
@@ -77,6 +86,7 @@ def debt_rows(debts: list[Debt], today: jdatetime.date | None = None) -> tuple[l
                 "due_year": str(stored.year if stored else debt.due_year),
                 "due_month": str(stored.month if stored else debt.due_month),
                 "due_day": str(stored.day if stored else debt.due_day),
+                "reminder_days_before": reminder_value(debt),
                 "monthly_label": format_toman(debt.monthly_toman),
                 "months_label": persian_digits(str(months)),
                 "entered_label": format_jalali_date(stored) if stored else "—",
@@ -177,6 +187,7 @@ def debts_page(
         "expense_form": expense_form or EMPTY_EXPENSE_FORM,
         "expense_errors": expense_errors or {},
         "editing_expense_id": editing_expense_id,
+        "reminder_options": REMINDER_OPTIONS,
         "sheet": sheet,
         "summary": summary_fa(len(errs)) if errs else None,
         "summary_links": [(f, FIELD_SHORT.get(f, f)) for f in errs],
@@ -200,7 +211,8 @@ def page_context_for_get(db: Session, user: User, request: Request) -> dict:
     if debt:
         base.update(sheet="debt", editing_id=debt["id"], debt_form={
             "title": debt["title"], "monthly_toman": debt["monthly_raw"], "months_left": debt["months_raw"],
-            "due_year": debt["due_year"], "due_month": debt["due_month"], "due_day": debt["due_day"]})
+            "due_year": debt["due_year"], "due_month": debt["due_month"], "due_day": debt["due_day"],
+            "reminder_days_before": debt["reminder_days_before"]})
         base["debt_orig"] = debt["monthly_orig"]
     elif exp:
         base.update(sheet="expense", editing_expense_id=exp["id"], expense_form={
@@ -254,9 +266,20 @@ def saved_response(request, message: str):
     return RedirectResponse(DEBTS_URL, status_code=303)
 
 
-def _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day) -> dict:
+def _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day, reminder="1") -> dict:
     return {"title": title.strip()[:64], "monthly_toman": monthly_toman, "months_left": months_left,
-            "due_year": due_year, "due_month": due_month, "due_day": due_day}
+            "due_year": due_year, "due_month": due_month, "due_day": due_day,
+            "reminder_days_before": "1" if reminder in (None, "") else reminder}
+
+
+def _with_reminder(errors: dict, raw: str | None) -> tuple[dict, int | None]:
+    """Adds the «یادآوری قسط» error (if any) after the other fields; returns the value to store."""
+    if raw is None:
+        return errors, None
+    err, value = reminder_error(raw)
+    if err:
+        errors = {**errors, "reminder_days_before": err}
+    return errors, value
 
 
 def _owned_debt(db, user, debt_id) -> Debt | None:
@@ -280,6 +303,7 @@ async def profile_add_debt(
     due_year: str = Form(""),
     due_month: str = Form(""),
     due_day: str = Form(""),
+    reminder_days_before: str | None = Form(None),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -287,12 +311,13 @@ async def profile_add_debt(
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
-    form = _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day)
+    form = _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day, reminder_days_before)
     errors, v = validate_debt(monthly_toman, months_left, due_year, due_month, due_day)
+    errors, reminder = _with_reminder(errors, reminder_days_before)
     if errors:
         return invalid_response(request, db, user, errors, debt_form=form, debt_errors=errors)
     db.add(Debt(user_id=user.id, title=form["title"], monthly_toman=v["monthly"], months_left=v["months"],
-                due_year=v["year"], due_month=v["month"], due_day=v["day"]))
+                due_year=v["year"], due_month=v["month"], due_day=v["day"], reminder_days_before=reminder))
     db.commit()
     return saved_response(request, "قسط اضافه شد")
 
@@ -307,6 +332,7 @@ async def profile_update_debt(
     due_year: str = Form(""),
     due_month: str = Form(""),
     due_day: str = Form(""),
+    reminder_days_before: str | None = Form(None),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -317,14 +343,18 @@ async def profile_update_debt(
     debt = _owned_debt(db, user, debt_id)
     if debt is None:
         return _not_found(request)
-    form = _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day)
+    form = _debt_form(title, monthly_toman, months_left, due_year, due_month, due_day,
+                      reminder_value(debt) if reminder_days_before is None else reminder_days_before)
     errors, v = validate_debt(monthly_toman, months_left, due_year, due_month, due_day, Decimal(debt.monthly_toman))
+    errors, reminder = _with_reminder(errors, reminder_days_before)
     if errors:
         return invalid_response(request, db, user, errors, debt_form=form, debt_errors=errors, editing_id=debt_id)
     debt.title = form["title"]
     debt.monthly_toman = v["monthly"]
     debt.months_left = v["months"]
     debt.due_year, debt.due_month, debt.due_day = v["year"], v["month"], v["day"]
+    if reminder_days_before is not None:  # a client that does not send the field keeps the loan's setting
+        debt.reminder_days_before = reminder
     db.commit()
     request.session.pop("debt_undo", None)  # an edit replaces whatever «برگردان» would restore
     return saved_response(request, "تغییرات ذخیره شد")

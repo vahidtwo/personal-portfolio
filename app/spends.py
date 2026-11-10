@@ -18,9 +18,11 @@ from app.daily_spend import (
     ensure_spend_categories,
     jalali_month_bounds,
     month_chart,
+    next_sort_order,
     picker_categories,
     shift_jalali_month,
 )
+from app.category_style import group_badge
 from app.db import get_db
 from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
@@ -124,7 +126,11 @@ def _normalize_category_name(name: str | None) -> str:
 
 
 def commission_category(db: Session, user: User | None = None) -> SpendCategory:
-    """The global «کارمزد» subcategory: reused when one with that name exists (an active one first), else created once under «پیامک»."""
+    """The global «کارمزد» subcategory: the row with slug sms_fee; else one named «کارمزد» (an active one first),
+    else created once under «پیامک». Found by slug first, so a renamed row keeps getting the fees."""
+    by_slug = db.query(SpendCategory).filter(SpendCategory.slug == SMS_COMMISSION_SLUG).one_or_none()
+    if by_slug is not None:
+        return by_slug
     target = _normalize_category_name(SMS_COMMISSION_NAME)
     subcategories = (
         db.query(SpendCategory)
@@ -142,7 +148,7 @@ def commission_category(db: Session, user: User | None = None) -> SpendCategory:
         name=SMS_COMMISSION_NAME,
         slug=None if slug_taken else SMS_COMMISSION_SLUG,
         is_seed=False,
-        sort_order=1,
+        sort_order=next_sort_order(db, parent.id),
     )
     db.add(row)
     db.flush()
@@ -267,7 +273,7 @@ def daily_view(
                 "child_name": name,
                 "name": name,
                 "color": _color_for(parent, parent_index.get(parent.id, 0)) if parent else "#475569",
-                "initial": (parent.icon if parent and parent.icon else parent_name[:1]),
+                "initial": group_badge(parent.icon if parent else None, parent_name),
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
                 "from_sms": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[0],

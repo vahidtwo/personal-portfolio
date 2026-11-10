@@ -267,7 +267,7 @@ def test_migration_0008_up_down_keeps_rows(tmp_path):
     copy = tmp_path / "copy.db"
     shutil.copyfile(db, copy)
 
-    ok("upgrade", "head")
+    ok("upgrade", "0008_debt_reminder_days")
     c = sqlite3.connect(db)
     assert c.execute("select version_num from alembic_version").fetchone()[0] == "0008_debt_reminder_days"
     info = {r[1]: r for r in c.execute("pragma table_info(debts)")}
@@ -283,7 +283,7 @@ def test_migration_0008_up_down_keeps_rows(tmp_path):
     assert after == before
 
     ok("stamp", "0007_global_categories")
-    ok("upgrade", "head")  # column already there: no-op
+    ok("upgrade", "0008_debt_reminder_days")  # column already there: no-op
 
     ok("downgrade", "0007_global_categories")
     c = sqlite3.connect(db)

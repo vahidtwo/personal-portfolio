@@ -36,6 +36,7 @@ from app.config import (
 from app.amounts_api import router as amounts_router
 from app.dashboard import router as dashboard_router
 from app.db import init_db
+from app.admin_categories import router as admin_categories_router
 from app.db_admin import router as db_admin_router
 from app.debts import router as debts_router
 from app.expenses import router as expenses_router
@@ -217,6 +218,7 @@ app.include_router(dashboard_router)
 app.include_router(amounts_router)
 app.include_router(admin_users_router)
 app.include_router(db_admin_router)
+app.include_router(admin_categories_router)
 app.include_router(mcp_router)
 app.include_router(assets_router)
 app.include_router(car_router)

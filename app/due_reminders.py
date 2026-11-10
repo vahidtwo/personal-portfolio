@@ -1,12 +1,15 @@
 """Push reminders before an instalment is due, plus one notice when it becomes overdue.
 
 Runs from the hourly job (only while ENABLE_INTERNAL_SCHEDULER is on). Sent through Firebase to the user's
-registered devices (Android app / web push). Each (loan, due date, kind) is sent at most once: a row in
+registered devices (Android app / web push). Upcoming and overdue notices go out only in the evening, Asia/Tehran:
+the run in the 20:00 hour sends them and the run in the 21:00 hour catches up on anything still unsent that day
+(window 20:00-21:59). Runs at any other hour send nothing, so with the default of 1 day the reminder arrives at
+about 20:00 the evening before the due date. Each (loan, due date, kind) is sent at most once: a row in
 due_reminders records it, so restarts and hourly runs never repeat it. Paying an instalment moves the due
 date, so the next instalment gets its own reminder. Finished loans (no instalments left) are skipped.
 Each loan picks how early its upcoming reminder goes out (debts.reminder_days_before): NULL = the default
 (DUE_REMINDER_DAYS, else 1 day), 0 = on the due day, -1 = off (the overdue notice still goes out).
-A loan added or changed inside its window still gets that one reminder on the next allowed run.
+A loan added or changed inside its window still gets that one reminder at the next evening window.
 Push text never contains amounts (masking); dates are Jalali.
 """
 from __future__ import annotations
@@ -28,8 +31,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_DAYS_BEFORE = 1
 KIND_UPCOMING = "upcoming"
 KIND_OVERDUE = "overdue"
-# Hourly runs outside these Tehran hours wait for the next one, so nobody is woken at night.
-SEND_FROM_HOUR, SEND_UNTIL_HOUR = 9, 21
+# Tehran hours whose hourly run may send: 20 is the send hour, 21 the same-day catch-up.
+SEND_FROM_HOUR, SEND_UNTIL_HOUR = 20, 22
+
+
+def in_send_window(now: datetime) -> bool:
+    """True when `now` (any timezone; naive means UTC) falls in 20:00-21:59 Asia/Tehran."""
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    return SEND_FROM_HOUR <= now.astimezone(TEHRAN).hour < SEND_UNTIL_HOUR
 
 
 def days_before() -> int:
@@ -96,9 +106,12 @@ def send_due_reminders(db: Session, *, now: datetime | None = None, push=None) -
         if not firebase_admin_ready():
             return 0
         push = send_push_to_user
-    local = (now or datetime.now(timezone.utc)).astimezone(TEHRAN)
-    if not (SEND_FROM_HOUR <= local.hour < SEND_UNTIL_HOUR):
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    if not in_send_window(now):
         return 0
+    local = now.astimezone(TEHRAN)
     today = jdatetime.date.fromgregorian(date=local.date())
     sent_keys = {(r.debt_id, r.kind, r.due_date) for r in db.query(DueReminder).all()}
     count = 0

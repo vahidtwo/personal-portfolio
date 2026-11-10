@@ -9,7 +9,7 @@ from html import unescape
 import pytest
 
 from tests.amounts_helper import with_amounts
-from tests.test_due_reminders import FakePush, _utc_noon
+from tests.test_due_reminders import FakePush, _evening
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
 
 P = "/profile?tab=debts"
@@ -42,7 +42,7 @@ def _loan(db, reminder=None, d=20, title="وام فیک"):
 def _send(db, day, push, shift=0):
     from app.due_reminders import send_due_reminders
 
-    return send_due_reminders(db, now=_utc_noon(1405, 8, day, shift), push=push)
+    return send_due_reminders(db, now=_evening(1405, 8, day, shift), push=push)
 
 
 def _first_day_sent(db, push, days=range(5, 21)):
@@ -112,9 +112,10 @@ def test_loan_created_late_inside_window_gets_one_reminder(db):
 def test_created_late_at_night_sends_next_allowed_hour(db):
     _loan(db, 1)
     push = FakePush()
-    assert _send(db, 19, push, 10) == 0  # 22:00 Tehran: quiet
-    assert _send(db, 20, push, -5) == 0  # 07:00 on the due day: quiet
-    assert _send(db, 20, push, -3) == 1 and "امروز" in push.calls[0]["body"]  # 09:00
+    assert _send(db, 19, push, 2) == 0  # 22:00 Tehran: outside the window
+    assert _send(db, 20, push, -13) == 0  # 07:00 on the due day
+    assert _send(db, 20, push, -1) == 0  # 19:00
+    assert _send(db, 20, push) == 1 and "امروز" in push.calls[0]["body"]  # 20:00
 
 
 def test_dedupe_holds_when_setting_changes_after_sending(db):

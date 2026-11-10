@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.category_style import DEFAULT_GROUP_ICONS
 from app.models import DailySpend, SpendCategory, User
 
 # slug, Persian label, subcategories (slug, label)
@@ -124,7 +126,8 @@ def ensure_spend_categories(db: Session, user: User | None = None) -> None:
     if db.query(SpendCategory.id).first() is not None:
         return
     for parent_index, (parent_slug, parent_name, children) in enumerate(DAILY_SPEND_TREE):
-        parent = SpendCategory(parent_id=None, name=parent_name, slug=parent_slug, is_seed=True, sort_order=parent_index)
+        parent = SpendCategory(parent_id=None, name=parent_name, slug=parent_slug, is_seed=True, sort_order=parent_index,
+                               icon=DEFAULT_GROUP_ICONS.get(parent_slug))
         db.add(parent)
         db.flush()
         for child_index, (child_slug, child_name) in enumerate(children):
@@ -134,6 +137,14 @@ def ensure_spend_categories(db: Session, user: User | None = None) -> None:
                 )
             )
     db.commit()
+
+
+def next_sort_order(db: Session, parent_id: int | None) -> int:
+    """sort_order for a new row: after its last sibling (0 for the first one)."""
+    q = db.query(func.max(SpendCategory.sort_order))
+    q = q.filter(SpendCategory.parent_id.is_(None)) if parent_id is None else q.filter(SpendCategory.parent_id == parent_id)
+    top = q.scalar()
+    return 0 if top is None else int(top) + 1
 
 
 def shift_jalali_month(year: int, month: int, delta: int) -> tuple[int, int]:
@@ -179,11 +190,13 @@ def categories_for_user(db: Session, user: User | None = None) -> tuple[list[Spe
 def picker_categories(
     parents: list[SpendCategory], children: list[SpendCategory], keep_id: int | None = None
 ) -> tuple[list[SpendCategory], list[SpendCategory]]:
-    """Pickers hide archived categories; keep_id (the spend being edited) stays selectable with its parent."""
+    """Pickers hide archived categories and groups with no active subcategory (nothing to pick in them);
+    keep_id (the spend being edited) stays selectable with its parent."""
     keep_parent = next((c.parent_id for c in children if c.id == keep_id), None)
     active_parents = {p.id for p in parents if not p.archived}
     shown_children = [c for c in children if c.id == keep_id or (not c.archived and c.parent_id in active_parents)]
-    shown_parents = [p for p in parents if p.id in active_parents or p.id == keep_parent]
+    with_child = {c.parent_id for c in shown_children}
+    shown_parents = [p for p in parents if p.id == keep_parent or (p.id in active_parents and p.id in with_child)]
     return shown_parents, shown_children
 
 

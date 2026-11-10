@@ -186,7 +186,7 @@ def test_migration_chain_0004_0005_0006_up_and_down(tmp_path):
     assert version() == "0005_sanjeh_token_encrypt" and _tokens(db)[1].startswith("enc1:")
     assert "due_reminders" not in tables()
     ok("upgrade", "head")
-    assert version() == "0008_debt_reminder_days"
+    assert version() == "0009_default_group_icons"
     ok("stamp", "0005_sanjeh_token_encrypt")
     ok("upgrade", "head")  # table already there: no-op
     after = _dump(db)
@@ -206,7 +206,7 @@ def test_single_alembic_head():
 
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parent.parent / "app" / "migrations"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0008_debt_reminder_days"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0009_default_group_icons"]
 
 
 def _hourly(monkeypatch, **kw):

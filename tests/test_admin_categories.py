@@ -110,7 +110,9 @@ def test_page_and_api_show_counts_only(client, monkeypatch, no_network):
     _spend(cid, 3)
     page = client.get(PAGE)
     assert page.status_code == 200 and page.headers["cache-control"] == "no-store"
-    assert 'dir="rtl"' in page.text and "admin-categories.js?v=20261110b" in page.text
+    from app.config import STATIC_ASSET_VERSION
+
+    assert 'dir="rtl"' in page.text and f"admin-categories.js?v={STATIC_ASSET_VERSION}" in page.text
     data = json.loads(re.search(r'<script type="application/json" id="ac-data">(.*?)</script>', page.text, re.S).group(1))
     row = next(r for r in data["rows"] if r["id"] == cid)
     assert row["spend_count"] == 3

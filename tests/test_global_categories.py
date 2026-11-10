@@ -236,44 +236,44 @@ def test_non_admin_gets_403_on_category_crud(client, monkeypatch, no_network):
         assert db.query(SpendCategory).filter(SpendCategory.name == "hacked").count() == 0
 
 
+def _api_token(client):
+    return re.search(r'data-csrf="([^"]+)"', client.get("/admin/categories").text).group(1)
+
+
 def test_admin_crud_requires_csrf_and_archives_instead_of_deleting_used(client, monkeypatch, no_network):
     from app.db import SessionLocal
     from app.models import DailySpend, SpendCategory
 
     _admin(client, monkeypatch)
     cid, pid = _child("cafe")
-    r = client.post("/admin/db/spend-categories/new", data={"name": "قهوه", "parent_id": str(pid)})
-    assert r.status_code == 400
-    t = _csrf(client, "/admin/db/spend-categories/new")
-    r = client.post("/admin/db/spend-categories/new", data={"csrf": t, "name": " قهوه ", "parent_id": str(pid),
-                    "icon": "☕", "color": "#123abc", "sort_order": "7", "archived": "0"}, follow_redirects=False)
-    assert r.status_code == 303
+    api = "/admin/api/categories"
+    assert client.post(api, json={"name": "قهوه", "parent_id": pid}).status_code == 403
+    h = {"X-CSRF-Token": _api_token(client)}
+    r = client.post(api, json={"name": " قهوه ", "parent_id": pid, "icon": "☕", "color": "#123abc"}, headers=h)
+    assert r.status_code == 200
     with SessionLocal() as db:
         new = db.query(SpendCategory).filter(SpendCategory.name == "قهوه").one()
-        assert (new.parent_id, new.icon, new.color, new.sort_order, new.archived) == (pid, "☕", "#123abc", 7, False)
+        assert (new.parent_id, new.icon, new.color, new.archived) == (pid, None, None, False)  # children: no style
         new_id = new.id
-    r = client.post("/admin/db/spend-categories/new", data={"csrf": t, "name": "قهوه", "parent_id": str(pid)})
-    assert "همین نام" in r.text
-    r = client.post(f"/admin/db/spend-categories/{cid}", data={"csrf": t, "name": "کافه و قهوه", "parent_id": str(pid),
-                    "icon": "", "color": "bad", "sort_order": "1", "archived": "0"})
-    assert "رنگ" in r.text
-    r = client.post(f"/admin/db/spend-categories/{cid}", data={"csrf": t, "name": "کافه و قهوه", "parent_id": str(pid),
-                    "icon": "", "color": "", "sort_order": "1", "archived": "0"}, follow_redirects=False)
-    assert r.status_code == 303
+    r = client.post(api, json={"name": "قهوه", "parent_id": pid}, headers=h)
+    assert r.status_code == 422 and "همین نام" in r.json()["fields"]["name"]
+    r = client.patch(f"{api}/{pid}", json={"color": "#123abc"}, headers=h)
+    assert r.status_code == 422 and "color" in r.json()["fields"]
+    assert client.patch(f"{api}/{cid}", json={"name": "کافه و قهوه"}, headers=h).status_code == 200
     with SessionLocal() as db:
         db.add(DailySpend(user_id=1, category_id=cid, amount_toman=1000, spent_on=date(2026, 1, 1), note=""))
         db.commit()
-    client.post(f"/admin/db/spend-categories/{cid}/delete", data={"csrf": t})
+    assert client.delete(f"{api}/{cid}", headers=h).status_code == 409
     with SessionLocal() as db:
         assert db.get(SpendCategory, cid) is not None  # in use: never hard-deleted
-    client.post(f"/admin/db/spend-categories/{new_id}/delete", data={"csrf": t})
+    assert client.delete(f"{api}/{new_id}", headers=h).status_code == 200
     sms_bank, _ = _child("sms_bank")
-    client.post(f"/admin/db/spend-categories/{sms_bank}/delete", data={"csrf": t})
+    assert client.delete(f"{api}/{sms_bank}", headers=h).status_code == 409
     with SessionLocal() as db:
         assert db.get(SpendCategory, new_id) is None  # unused: deleted
         assert db.get(SpendCategory, sms_bank) is not None
-    page = client.get("/admin/db/spend-categories").text
-    assert "کافه و قهوه" in page and "فعال" in page
+    page = client.get("/admin/categories").text
+    assert "کافه و قهوه" in page
 
 
 def _picker(html):
@@ -293,9 +293,8 @@ def test_archived_category_hidden_from_picker_but_kept_on_old_spends(client, mon
             "parent_id": str(pid), "category_id": str(cid), "note": "old"}
     assert client.post("/profile/spends", data={**form, "csrf": _csrf(client, DAILY)}, follow_redirects=False).status_code == 303
     assert str(cid) in _picker(client.get(DAILY).text)
-    t = _csrf(client, "/admin/db/spend-categories/new")
-    client.post(f"/admin/db/spend-categories/{cid}", data={"csrf": t, "name": "کافه", "parent_id": str(pid),
-                "icon": "", "color": "", "sort_order": "1", "archived": "1"})
+    r = client.post(f"/admin/api/categories/{cid}/archive", headers={"X-CSRF-Token": _api_token(client)})
+    assert r.status_code == 200
     with SessionLocal() as db:
         assert db.get(SpendCategory, cid).archived
         spend_id = db.query(DailySpend).one().id

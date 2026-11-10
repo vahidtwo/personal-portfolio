@@ -2749,12 +2749,14 @@ html.dv-locked{overflow:hidden}
 @media (min-width:900px){.dv-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .dv-tile{padding:12px 14px;border-radius:14px;border:1px solid var(--border-subtle,var(--border));background:color-mix(in srgb,var(--text) 3%,transparent);min-width:0}
 .dv-tile>span{display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:13px;min-height:24px}
-.dv-tile b{display:block;font-size:19px;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-tile b{display:block;font-size:clamp(15px,4.4vw,19px);line-height:1.6;white-space:nowrap;overflow:visible;text-overflow:clip} /* money is never truncated */
+html[data-show-portfolio="1"] .dv-tile b[data-mask="portfolio"]{font-size:clamp(15px,4.4vw,19px)!important} /* the privacy reveal rule otherwise resets it to inherit (15px) */
 .dv-tile small{color:var(--text-muted);font-size:12.5px}
 .dv-tile.dv-left{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:12px}
 .dv-tile.dv-left>*{grid-column:1}
 .dv-tile.dv-left .privacy-btn{grid-column:2;grid-row:1/4;min-height:44px;min-width:44px;margin:0;padding:0 14px;border:1px solid var(--border);border-radius:12px}
 @media (min-width:900px){.dv-tile.dv-left{grid-column:auto}}
+@media (max-width:899px){.dv-tiles{display:flex;flex-wrap:wrap}.dv-tile{flex:1 1 calc(50% - 6px);min-width:min-content}.dv-tiles>.dv-tile:not(.dv-left):nth-child(odd):nth-last-child(2),.dv-tile.dv-left{flex-basis:100%}}
 .dv-next{display:flex;align-items:center;gap:12px;margin:12px 0 0;padding:12px 14px;border-radius:14px;background:var(--accent-muted);line-height:1.7;font-size:14px}
 .dv-next b{color:var(--text)}.dv-next .d{margin-inline-start:auto;color:var(--accent-text);font-weight:700;white-space:nowrap}
 [data-theme=light] .dv-next{background:#dff5ee}
@@ -2831,7 +2833,7 @@ html.dv-locked{overflow:hidden}
 }
 @media (max-width:599px){
   .dv-sheet .grid-form{grid-template-columns:1fr!important}.dv-sheet .grid-form>*{grid-column:1/-1}
-  .dv-tile{padding:10px 12px}.dv-tile b{font-size:17px}
+  .dv-tile{padding:10px 12px}
   .dv-row{grid-template-columns:minmax(0,1fr) 44px;grid-template-areas:"t dots" "a dots" "meta meta"}
   .dv-row .t{grid-area:t}.dv-row .a{grid-area:a;text-align:start;display:flex;gap:6px;align-items:baseline}.dv-row .a small{display:inline}
   .dv-dots{grid-area:dots;grid-row:auto;grid-column:auto;align-self:start}.dv-meta{grid-area:meta}

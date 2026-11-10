@@ -672,29 +672,38 @@
         if (isNew || v.icon !== r.icon) p.icon = v.icon;
         if (isNew || v.color !== (r.color || r.shown_color || "")) p.color = v.color;
       }
-      if (confirm) p.confirm_move = true;
+      if (confirm != null) { p.confirm_move = true; p.confirm_spend_count = confirm; }
       return p;
     }
-    function save(confirm) {
+    function askMove(count, onYes) {
+      var to = byId(v.parent_id);
+      dialog({
+        title: "جابه‌جایی «" + r.name + "» به «" + (to ? to.name : "") + "»؟", ok: "جابه‌جا کن",
+        body: "<p>" + fa(count) + " خرج قبلیِ همهٔ کاربران با این زیردسته به گروه «" + esc(to ? to.name : "") + "» می‌رود. خرج‌ها همان دسته را نگه می‌دارند، ولی نمودار ماه‌های قبل به‌حساب گروه تازه می‌آید.</p>",
+        onOk: function () { setTimeout(onYes, 0); }
+      });
+    }
+    function save(confirmCount) {
       if (!v.name.trim()) { setErr({ name: "نام دسته را بنویسید." }); $("#ac-name", el).focus(); return; }
-      if (!isNew && !confirm && v.parent_id !== r.parent_id && r.spend_count) {
-        var to = byId(v.parent_id);
-        dialog({
-          title: "جابه‌جایی «" + r.name + "» به «" + (to ? to.name : "") + "»؟", ok: "جابه‌جا کن",
-          body: "<p>" + fa(r.spend_count) + " خرج قبلیِ همهٔ کاربران با این زیردسته به گروه «" + esc(to ? to.name : "") + "» می‌رود. خرج‌ها همان دسته را نگه می‌دارند، ولی نمودار ماه‌های قبل به‌حساب گروه تازه می‌آید.</p>",
-          onOk: function () { setTimeout(function () { save(true); }, 0); }
-        });
+      if (!isNew && confirmCount == null && v.parent_id !== r.parent_id && r.spend_count) {
+        var seen = r.spend_count;
+        askMove(seen, function () { save(seen); });
         return;
       }
       busy(true); setErr(null, null);
-      var req = isNew ? api("POST", "", payload()) : api("PATCH", "/" + r.id, payload(confirm));
+      var req = isNew ? api("POST", "", payload()) : api("PATCH", "/" + r.id, payload(confirmCount));
       req.then(function (res) {
         busy(false);
         if (res.status === 200 && res.body.ok) {
           take(res); var id = res.body.id; closeModal(true); render(id); toast("ذخیره شد"); return;
         }
         if (res.status === 422) { setErr(res.body.fields, null); var f = $("[aria-invalid=true]", el) || $("#ac-name", el); f.focus(); return; }
-        if (res.status === 409 && res.body.reason === "needs_confirm") { save(true); return; }
+        if (res.status === 409 && res.body.reason === "needs_confirm") {
+          var fresh = res.body.spend_count;  /* the count changed since the page loaded: ask again with the server's number */
+          r.spend_count = fresh;
+          askMove(fresh, function () { save(fresh); });
+          return;
+        }
         setErr(null, errText(res));
       }, function () { busy(false); setErr(null, "ذخیره نشد؛ اتصال به سرور برقرار نشد. چیزی که نوشتید سر جایش مانده است."); });
     }
@@ -713,7 +722,7 @@
     el.addEventListener("click", function (e) {
       var t = e.target.closest("button"); if (!t || t.disabled) return;
       if (t.hasAttribute("data-close")) { closeModal(); return; }
-      if (t.hasAttribute("data-save")) { save(false); return; }
+      if (t.hasAttribute("data-save")) { save(null); return; }
       if (t.hasAttribute("data-kind")) {
         kind = t.getAttribute("data-kind");
         if (kind === "child" && !v.parent_id) { var first = groupOptions()[0]; v.parent_id = first ? first.id : null; }

@@ -389,3 +389,57 @@ def test_migration_0009_sets_only_empty_default_icons(tmp_path):
     with sqlite3.connect(db) as c:
         assert c.execute("select * from daily_spends").fetchall() == before
         assert c.execute("pragma integrity_check").fetchone()[0] == "ok"
+
+
+def test_stale_spend_count_asks_again_and_writes_nothing(client, monkeypatch, no_network):
+    from app.db import SessionLocal
+    from app.models import AdminAuditLog
+
+    _admin(client, monkeypatch)
+    h = _h(client)
+    cid, pid = _child("cafe")
+    _, other_parent = _child("fuel")
+    _spend(cid, 1)
+    seen = _rows(client)[cid]["spend_count"]
+    _spend(cid, 2)  # more spends arrive after the admin saw the warning
+    before = _snapshot()
+    r = client.patch(f"{API}/{cid}", json={"parent_id": other_parent, "confirm_move": True,
+                                           "confirm_spend_count": seen}, headers=h)
+    assert r.status_code == 409 and r.json()["reason"] == "needs_confirm" and r.json()["spend_count"] == 3
+    for bad in ("3", True):
+        r = client.patch(f"{API}/{cid}", json={"parent_id": other_parent, "confirm_move": True,
+                                               "confirm_spend_count": bad}, headers=h)
+        assert r.status_code == 409, bad
+    with SessionLocal() as db:
+        assert db.query(AdminAuditLog).filter(AdminAuditLog.action == "category_reparent").count() == 0
+    assert _row(cid).parent_id == pid and _snapshot() == before  # cancel = no further request = no write
+    r = client.patch(f"{API}/{cid}", json={"parent_id": other_parent, "confirm_move": True,
+                                           "confirm_spend_count": 3}, headers=h)
+    assert r.status_code == 200 and _row(cid).parent_id == other_parent and _snapshot() == before
+
+
+def test_client_reconfirms_with_server_count_instead_of_retrying():
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "admin-categories.js").read_text(encoding="utf-8")
+    branch = re.search(r'reason === "needs_confirm"\) \{(.*?)\n        \}', js, re.S).group(1)
+    assert "askMove(fresh" in branch and "res.body.spend_count" in branch
+    assert "save(true)" not in js
+    assert "confirm_spend_count" in js
+
+
+def test_writes_without_or_with_wrong_csrf_token_are_403(client, monkeypatch, no_network):
+    _admin(client, monkeypatch)
+    _token(client)
+    cid, pid = _child("cafe")
+    before = (_snapshot(), _row(cid).name, _row(cid).archived)
+    writes = [("post", API, {"name": "بدون توکن", "parent_id": pid}), ("patch", f"{API}/{cid}", {"name": "x"}),
+              ("post", f"{API}/{cid}/archive", {}), ("post", f"{API}/{cid}/restore", {}), ("delete", f"{API}/{cid}", None),
+              ("post", f"{API}/reorder", {"parent_id": pid, "ids": []}), ("post", f"{API}/seed", {})]
+    for headers in ({}, {"X-CSRF-Token": "wrong"}):
+        for method, path, body in writes:
+            kw = {"json": body} if body is not None else {}
+            r = getattr(client, method)(path, headers=headers, **kw)
+            assert r.status_code == 403, (method, path, headers)
+    assert (_snapshot(), _row(cid).name, _row(cid).archived) == before
+    assert not [r for r in _rows(client).values() if r["name"] == "بدون توکن"]

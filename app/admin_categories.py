@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -63,7 +63,11 @@ def _admin(request: Request, db: Session):
 
 
 def _csrf(request: Request) -> None:
-    require_csrf(request, request.headers.get("x-csrf-token"))
+    """Every API write needs the session's token in X-CSRF-Token; a missing or wrong one is 403."""
+    try:
+        require_csrf(request, request.headers.get("x-csrf-token"))
+    except HTTPException:
+        raise HTTPException(status_code=403, detail="CSRF token invalid") from None
 
 
 async def _body(request: Request) -> dict:
@@ -333,7 +337,9 @@ async def api_update(cid: int, request: Request, db: Session = Depends(get_db)):
 
     moved = new_parent_id != row.parent_id
     spend_count = db.query(func.count(DailySpend.id)).filter(DailySpend.category_id == row.id).scalar() or 0
-    if moved and spend_count and not data.get("confirm_move"):
+    seen = data.get("confirm_spend_count")
+    stale_count = seen is not None and (not isinstance(seen, int) or isinstance(seen, bool) or seen != spend_count)
+    if moved and spend_count and (not data.get("confirm_move") or stale_count):
         return _err(409, reason="needs_confirm", spend_count=spend_count,
                     error="این زیردسته خرج دارد؛ جابه‌جایی‌اش خرج‌های قبلی را هم به گروه تازه می‌برد.")
     old_parent_id = row.parent_id

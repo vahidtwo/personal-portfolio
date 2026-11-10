@@ -247,7 +247,7 @@ def test_admin_crud_requires_csrf_and_archives_instead_of_deleting_used(client, 
     _admin(client, monkeypatch)
     cid, pid = _child("cafe")
     api = "/admin/api/categories"
-    assert client.post(api, json={"name": "قهوه", "parent_id": pid}).status_code == 400
+    assert client.post(api, json={"name": "قهوه", "parent_id": pid}).status_code == 403
     h = {"X-CSRF-Token": _api_token(client)}
     r = client.post(api, json={"name": " قهوه ", "parent_id": pid, "icon": "☕", "color": "#123abc"}, headers=h)
     assert r.status_code == 200

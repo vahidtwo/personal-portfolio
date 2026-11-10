@@ -34,7 +34,7 @@ html.ac-locked{overflow:hidden}
 .ac-search input::-webkit-search-cancel-button{display:none}
 .ac-clr{position:absolute;inset-inline-end:2px;width:44px;height:44px;border:0;background:none;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .ac-seg{display:inline-flex;border:1px solid var(--ac-border-strong);border-radius:12px;padding:3px;gap:2px;background:var(--ac-card)}
-.ac-seg button{min-height:40px;min-width:44px;padding:0 14px;border:0;border-radius:9px;background:none;cursor:pointer;color:var(--text-muted);font:inherit;font-weight:600;font-size:14px;white-space:nowrap}
+.ac-seg button{min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:9px;background:none;cursor:pointer;color:var(--text-muted);font:inherit;font-weight:600;font-size:14px;white-space:nowrap}
 .ac-seg button[aria-pressed=true],.ac-seg button[aria-checked=true]{background:var(--accent-muted);color:var(--ac-accent-text);font-weight:800}
 .ac-lay{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
 .ac-card{background:var(--ac-card);border:1px solid var(--ac-border);border-radius:16px}
@@ -188,9 +188,8 @@ html.ac-locked{overflow:hidden}
  .ac-shb{padding:14px 16px 8px}
  .ac-shf{padding:12px 16px 16px}
  .ac-icgrid{grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:8px}
- .ac-swgrid{grid-template-columns:repeat(7,40px);gap:8px;justify-content:space-between}
- .ac-swb{width:40px;height:40px;position:relative}
- .ac-swb:after{content:"";position:absolute;inset:-2px}
+ .ac-swgrid{grid-template-columns:repeat(7,44px);gap:6px;justify-content:space-between}
+ .ac-swb{width:44px;height:44px}
  .ac-dlg{left:12px;right:12px;width:auto;max-width:none;top:auto;bottom:12px;transform:none;padding:20px}
  .ac-acts2{flex-direction:column}
  .ac-acts2 .ac-btn{min-height:48px}

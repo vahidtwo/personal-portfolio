@@ -2,6 +2,8 @@
 from pathlib import Path
 import re
 
+from tests.test_holdings import no_network  # noqa: F401
+
 CSS = (Path(__file__).resolve().parent.parent / "app/static/style.css").read_text(encoding="utf-8")
 
 
@@ -46,7 +48,12 @@ REVEALED_HERO = 'html[data-show-portfolio="1"].dash-hero[data-mask="portfolio"].
 def test_revealed_hero_scales_with_its_card_on_phones():
     assert any("container-type:inline-size" in body for body in _rules(r"\.dash-hero"))
     mobile = _media("max-width: ?899px")
-    assert REVEALED_HERO + "font-size:clamp(22px,11cqi,40px)!important;}" in mobile
+    assert REVEALED_HERO + "font-size:clamp(22px,10.5cqi,40px)!important;}" in mobile
+    long_sel = REVEALED_HERO[:-1] + ":is(" + ",".join(f'[data-digits="{n}"]' for n in range(12, 21)) + "){"
+    assert long_sel + "font-size:clamp(22px,8cqi,40px)!important;}" in mobile
+    assert mobile.index(REVEALED_HERO) < mobile.index(long_sel)
+    uses = [ln.strip() for ln in CSS.splitlines() if "[data-digits=" in ln]
+    assert uses and all(ln.startswith('html[data-show-portfolio="1"] ') for ln in uses)  # only under the revealed selector
     assert REVEALED_HERO not in _media("max-width: ?380px")  # a later phone rule would override the card-based size
     assert mobile.index(REVEALED_HERO) < mobile.index(".dash-hero.total-num{white-space:normal;overflow-wrap:anywhere;}")
 
@@ -60,3 +67,21 @@ def test_report_amount_drops_under_its_label_instead_of_spilling():
     body = "".join(_rules(r"\.net-line dd\.num"))
     assert "min-width:min-content" in body and "margin-inline-start:auto" in body
     assert any(r.startswith(".net-line dd.num") and "white-space: nowrap" in r for r in re.findall(r"^[^{}\n]*\{[^{}]*\}", CSS, re.M))
+
+
+def test_digit_count_is_set_only_while_shown_and_never_in_page_html(client, no_network):
+    from tests.amounts_helper import amounts_for
+    from tests.test_holdings import _csrf, _register
+
+    _register(client)
+    client.post("/profile", data={"cash_toman": "9876543210987", "csrf": _csrf(client)})
+    html = client.get("/dashboard").text
+    hero = re.search(r'<span class="total-num"[^>]*>', html).group(0)
+    assert "data-digits-slot" in hero
+    assert not re.search(r"data-digits\s*=", html)  # no digit count (order of magnitude) in the server HTML
+    net = amounts_for(client, "/dashboard")["net"]
+    assert len(re.findall(r"[0-9\u06f0-\u06f9]", net)) == 13 and net not in html
+    js = (Path(__file__).resolve().parent.parent / "app/static/amounts.js").read_text(encoding="utf-8")
+    sync = js[js.index("function syncDigits"):js.index("W.Amounts = {")]
+    assert "var on = shown();" in sync and 'removeAttribute("data-digits")' in sync
+    assert 'addEventListener("amounts:filled", syncDigits)' in sync and 'attributeFilter: ["data-show-portfolio"]' in sync

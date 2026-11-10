@@ -2121,8 +2121,10 @@ html:not([data-show-portfolio="1"]) .stat dd[data-mask] > small { display: none;
   .stats, .dash-tiles { display: flex; flex-wrap: wrap; }
   .stat { flex: 1 1 0; min-width: min-content; }
   .tile { flex: 1 1 calc(50% - 5px); min-width: min-content; }
-  html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { font-size: clamp(22px, 11cqi, 40px) !important; } /* sized to the card so the number stays on one line */
-  .dash-hero .total-num { white-space: normal; overflow-wrap: anywhere; } /* last resort only: wrap, never clip in .summary */
+  html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { font-size: clamp(22px, 10.5cqi, 40px) !important; } /* sized to the card so the number stays on one line */
+  /* 12+ digits: data-digits is set by amounts.js only while amounts are shown */
+  html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num:is([data-digits="12"], [data-digits="13"], [data-digits="14"], [data-digits="15"], [data-digits="16"], [data-digits="17"], [data-digits="18"], [data-digits="19"], [data-digits="20"]) { font-size: clamp(22px, 8cqi, 40px) !important; }
+  .dash-hero .total-num { white-space: normal; overflow-wrap: anywhere; } /* last resort, only once the size is at its 22px floor: wrap, never clip in .summary */
 }
 
 /* asset cards (phones) */

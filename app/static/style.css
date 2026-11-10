@@ -1357,6 +1357,10 @@ html[data-show-portfolio="1"] [data-mask="portfolio"]::after,
 html[data-show-salary="1"] [data-mask="salary"]::after {
   content: none;
 }
+/* Signed amounts are left-to-right islands, so a minus stays before the digits («−۸۸۸»). The hero net
+   needs it here because .total-num is an RTL box; the other signed values sit in <bdi dir="ltr">.
+   The placeholder is empty until amounts are shown. */
+.total-num > [data-amt] { unicode-bidi: isolate; direction: ltr; }
 .section-logo {
   width: 18px;
   height: 18px;

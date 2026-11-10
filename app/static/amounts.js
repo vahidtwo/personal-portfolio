@@ -65,6 +65,19 @@
     return pending;
   }
 
+  // [data-digits-slot] gets data-digits (how many digits it shows) only while amounts are shown, so CSS
+  // can size a long number. It is never in the page HTML and is removed again on hide.
+  function syncDigits() {
+    var on = shown();
+    document.querySelectorAll("[data-digits-slot]").forEach(function (el) {
+      var n = on ? (el.textContent.match(/[0-9\u06F0-\u06F9\u0660-\u0669]/g) || []).length : 0;
+      if (n) el.setAttribute("data-digits", String(n));
+      else el.removeAttribute("data-digits");
+    });
+  }
+  document.addEventListener("amounts:filled", syncDigits);
+  new MutationObserver(syncDigits).observe(document.documentElement, { attributes: true, attributeFilter: ["data-show-portfolio"] });
+
   W.Amounts = {
     // Re-read after a part of the page was swapped in from url (defaults to this page).
     refresh: function (url) { loaded = null; return shown() ? load(url, true) : Promise.resolve(false); },

@@ -290,7 +290,7 @@ def test_dashboard_numbers_match_previous_formulas(client, no_network):
     old_total = format_toman(view.total_toman)                    # pre-Phase-2 total_label
     old_usd = format_number(view.total_toman / Decimal("100000"), 2)  # pre-Phase-2 usd label (trimmed)
     assert old_net == "۲۳٬۲۰۰٬۰۰۰" and old_total == "۲۳٬۵۰۰٬۰۰۰"
-    assert f'data-mask="portfolio">{old_net}</span>' in html
+    assert re.search(r'<span class="total-num"[^>]*data-mask="portfolio"[^>]*>' + re.escape(old_net) + '</span>', html)
     tfoot = html[html.index("<tfoot>"):html.index("</tfoot>")]
     assert old_total in tfoot
     # the exact debt total is no longer in a hover title (it showed while amounts were hidden)

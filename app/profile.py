@@ -67,9 +67,11 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
             "due_year": editing["due_year"],
             "due_month": editing["due_month"],
             "due_day": editing["due_day"],
+            "reminder_days_before": editing["reminder_days_before"],
         }
         if editing
-        else {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": ""}
+        else {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": "",
+              "reminder_days_before": "1"}
     )
     flash_message, flash_error = pop_flash(request)
     mcp_token = request.session.pop("mcp_token_once", None)

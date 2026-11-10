@@ -64,7 +64,7 @@
           </div>
           <div class="dv-menu" role="menu" aria-label="گزینه‌های {{ r.display_title }}" hidden data-dv-menu>
             <a role="menuitem" href="/profile?tab=debts&edit={{ r.id }}" data-dv-edit="debt" data-id="{{ r.id }}"
-              {{ amt_attrs(("data-form", "debt-form-" ~ r.id, {"title": r.title, "monthly_toman": r.monthly_raw, "months_left": r.months_raw, "due_year": r.due_year, "due_month": r.due_month, "due_day": r.due_day, "orig": r.monthly_orig})) }}>ویرایش</a>
+              {{ amt_attrs(("data-form", "debt-form-" ~ r.id, {"title": r.title, "monthly_toman": r.monthly_raw, "months_left": r.months_raw, "due_year": r.due_year, "due_month": r.due_month, "due_day": r.due_day, "reminder_days_before": r.reminder_days_before, "orig": r.monthly_orig})) }}>ویرایش</a>
             {% if r.active %}
             <form method="post" action="/profile/debts/{{ r.id }}/paid" data-dv-action>
               <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="expect" value="{{ r.months_left }}">
@@ -154,6 +154,13 @@
         <span class="dv-err" id="dv-err-due_year" data-dv-err>{{ e.due_year or "" }}</span>
         <p class="dv-hint" id="dv-date-hint">روزِ این تاریخ، روز قسط در هر ماه است.</p>
       </fieldset>
+      {% set rem = dv.debt_form.reminder_days_before or "1" %}
+      <label class="span-2 dv-field"><span class="label-text">یادآوری قسط</span>
+        <select id="dv-reminder_days_before" name="reminder_days_before" data-default="1" aria-describedby="dv-err-reminder_days_before dv-reminder-hint"{% if e.reminder_days_before %} aria-invalid="true"{% endif %}>
+          {% for value, label in dv.reminder_options %}<option value="{{ value }}"{% if rem == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <span class="dv-err" id="dv-err-reminder_days_before" data-dv-err>{{ e.reminder_days_before or "" }}</span>
+        <span class="dv-hint" id="dv-reminder-hint">اعلان قبل از سررسید هر قسط، بدون مبلغ.</span></label>
       <p class="dv-preview span-2" aria-live="polite" data-dv-preview hidden></p>
       <p class="dv-fail span-2" role="alert" data-dv-fail hidden>ذخیره نشد. اتصال برقرار نشد. چیزی که نوشتید سر جایش مانده است.</p>
       <div class="form-actions span-2">

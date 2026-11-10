@@ -51,18 +51,18 @@ def _run(db, now, push, monkeypatch=None):
     return send_due_reminders(db, now=now, push=push)
 
 
-def test_sent_three_days_before_once_with_jalali_and_no_amount(db, monkeypatch):
+def test_sent_one_day_before_once_with_jalali_and_no_amount(db, monkeypatch):
     monkeypatch.delenv("DUE_REMINDER_DAYS", raising=False)
     _debt(db)
     push = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 16), push) == 0  # 4 days before: too early
-    assert _run(db, _utc_noon(1405, 8, 17), push) == 1  # 3 days before
+    assert _run(db, _utc_noon(1405, 8, 18), push) == 0  # 2 days before: too early
+    assert _run(db, _utc_noon(1405, 8, 19), push) == 1  # 1 day before
     body = push.calls[0]["body"]
-    assert "۱۴۰۵/۰۸/۲۰" in body and "۳ روز دیگر" in body and "وام فیک" in body
+    assert "۱۴۰۵/۰۸/۲۰" in body and "فردا" in body and "وام فیک" in body
     for amount in ("12345678", "۱۲٬۳۴۵٬۶۷۸", "۱۲,۳۴۵,۶۷۸", "۱۲۳۴۵۶۷۸", "تومان"):
-        assert amount not in body + push.calls[0]["title"]
-    # later hours and days before the due date: never again
-    for day in (17, 18, 19, 20):
+        assert amount not in body + push.calls[0]["title"] + repr(push.calls[0]["data"])
+    # later hours and the due day itself: never again
+    for day in (19, 20):
         for shift in (0, 3):
             assert _run(db, _utc_noon(1405, 8, day, shift), push) == 0
     assert len(push.calls) == 1
@@ -71,10 +71,10 @@ def test_sent_three_days_before_once_with_jalali_and_no_amount(db, monkeypatch):
 def test_next_instalment_after_payment_gets_its_own_reminder(db):
     debt = _debt(db)
     push = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 18), push) == 1
+    assert _run(db, _utc_noon(1405, 8, 19), push) == 1
     debt.months_left, debt.due_month = 4, 9  # paid: next one a month on
     db.commit()
-    assert _run(db, _utc_noon(1405, 9, 17), push) == 1
+    assert _run(db, _utc_noon(1405, 9, 19), push) == 1
     assert "۱۴۰۵/۰۹/۲۰" in push.calls[-1]["body"]
 
 
@@ -98,7 +98,7 @@ def test_overdue_gets_one_separate_notice(db):
 def test_upcoming_then_overdue_is_two_notices_total(db):
     _debt(db)
     push = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 18), push) == 1
+    assert _run(db, _utc_noon(1405, 8, 19), push) == 1
     assert _run(db, _utc_noon(1405, 8, 21), push) == 1
     assert [c["data"]["type"] for c in push.calls] == ["debt_upcoming", "debt_overdue"]
 
@@ -106,10 +106,10 @@ def test_upcoming_then_overdue_is_two_notices_total(db):
 def test_not_delivered_is_retried_then_sent_once(db):
     _debt(db)
     failing = FakePush(delivered=0)
-    assert _run(db, _utc_noon(1405, 8, 18), failing) == 0
+    assert _run(db, _utc_noon(1405, 8, 19), failing) == 0
     ok = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 18, 1), ok) == 1
-    assert _run(db, _utc_noon(1405, 8, 18, 2), ok) == 0
+    assert _run(db, _utc_noon(1405, 8, 19, 1), ok) == 1
+    assert _run(db, _utc_noon(1405, 8, 19, 2), ok) == 0
 
 
 def test_push_exception_does_not_crash_or_record(db):
@@ -118,31 +118,31 @@ def test_push_exception_does_not_crash_or_record(db):
     def boom(*a, **k):
         raise RuntimeError("fcm down")
 
-    assert _run(db, _utc_noon(1405, 8, 18), boom) == 0
-    assert _run(db, _utc_noon(1405, 8, 18), FakePush()) == 1
+    assert _run(db, _utc_noon(1405, 8, 19), boom) == 0
+    assert _run(db, _utc_noon(1405, 8, 19), FakePush()) == 1
 
 
 def test_quiet_hours(db):
     _debt(db)
     push = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 18, -5), push) == 0  # 07:00 Tehran
-    assert _run(db, _utc_noon(1405, 8, 18, 10), push) == 0  # 22:00 Tehran
+    assert _run(db, _utc_noon(1405, 8, 19, -5), push) == 0  # 07:00 Tehran
+    assert _run(db, _utc_noon(1405, 8, 19, 10), push) == 0  # 22:00 Tehran
     assert push.calls == []
 
 
-def test_days_configurable_by_env(db, monkeypatch):
-    monkeypatch.setenv("DUE_REMINDER_DAYS", "1")
+def test_default_days_configurable_by_env(db, monkeypatch):
+    monkeypatch.setenv("DUE_REMINDER_DAYS", "3")
     _debt(db)
     push = FakePush()
-    assert _run(db, _utc_noon(1405, 8, 18), push) == 0
-    assert _run(db, _utc_noon(1405, 8, 19), push) == 1 and "فردا" in push.calls[0]["body"]
+    assert _run(db, _utc_noon(1405, 8, 16), push) == 0
+    assert _run(db, _utc_noon(1405, 8, 17), push) == 1 and "۳ روز دیگر" in push.calls[0]["body"]
 
 
 def test_firebase_not_configured_sends_nothing(db):
     from app.due_reminders import send_due_reminders
 
     _debt(db)
-    assert send_due_reminders(db, now=_utc_noon(1405, 8, 18)) == 0  # default push: Firebase admin not set
+    assert send_due_reminders(db, now=_utc_noon(1405, 8, 19)) == 0  # default push: Firebase admin not set
 
 
 def test_hourly_job_calls_reminders(monkeypatch, client):
@@ -186,7 +186,7 @@ def test_migration_chain_0004_0005_0006_up_and_down(tmp_path):
     assert version() == "0005_sanjeh_token_encrypt" and _tokens(db)[1].startswith("enc1:")
     assert "due_reminders" not in tables()
     ok("upgrade", "head")
-    assert version() == "0007_global_categories"
+    assert version() == "0008_debt_reminder_days"
     ok("stamp", "0005_sanjeh_token_encrypt")
     ok("upgrade", "head")  # table already there: no-op
     after = _dump(db)
@@ -206,7 +206,7 @@ def test_single_alembic_head():
 
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parent.parent / "app" / "migrations"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0007_global_categories"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0008_debt_reminder_days"]
 
 
 def _hourly(monkeypatch, **kw):

@@ -147,6 +147,8 @@ class Debt(Base):
     due_year: Mapped[int] = mapped_column()
     due_month: Mapped[int] = mapped_column()
     due_day: Mapped[int] = mapped_column()
+    # Upcoming push N days before each due date. NULL = default (1), 0 = same day, -1 = off.
+    reminder_days_before: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="debts")

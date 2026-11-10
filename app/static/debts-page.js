@@ -15,7 +15,7 @@
     expDay: "روز بین ۱ تا ۳۱ است",
     day: function (n) { return "این ماه " + fa(n) + " روز دارد"; },
   };
-  var SHORT = { monthly_toman: "مبلغ هر قسط", months_left: "تعداد قسط مانده", due_year: "سال", due_month: "ماه", due_day: "روز", amount_toman: "مبلغ" };
+  var SHORT = { monthly_toman: "مبلغ هر قسط", months_left: "تعداد قسط مانده", due_year: "سال", due_month: "ماه", due_day: "روز", amount_toman: "مبلغ", reminder_days_before: "یادآوری قسط" };
   var DEBT_ORDER = ["monthly_toman", "months_left", "due_year", "due_month", "due_day"];
 
   function norm(raw) { try { return N().normalize(raw); } catch (e) { return null; } }
@@ -123,7 +123,7 @@
     var v = formValues(form);
     return form.getAttribute("data-dv-form") === "expense" ? validateExpense(v) : validateDebt(v);
   }
-  function fields(form) { return form.getAttribute("data-dv-form") === "expense" ? ["amount_toman", "due_day"] : DEBT_ORDER; }
+  function fields(form) { return form.getAttribute("data-dv-form") === "expense" ? ["amount_toman", "due_day"] : DEBT_ORDER.concat(["reminder_days_before"]); }
   function showErrors(form, errs) {
     var sheet = form.closest("[data-dv-sheet]"), sum = $("[data-dv-summary]", sheet), p = prefix(form);
     fields(form).forEach(function (k) { setErr(form, k, errs[k]); });
@@ -166,6 +166,11 @@
         if (data && data.orig) i.setAttribute("data-dv-orig", data.orig); else i.removeAttribute("data-dv-orig");
         i.dispatchEvent(new Event("blur"));
       }
+    });
+    $$("select[data-default]", form).forEach(function (sel) {
+      var val = data && data[sel.name] != null && data[sel.name] !== "" ? String(data[sel.name]) : sel.getAttribute("data-default");
+      sel.value = val;
+      if (sel.selectedIndex < 0) sel.value = sel.getAttribute("data-default");
     });
     showErrors(form, {});
     $("[data-dv-fail]", form).hidden = true;

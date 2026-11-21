@@ -4,6 +4,7 @@
 <style>
   /* load failed: tiles read «—» without a unit, and the next-due strip is hidden (review #24) */
   .dv-page [data-dv-loadfail]:not([hidden]) ~ .dv-grid :is(.dv-unit,[data-dv-swap="next"]){display:none}
+  .dv-tile .dv-unit[data-installment-overdue]{display:block;margin-top:2px}
 </style>
 <div class="dv-page" data-dv-page{% if dv.sheet %} data-dv-open="{{ dv.sheet }}"{% endif %}>
   <p class="dv-sub">وام‌ها و قسط‌ها، و پرداخت‌های ثابت هر ماه مثل اجاره و قبض.</p>
@@ -29,7 +30,7 @@
       {% else %}
       <h2 id="dv-sum-h">این ماه</h2>
       <div class="dv-tiles">
-        <div class="dv-tile"><span>اقساط باقی‌مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("installments-left", dv.installment_label) }}</bdi></b><small class="dv-unit">تومان</small>{% if dv.installment_overdue_label %}<small class="dv-unit" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", dv.installment_overdue_label) }}</bdi></small>{% endif %}</div>
+        <div class="dv-tile"><span>اقساط باقی‌مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("installments-left", dv.installment_label) }}</bdi></b><small class="dv-unit">تومان</small>{% if dv.installment_overdue_label %} <small class="dv-unit" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", dv.installment_overdue_label) }}</bdi></small>{% endif %}</div>
         <div class="dv-tile"><span>هزینهٔ ماهانه</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("fixed-monthly", dv.expense_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
         <div class="dv-tile"><span>جمع بدهی مانده</span><b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">{{ amt("debts", dv.total_label) }}</bdi></b><small class="dv-unit">تومان</small></div>
 {% include "partials/debts_left_tile.html" %}

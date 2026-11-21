@@ -22,10 +22,10 @@ FIRST = jdatetime.date(1405, 8, 1)
 LAST = jdatetime.date(1405, 8, 30)
 
 
-def test_unpaid_and_paid_this_month_both_count():
+def test_unpaid_this_month_counts_and_next_month_does_not():
     unpaid = D(5, 1405, 8, 20, 1000)
-    paid = D(4, 1405, 9, 5, 2000)
-    assert ds.this_month_installments([unpaid, paid], TODAY) == Decimal("3000")
+    nxt = D(4, 1405, 9, 5, 2000)
+    assert ds.this_month_installments([unpaid, nxt], TODAY) == Decimal("1000")
 
 
 def test_older_overdue_months_are_not_added():
@@ -53,7 +53,7 @@ def test_month_boundaries():
     assert ds.this_month_installments([debt], LAST) == Decimal("1000")
     last_day = D(3, 1405, 8, 31, 1000)
     assert ds.this_month_installments([last_day], LAST) == Decimal("1000")
-    assert ds.this_month_installments([D(3, 1405, 9, 1, 1000)], LAST) == Decimal("1000")
+    assert ds.this_month_installments([D(3, 1405, 9, 1, 1000)], LAST) == Decimal("0")
     assert ds.this_month_installments([D(3, 1405, 9, 1, 1000)], jdatetime.date(1405, 9, 1)) == Decimal("1000")
 
 
@@ -61,13 +61,13 @@ def test_new_loan_starting_next_month_is_not_counted():
     created = datetime(2026, 11, 3, 8, tzinfo=timezone.utc)
     assert ds.this_month_installments([D(6, 1405, 9, 5, 1000, created)], TODAY) == Decimal("0")
     early = datetime(2026, 10, 1, 8, tzinfo=timezone.utc)
-    assert ds.this_month_installments([D(6, 1405, 9, 5, 1000, early)], TODAY) == Decimal("1000")
+    assert ds.this_month_installments([D(6, 1405, 9, 5, 1000, early)], TODAY) == Decimal("0")
 
 
 def test_salary_left_formula_and_negative():
     debts = [D(5, 1405, 8, 20, 4_000_000), D(4, 1405, 9, 5, 3_000_000), D(2, 1405, 6, 1, 1_000_000)]
-    assert ds.salary_left(20_000_000, debts, 5_000_000, TODAY) == Decimal("8000000")
-    assert ds.salary_left(6_000_000, debts, 5_000_000, TODAY) == Decimal("-6000000")
+    assert ds.salary_left(20_000_000, debts, 5_000_000, TODAY) == Decimal("11000000")
+    assert ds.salary_left(6_000_000, debts, 5_000_000, TODAY) == Decimal("-3000000")
     assert ds.salary_left(None, [], None, TODAY) == Decimal("0")
 
 
@@ -93,12 +93,12 @@ def test_pages_split_remaining_and_month_total(client, no_network, clock):  # no
     dash = with_amounts(client, "/dashboard")
     left = re.search(r"<dt>اقساط باقی‌مانده</dt><dd[^>]*><bdi[^>]*data-amount>([^<]+)</bdi>", dash)
     total = re.search(r"<dt>جمع اقساط این ماه</dt><dd[^>]*><bdi[^>]*data-mask=\"portfolio\" data-amount data-month-total>([^<]+)</bdi>", dash)
-    assert left.group(1) == "۲٬۲۰۰٬۰۰۰" and total.group(1) == "۱٬۷۰۰٬۰۰۰"
+    assert left.group(1) == "۲٬۲۰۰٬۰۰۰" and total.group(1) == "۱٬۲۰۰٬۰۰۰"
     tab = with_amounts(client, P)
-    assert re.search(r'<p class="dv-sumrow lead" data-month-total-row><span>جمع اقساط این ماه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount data-month-total>۱٬۷۰۰٬۰۰۰</bdi>', tab)
+    assert re.search(r'<p class="dv-sumrow lead" data-month-total-row><span>جمع اقساط این ماه</span><b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount data-month-total>۱٬۲۰۰٬۰۰۰</bdi>', tab)
     assert "جمع اقساط این ماه" not in tab[tab.index("dv-tiles"):tab.index("data-month-total-row")]
     assert re.search(r"<span>اقساط باقی‌مانده</span><b[^>]*data-mask=\"portfolio\"[^>]*><bdi dir=\"ltr\">۲٬۲۰۰٬۰۰۰<", tab)
-    assert client.get("/api/salary").json()["left"] == "۷٬۳۰۰٬۰۰۰"
+    assert client.get("/api/salary").json()["left"] == "۷٬۸۰۰٬۰۰۰"
 
 
 def test_dashboard_month_total_sits_in_monthly_report(client, no_network, clock):  # noqa: F811
@@ -135,5 +135,57 @@ def test_final_paid_in_esfand_rolls_to_farvardin():
 
 def test_final_paid_not_double_counted_with_active_loans():
     debts = [D(0, 1405, 9, 10, 700), D(3, 1405, 8, 20, 1000), D(2, 1405, 9, 5, 500)]
-    assert ds.this_month_installments(debts, TODAY) == Decimal("2200")
+    assert ds.this_month_installments(debts, TODAY) == Decimal("1700")
     assert ds.month_due(debts, TODAY)[0] == Decimal("1000")
+
+
+def test_next_month_loan_after_due_day_is_not_counted():
+    """A next-month unpaid loan is out, even when its due day has already passed this month."""
+    early = datetime(2026, 10, 1, 8, tzinfo=timezone.utc)
+    # Prod case: 30 آبان, loan due 30 آذر, entered earlier.
+    assert ds.this_month_installments([D(6, 1405, 9, 30, 10_000_000, early)], LAST) == Decimal("0")
+    assert ds.this_month_installments([D(6, 1405, 9, 13, 10_000_000, early)], TODAY) == Decimal("0")
+    assert ds.this_month_installments([D(6, 1405, 9, 5, 2000)], TODAY) == Decimal("0")
+
+
+def test_this_month_loan_is_counted():
+    assert ds.this_month_installments([D(5, 1405, 8, 20, 2_000_000)], TODAY) == Decimal("2000000")
+    assert ds.this_month_installments([D(5, 1405, 8, 10, 2_000_000)], TODAY) == Decimal("2000000")
+    assert ds.this_month_installments([D(3, 1405, 8, 30, 1000)], LAST) == Decimal("1000")
+
+
+def test_overdue_loan_adds_only_this_month_slice():
+    late = D(5, 1405, 6, 10, 1000)
+    assert ds.month_due([late], TODAY) == (Decimal("3000"), Decimal("3000"))
+    assert ds.this_month_installments([late], TODAY) == Decimal("1000")
+    # Earlier-month overdue plus a this-month unpaid plus a next-month unpaid.
+    debts = [D(5, 1405, 6, 10, 1_000_000), D(3, 1405, 8, 30, 2_000_000), D(4, 1405, 9, 30, 10_000_000)]
+    assert ds.this_month_installments(debts, LAST) == Decimal("3000000")
+    assert ds.month_due(debts, LAST)[0] == Decimal("5000000")
+
+
+def test_month_boundary_last_day_and_next_first():
+    end = jdatetime.date(1405, 8, 30)
+    start = jdatetime.date(1405, 9, 1)
+    this_month = D(1, 1405, 8, 30, 1000)
+    next_month = D(3, 1405, 9, 1, 2000)
+    assert ds.this_month_installments([this_month, next_month], end) == Decimal("1000")
+    assert ds.this_month_installments([this_month, next_month], start) == Decimal("2000")
+    # Year wrap: 29 اسفند / 1 فروردین.
+    esf = jdatetime.date(1405, 12, 29)
+    far = jdatetime.date(1406, 1, 1)
+    assert ds.this_month_installments([D(2, 1405, 12, 29, 400)], esf) == Decimal("400")
+    assert ds.this_month_installments([D(2, 1406, 1, 1, 500)], esf) == Decimal("0")
+    assert ds.this_month_installments([D(2, 1406, 1, 1, 500)], far) == Decimal("500")
+
+
+def test_overdue_unit_is_not_glued_to_toman(client, no_network, clock):  # noqa: F811
+    from tests.test_debts_v2 import P, _seed
+    from tests.test_holdings import _register
+
+    _register(client)
+    _seed([("عقب", 1000000, 5, 1405, 6, 1)])
+    html = client.get(P).text
+    assert "تومانشامل" not in html
+    assert 'data-installment-overdue' in html
+    assert "تومان</small> <small class=\"dv-unit\" data-installment-overdue>" in html

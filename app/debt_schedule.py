@@ -12,13 +12,12 @@ triple like 1405/08/31 is therefore allowed and every reader goes through `clamp
 
 from __future__ import annotations
 
-from datetime import timezone
 from decimal import Decimal
 
 import jdatetime
 
 from app.daily_spend import JALALI_MONTHS
-from app.formatting import TEHRAN, format_toman, persian_digits, tehran_today
+from app.formatting import format_toman, persian_digits, tehran_today
 
 
 def month_length(year: int, month: int) -> int:
@@ -158,21 +157,12 @@ def month_due(debts, today: jdatetime.date | None = None) -> tuple[Decimal, Deci
     return total, overdue
 
 
-def _entered_on(debt) -> jdatetime.date | None:
-    created = getattr(debt, "created_at", None)
-    if created is None:
-        return None
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    return jdatetime.date.fromgregorian(date=created.astimezone(TEHRAN).date())
-
-
 def this_month_installments(debts, today: jdatetime.date | None = None) -> Decimal:
-    """Instalments dated in today's Jalali month, paid or not; older overdue months are left out.
+    """Unpaid instalments dated in today's Jalali month; later months and older overdue months are left out.
 
-    An unpaid one is the stored month itself. A paid one shows as a stored month exactly one month ahead,
-    unless the loan was entered after this month's due date (its first instalment is then next month).
-    A finished loan counts only when its final instalment was this month's.
+    A loan whose next due is already next month is not counted, even when its due day has already
+    passed in this month: that row is either paid or first due later, and is not still owed now.
+    A finished loan still counts when its final instalment was this month's.
     """
     today = today or tehran_today()
     following = add_months(today.year, today.month, 1)
@@ -186,9 +176,6 @@ def this_month_installments(debts, today: jdatetime.date | None = None) -> Decim
         stored = (nxt.year, nxt.month)
         if stored <= (today.year, today.month):
             due_now = int(debt.months_left) > _months_between(stored, today)
-        elif stored == following:
-            entered = _entered_on(debt)
-            due_now = entered is None or entered <= clamp(today.year, today.month, debt.due_day)
         else:
             due_now = False
         if due_now:

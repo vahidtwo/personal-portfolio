@@ -160,10 +160,12 @@
     return sign + body + "٪";
   }
 
+  const CHANGE_LABEL_PREFIX = "تغییر نسبت به قبل: ";
+
   function changeLabelForPoint(ctx) {
     const idx = ctx.dataIndex;
     if (idx <= 0) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + "—";
     }
     const series = ctx.dataset.data;
     const current = ctx.parsed.y;
@@ -171,9 +173,49 @@
     const previous = Number(prevPoint && typeof prevPoint === "object" ? prevPoint.y : prevPoint);
     const change = formatChangeFromPrevious(current, previous);
     if (change == null) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + "—";
     }
-    return "تغییر نسبت به قبل: " + change;
+    return CHANGE_LABEL_PREFIX + change;
+  }
+
+  /** Chart.js tooltip text inherits the page's RTL direction and then flips textAlign to left,
+      which paints a signed change as «۲۰٪−». Draw the number as its own left-to-right run. */
+  function attachSignedChangeDraw(ctx) {
+    if (!ctx || ctx.__signedChangeDraw) return;
+    ctx.__signedChangeDraw = true;
+    const orig = ctx.fillText.bind(ctx);
+    ctx.fillText = function (text, x, y, maxWidth) {
+      if (typeof text !== "string" || !text.startsWith(CHANGE_LABEL_PREFIX)) {
+        return orig(text, x, y, maxWidth);
+      }
+      const change = text.slice(CHANGE_LABEL_PREFIX.length);
+      if (!change || change === "—") {
+        return orig(text, x, y, maxWidth);
+      }
+      const dir = this.direction;
+      const align = this.textAlign;
+      const prefixW = this.measureText(CHANGE_LABEL_PREFIX).width;
+      this.direction = "ltr";
+      const changeW = this.measureText(change).width;
+      this.direction = dir;
+      let prefixX, changeX;
+      if (align === "right" || align === "end") {
+        changeX = x - changeW;
+        prefixX = changeX - prefixW;
+      } else if (align === "center") {
+        prefixX = x - (prefixW + changeW) / 2;
+        changeX = prefixX + prefixW;
+      } else {
+        prefixX = x;
+        changeX = x + prefixW;
+      }
+      this.textAlign = "left";
+      orig(CHANGE_LABEL_PREFIX, prefixX, y, maxWidth);
+      this.direction = "ltr";
+      orig(change, changeX, y, maxWidth);
+      this.direction = dir;
+      this.textAlign = align;
+    };
   }
 
   let pieChartInited = false;
@@ -603,6 +645,7 @@
           height: chartWrap ? chartWrap.clientHeight : 220,
         }),
       });
+      attachSignedChangeDraw(chart.ctx);
     }
 
     function onSeriesChange() {

@@ -30,6 +30,7 @@ from app.portfolio import (
     build_portfolio,
     latest_market_prices_fetched_at,
     load_prices,
+    unit_price_parts,
 )
 from app.sanjeh import SanjehAuthError
 from app.security import get_authenticated_user, redirect_to_login, require_csrf
@@ -564,6 +565,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
                 "quantity_label": quantity_label,
                 "unit_fa": "دلار" if row.key == "usd" else row.unit_fa,
                 "unit_price_label": format_toman(row.unit_price),
+                "unit_price": unit_price_parts(row.key, row.unit_price),
                 "value_label": format_toman(row.value_toman),
                 "usd_equiv_label": usd_equiv_label,
                 "share_label": format_share_label(share),

@@ -44,6 +44,9 @@ def _format_usd(value: Decimal) -> str:
     return format_usd(value, fixed=True)
 
 
+# Placeholder until design supplies the final wording for the chart's no-prices state.
+CHART_NO_PRICES_PLACEHOLDER_FA = "هنوز قیمت بازار دریافت نشده است. نمودار بعد از دریافت قیمت‌ها پر می‌شود."
+
 # Chart points: last snapshot per Tehran day for the week/month/3-month ranges (sent for the last
 # 92 days only), last snapshot per week for year/all. Stored values are never changed.
 CHART_DAILY_SPAN = timedelta(days=92)
@@ -56,13 +59,16 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since: timedelta | None = None) -> list:
+def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since: timedelta | None = None,
+                    keep_first_now: bool = False) -> list:
     """Chart points, oldest first: the last snapshot per Tehran day (``"day"``) or per ISO week
     of the Tehran date (``"week"``). No hourly points (Arabi, batch 1).
 
     The bucket that contains ``now`` is dropped, because the live portfolio value is appended as the
-    final point for that bucket. ``since`` limits how far back to go. Every kept point is a real
-    snapshot with its stored values. Works on anything with ``taken_at``.
+    final point for that bucket. With ``keep_first_now``, when that would leave no point at all (a
+    first save today), the earliest snapshot of the ``now`` bucket is kept as the start point
+    instead. ``since`` limits how far back to go. Every kept point is a real snapshot with its
+    stored values. Works on anything with ``taken_at``.
     """
     def key(at_utc: datetime):
         d = at_utc.astimezone(TEHRAN).date()
@@ -71,14 +77,19 @@ def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since:
     now_key = key(_as_utc(now))
     cutoff = now - since if since is not None else None
     buckets: dict = {}
+    first_in_now = None
     for snap in snaps:
         at = _as_utc(snap.taken_at)
         if cutoff is not None and at < cutoff:
             continue
         k = key(at)
         if k == now_key:
+            if first_in_now is None or at < _as_utc(first_in_now.taken_at):
+                first_in_now = snap
             continue
         buckets[k] = snap  # ascending input: last one in the bucket wins
+    if keep_first_now and not buckets and first_in_now is not None:
+        return [first_in_now]
     return sorted(buckets.values(), key=lambda s: _as_utc(s.taken_at))
 
 
@@ -137,8 +148,9 @@ def build_chart_data(db: Session, user_id: int, view, now: datetime | None = Non
         .order_by(PortfolioSnapshot.taken_at.asc(), PortfolioSnapshot.id.asc())
         .all()
     )
-    daily = _chart_points(db, chart_snapshots(index, now, "day", since=CHART_DAILY_SPAN), view, now)
-    weekly = _chart_points(db, chart_snapshots(index, now, "week"), view, now)
+    daily_snaps = chart_snapshots(index, now, "day", since=CHART_DAILY_SPAN, keep_first_now=True)
+    daily = _chart_points(db, daily_snaps, view, now)
+    weekly = _chart_points(db, chart_snapshots(index, now, "week", keep_first_now=True), view, now)
     asset_options = [{"key": "total", "label": "جمع کل"}] + [
         {"key": row.key, "label": row.name_fa} for row in view.rows
     ]
@@ -633,6 +645,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         price=price_status(view.prices_fetched_at, utcnow()),
         missing_fa=missing_fa,
         chart_data=chart_data,
+        chart_no_prices=not prices,
+        chart_no_prices_fa=CHART_NO_PRICES_PLACEHOLDER_FA,
         chart_asset_options=chart_asset_options,
         default_chart_asset_key=default_chart_asset_key,
         pie_data=pie_data,

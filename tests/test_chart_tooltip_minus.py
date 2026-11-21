@@ -30,17 +30,20 @@ def test_format_change_puts_the_minus_before_the_digits():
     assert 'return sign + body + "٪"' in fn
 
 
-def test_tooltip_draws_the_signed_change_left_to_right():
-    # This is the test that fails on main: the signed change was one RTL fillText, so the
-    # minus sat after the digits («۲۰٪−»). The number is now its own left-to-right run.
-    fn = _fn("attachSignedChangeDraw")
-    assert 'this.direction = "ltr"' in fn
-    assert "CHANGE_LABEL_PREFIX" in fn
-    assert "orig(change," in fn
-    assert "attachSignedChangeDraw(chart.ctx)" in JS
-    assert "rtl: true" in JS  # the tooltip itself stays RTL so the Persian label is unchanged
-    # bidi isolates in the string made the canvas worse; do not put them in the change text
-    assert "\u2066" not in fn and "\u2067" not in fn and "\u2068" not in fn
+def test_tooltip_isolates_the_signed_change_in_an_ltr_run():
+    # On main the tooltip is only rtl: true, so canvas bidi paints «٪۲۰−»
+    # and can jump the colon. The change value is wrapped in LRI…PDI and
+    # the tooltip sets textDirection to rtl, so the pixels read «−۲۰٪»
+    # with the minus before the digits and the colon after «قبل».
+    fn = _fn("changeLabelForPoint")
+    assert "isolateLtr" in fn
+    assert _fn("isolateLtr")
+    assert "LTR_ISOLATE" in JS and "\\u2066" in JS
+    assert "POP_ISOLATE" in JS and "\\u2069" in JS
+    assert "isolateLtr(change)" in fn
+    assert 'textDirection: "rtl"' in JS
+    assert "rtl: true" in JS
+    assert "attachSignedChangeDraw" not in JS
 
 
 def test_change_prefix_is_the_fixed_label():

@@ -8,6 +8,7 @@ import jdatetime
 import pytest
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 TEHRAN = ZoneInfo("Asia/Tehran")
 
@@ -26,10 +27,10 @@ def _tehran(*args):
 
 
 def _month_line(client, query=""):
-    html = client.get("/dashboard?tab=daily" + query).text
+    html = with_amounts(client, "/dashboard?tab=daily" + query)
     # Spending v2 tiles: «امروز» + «این ماه», or a single «جمع {ماه}» for a past month (no «امروز» there).
-    today = re.search(r'<span>امروز</span><b class="num">([^<]+)</b>', html)
-    month = re.search(r'<span>(?:این ماه|جمع [^<]+)</span><b class="num">([^<]+)</b>', html)
+    today = re.search(r'<span>امروز</span><b class="num"[^>]*>([^<]+)</b>', html)
+    month = re.search(r'<span>(?:این ماه|جمع [^<]+)</span><b class="num"[^>]*>([^<]+)</b>', html)
     title = re.search(r"data-sp-title>([^<]+ [۰-۹]{4})</strong>", html).group(1)
     return title, today.group(1) if today else None, month.group(1)
 
@@ -57,9 +58,9 @@ def test_spend_logged_0030_tehran_on_the_1st_counts_in_new_month(client, freeze,
     title, today_total, month_total = _month_line(client)
     assert title == "آبان ۱۴۰۵" and today_total == "۷۰٬۰۰۰" and month_total == "۷۰٬۰۰۰"
     # The form's default date is the Tehran date too.
-    html = client.get("/dashboard?tab=daily").text
+    html = with_amounts(client, "/dashboard?tab=daily")
     assert 'name="month" value="۸"' in html and 'name="day" value="۱"' in html
-    tile = client.get("/dashboard").text
+    tile = with_amounts(client, "/dashboard")
     tile = tile[tile.index('id="tile-month-spend"'):]
     assert "آبان ۱۴۰۵" in tile[:800] and "۷۰٬۰۰۰" in tile[:800]
 
@@ -101,15 +102,15 @@ def test_past_month_totals_unchanged(client, freeze, no_network):
 def test_instalment_due_today_in_the_0000_0330_window(client, freeze, no_network):
     _register(client)
     client.post("/profile/debts", data={"title": "وام", "monthly_toman": "250000", "months_left": "6",
-                                        "due_year": "1405", "due_month": "1", "due_day": "26",
+                                        "due_year": "1405", "due_month": "7", "due_day": "26",
                                         "csrf": _csrf(client, "/profile?tab=debts")})
     freeze(datetime(2026, 10, 17, 21, 0, tzinfo=timezone.utc))  # 00:30 Tehran, 1405/07/26 (UTC date is still the 25th)
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     tile = html[html.index('id="tile-next-debt"'):html.index('id="tile-month-spend"')]
     assert re.search(r'badge-due[^"]*">امروز<', tile) and "۲۶ مهر" in tile
-    debts = client.get("/profile?tab=debts").text
+    debts = with_amounts(client, "/profile?tab=debts")
     assert "قسط بعدی: <b>۲۶ مهر</b>" in debts and "امروز" in debts  # same date on the debts page
     freeze(datetime(2026, 10, 17, 20, 0, tzinfo=timezone.utc))  # 23:30 Tehran on the 25th
-    tile = client.get("/dashboard").text
+    tile = with_amounts(client, "/dashboard")
     tile = tile[tile.index('id="tile-next-debt"'):tile.index('id="tile-month-spend"')]
     assert re.search(r'badge-due[^"]*">فردا<', tile)

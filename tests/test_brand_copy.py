@@ -50,8 +50,8 @@ def test_manifest_offline_and_push_defaults():
     assert m["name"] == NAME and m["short_name"] == NAME
     assert len(m["short_name"]) <= 12
     assert _title((ROOT / "app/static/offline.html").read_text(encoding="utf-8")) == f"بدون اتصال، {NAME}"
-    assert f'|| "{NAME}"' in (ROOT / "app/static/push.js").read_text(encoding="utf-8")
-    assert f'|| "{NAME}"' in (ROOT / "app/firebase_push.py").read_text(encoding="utf-8")
+    assert f'DEFAULT_TITLE = "{NAME}"' in (ROOT / "app/static/push.js").read_text(encoding="utf-8")
+    assert f'PUSH_DEFAULT_TITLE = "{NAME}"' in (ROOT / "app/static/sw.js").read_text(encoding="utf-8")
 
 
 def test_api_docs_title_and_mcp_sample_key(client):

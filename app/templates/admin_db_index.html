@@ -14,7 +14,7 @@
 
 <section class="admin-stats" aria-label="جدول‌ها">
   {% for table in tables %}
-  <a class="stat-card db-table-card" href="/admin/db/{{ table.slug }}">
+  <a class="stat-card db-table-card" href="{{ table.href or '/admin/db/' ~ table.slug }}">
     <p class="stat-label">{{ table.label }}</p>
     <p class="stat-value">{{ table.count }}</p>
     <p class="card-desc">{{ table.description }}</p>

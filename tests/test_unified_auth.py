@@ -1,6 +1,5 @@
 """Phase 3 unified sign-in (/auth): login, new-account confirm step, errors, rate limit, redirects."""
 import re
-import time
 
 from app.formatting import persian_digits  # noqa: F401
 
@@ -66,7 +65,7 @@ def test_password_never_in_url_or_page(client):
 
 def test_existing_user_login_and_generic_error(client):
     assert _signup(client).status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     wrong = _continue(client, "newuser", "wrongpass1")
     assert wrong.status_code == 200 and "نام کاربری یا رمز درست نیست." in wrong.text
     assert 'value="newuser"' in wrong.text and "حساب تازه بسازیم؟" not in wrong.text
@@ -77,20 +76,41 @@ def test_existing_user_login_and_generic_error(client):
 def test_rate_limit_message(client):
     from app import rate_limit
     assert _signup(client).status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     for _ in range(rate_limit.LOGIN_FAILS_PER_USER):
         _continue(client, "newuser", "wrongpass1")
     r = _continue(client, "newuser", "password123")
     assert r.status_code == 429 and "چند بار پشت سر هم اشتباه شد." in r.text
 
 
-def test_unknown_user_takes_bcrypt_time_too(client):
-    """Equal timing: an unknown username runs bcrypt like a wrong password (no fast path)."""
+def test_unknown_user_runs_bcrypt_like_a_wrong_password(client, monkeypatch):
+    """Equal work: an unknown username runs the same bcrypt check as a wrong password (no fast path).
+    Counted, not timed, so a busy CI runner cannot make it flaky."""
+    import app.unified_auth as ua
+
     assert _signup(client, "timer1").status_code == 303
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
-    t = time.perf_counter(); _continue(client, "timer1", "wrongpass1"); known = time.perf_counter() - t
-    t = time.perf_counter(); _continue(client, "nobody99", "wrongpass1"); unknown = time.perf_counter() - t
-    assert unknown > known * 0.5  # both pay at least one bcrypt (unknown pays dummy + new hash)
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
+    calls = {"verify": 0, "hash": 0}
+    real_verify, real_hash = ua.verify_password, ua.hash_password
+
+    def verify(*a, **k):
+        calls["verify"] += 1
+        return real_verify(*a, **k)
+
+    def hash_(*a, **k):
+        calls["hash"] += 1
+        return real_hash(*a, **k)
+
+    monkeypatch.setattr(ua, "verify_password", verify)
+    monkeypatch.setattr(ua, "hash_password", hash_)
+    _continue(client, "timer1", "wrongpass1")
+    known = dict(calls)
+    calls.update(verify=0, hash=0)
+    _continue(client, "nobody99", "wrongpass1")
+    unknown = dict(calls)
+    assert known == {"verify": 1, "hash": 0}
+    assert unknown["verify"] == 1  # the dummy check, same cost as the wrong password
+    assert unknown["hash"] == 1  # plus hashing the pending signup
 
 
 def test_pending_signup_expires(client, monkeypatch):
@@ -104,5 +124,5 @@ def test_pending_signup_expires(client, monkeypatch):
 
 def test_logout_goes_to_auth(client):
     assert _signup(client).status_code == 303
-    out = client.post("/logout", data={"csrf": _csrf(client, "/dashboard")}, follow_redirects=False)
+    out = client.post("/logout", data={"csrf": _csrf(client, "/profile")}, follow_redirects=False)
     assert out.headers["location"] == "/auth"

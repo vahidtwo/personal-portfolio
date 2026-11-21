@@ -1,4 +1,4 @@
-"""Admin-only editors for users, market prices, portfolio snapshots, and spend categories."""
+"""Admin-only editors for users, market prices and portfolio snapshots (spend categories: app/admin_categories.py)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.datastructures import FormData
 
@@ -62,6 +62,16 @@ def _require_admin(request: Request, db: Session) -> User | RedirectResponse:
     if not is_admin(user):
         ui.flash(request, "دسترسی مدیریت ندارید.", error=True)
         return RedirectResponse("/dashboard", status_code=303)
+    return user
+
+
+def _require_admin_write(request: Request, db: Session) -> User | RedirectResponse | PlainTextResponse:
+    """Writes: signed out -> login; signed in without admin rights -> 403."""
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return redirect_to_login(request)
+    if not is_admin(user):
+        return PlainTextResponse("forbidden", status_code=403)
     return user
 
 
@@ -287,20 +297,21 @@ def catalog(db: Session) -> list[dict]:
         },
         {
             "slug": "spend-categories",
+            "href": CATEGORIES_PAGE,
             "label": "دسته‌های خرج",
-            "description": "گروه و زیردسته خرج روزانه",
+            "description": "گروه و زیردسته خرج روزانه، مشترک برای همه کاربران",
             "count": _ui().persian_digits(str(db.query(SpendCategory).count())),
         },
     ]
 
 
 # Vahid's rule (Oct 13 2026): user data is never removed or overwritten from the DB editor.
-READ_ONLY_SLUGS = frozenset({"snapshots", "spend-categories"})
+READ_ONLY_SLUGS = frozenset({"snapshots"})
 READ_ONLY_ERROR = "این جدول دادهٔ کاربران است و در ویرایشگر فقط‌خواندنی است."
 
 
 def _known_slug(slug: str) -> bool:
-    return slug in {"users", "market-prices", "snapshots", "spend-categories"}
+    return slug in {"users", "market-prices", "snapshots"}
 
 
 def list_view(db: Session, slug: str, query: str) -> dict:
@@ -350,39 +361,6 @@ def list_view(db: Session, slug: str, query: str) -> dict:
                 for row in rows
             ],
         }
-    if slug == "spend-categories":
-        rows = (
-            db.query(SpendCategory, User.username)
-            .join(User, User.id == SpendCategory.user_id)
-            .order_by(User.username.asc(), SpendCategory.parent_id.asc(), SpendCategory.sort_order.asc(), SpendCategory.id.asc())
-            .all()
-        )
-        names = {row.id: row.name for row, _username in rows}
-        if needle:
-            rows = [
-                pair
-                for pair in rows
-                if needle in pair[1].lower()
-                or needle in pair[0].name.lower()
-                or needle in names.get(pair[0].parent_id, "").lower()
-            ]
-        return {
-            "label": "دسته‌های خرج",
-            "columns": ["شناسه", "کاربر", "نام", "والد", "نوع"],
-            "rows": [
-                {
-                    "pk": str(row.id),
-                    "cells": [
-                        ui.persian_digits(str(row.id)),
-                        username,
-                        row.name,
-                        names.get(row.parent_id, "—"),
-                        "زیردسته" if row.parent_id else "گروه",
-                    ],
-                }
-                for row, username in rows
-            ],
-        }
     rows = (
         db.query(PortfolioSnapshot, User.username)
         .join(User, User.id == PortfolioSnapshot.user_id)
@@ -417,10 +395,6 @@ def _load(db: Session, slug: str, pk: str):
         return db.get(User, int(pk))
     if slug == "market-prices":
         return db.get(MarketPrice, pk)
-    if slug == "spend-categories":
-        if not pk.isdigit():
-            return None
-        return db.get(SpendCategory, int(pk))
     if pk.isdigit():
         return db.get(PortfolioSnapshot, int(pk))
     return None
@@ -431,8 +405,6 @@ def fields_for(db: Session, slug: str, obj, form: FormData | None) -> list[dict]
         return _user_fields(obj, form)
     if slug == "market-prices":
         return _price_fields(obj, form, creating=obj is None)
-    if slug == "spend-categories":
-        return _category_fields(db, obj, form)
     return _snapshot_fields(db, obj, form)
 
 
@@ -520,109 +492,11 @@ def _save_snapshot(db: Session, row: PortfolioSnapshot | None, form: FormData) -
     return None
 
 
-def _category_fields(db: Session, row: SpendCategory | None, form: FormData | None) -> list[dict]:
-    def val(name: str, current: str) -> str:
-        if form is not None and name in form:
-            return _posted(form, name)
-        return current
-
-    users = db.query(User).order_by(User.username.asc()).all()
-    user_options = [{"value": str(account.id), "label": account.username} for account in users]
-    user_id = val("user_id", str(row.user_id) if row else (user_options[0]["value"] if user_options else ""))
-    parents = (
-        db.query(SpendCategory)
-        .filter(SpendCategory.parent_id.is_(None))
-        .order_by(SpendCategory.name.asc())
-        .all()
-    )
-    usernames = {account.id: account.username for account in users}
-    parent_options = [{"value": "", "label": "بدون والد (گروه)"}]
-    for parent in parents:
-        if row is not None and parent.id == row.id:
-            continue
-        owner = usernames.get(parent.user_id, str(parent.user_id))
-        parent_options.append({"value": str(parent.id), "label": f"{owner} — {parent.name}"})
-    fields = []
-    if row is None:
-        fields.append(_field("user_id", "کاربر", user_id, kind="select", options=user_options))
-    else:
-        fields.append(_field("user_label", "کاربر", usernames.get(row.user_id, str(row.user_id)), kind="readonly"))
-    fields.append(
-        _field(
-            "name",
-            "نام",
-            val("name", row.name if row else ""),
-            text_dir="rtl",
-        )
-    )
-    fields.append(
-        _field(
-            "parent_id",
-            "والد",
-            val("parent_id", str(row.parent_id) if row and row.parent_id else ""),
-            kind="select",
-            options=parent_options,
-            hint="خالی یعنی گروه اصلی. والد باید مال همان کاربر باشد.",
-        )
-    )
-    fields.append(
-        _field(
-            "sort_order",
-            "ترتیب",
-            val("sort_order", str(row.sort_order) if row else "0"),
-            kind="int",
-        )
-    )
-    if row is not None:
-        fields.append(_field("seed_label", "دسته آماده", "بله" if row.is_seed else "خیر", kind="readonly"))
-    return fields
-
-
-def _save_category(db: Session, row: SpendCategory | None, form: FormData) -> str | None:
-    name = _posted(form, "name").strip()[:64]
-    if not name:
-        return "نام دسته را بنویسید."
-    if row is None:
-        user_raw = _posted(form, "user_id").strip()
-        if not user_raw.isdigit() or db.get(User, int(user_raw)) is None:
-            return "کاربر را انتخاب کنید"
-        user_id = int(user_raw)
-    else:
-        user_id = row.user_id
-    parent_raw = _posted(form, "parent_id").strip()
-    parent_id = None
-    if parent_raw:
-        if not parent_raw.isdigit():
-            return "والد نامعتبر است"
-        parent = db.get(SpendCategory, int(parent_raw))
-        if parent is None or parent.user_id != user_id or parent.parent_id is not None:
-            return "والد باید یک گروه از همین کاربر باشد"
-        if row is not None and parent.id == row.id:
-            return "دسته نمی‌تواند والد خودش باشد"
-        parent_id = parent.id
-    if row is not None and parent_id is not None:
-        has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == row.id).first() is not None
-        if has_child:
-            return "این گروه زیردسته دارد و نمی‌تواند زیر گروه دیگری برود"
-    sort_order, sort_error = _parse_int(_posted(form, "sort_order"), field="ترتیب")
-    if sort_error:
-        return sort_error
-    if row is None:
-        db.add(
-            SpendCategory(
-                user_id=user_id,
-                parent_id=parent_id,
-                name=name,
-                slug=None,
-                is_seed=False,
-                sort_order=sort_order or 0,
-            )
-        )
-    else:
-        row.name = name
-        row.parent_id = parent_id
-        row.sort_order = sort_order or 0
-    return None
+# SMS spends are saved into these by slug: they can't be deleted, archived, re-parented or given a new slug.
+SYSTEM_CATEGORY_SLUGS = frozenset({"sms", "sms_bank", "sms_fee"})
+# The spend-category editor moved to /admin/categories; the old table URLs lead there.
+CATEGORIES_PAGE = "/admin/categories"
+CATEGORY_SLUG = "spend-categories"
 
 
 def save_record(db: Session, slug: str, obj, form: FormData) -> str | None:
@@ -630,8 +504,6 @@ def save_record(db: Session, slug: str, obj, form: FormData) -> str | None:
         return _save_user(db, obj, form)
     if slug == "market-prices":
         return _save_price(db, obj, form)
-    if slug == "spend-categories":
-        return _save_category(db, obj, form)
     return _save_snapshot(db, obj, form)
 
 
@@ -645,15 +517,6 @@ def delete_record(db: Session, slug: str, obj, actor_id: int) -> str | None:
             return USER_HAS_DATA_ERROR
         db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == obj.id).delete(synchronize_session=False)
         db.query(DailySpend).filter(DailySpend.user_id == obj.id).delete(synchronize_session=False)
-        db.query(SpendCategory).filter(
-            SpendCategory.user_id == obj.id, SpendCategory.parent_id.is_not(None)
-        ).delete(synchronize_session=False)
-        db.query(SpendCategory).filter(SpendCategory.user_id == obj.id).delete(synchronize_session=False)
-    if slug == "spend-categories":
-        has_child = db.query(SpendCategory.id).filter(SpendCategory.parent_id == obj.id).first() is not None
-        has_spend = db.query(DailySpend.id).filter(DailySpend.category_id == obj.id).first() is not None
-        if has_child or has_spend:
-            return "این دسته خرج یا زیردسته دارد و حذف نمی‌شود."
     db.delete(obj)
     return None
 
@@ -680,6 +543,8 @@ async def admin_db_list(slug: str, request: Request, db: Session = Depends(get_d
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug == CATEGORY_SLUG:
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if not _known_slug(slug):
         return RedirectResponse("/admin/db", status_code=303)
     ui = _ui()
@@ -703,6 +568,8 @@ async def admin_db_new(slug: str, request: Request, db: Session = Depends(get_db
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug == CATEGORY_SLUG:
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if not _known_slug(slug):
         return RedirectResponse("/admin/db", status_code=303)
     ui = _ui()
@@ -722,9 +589,11 @@ async def admin_db_new(slug: str, request: Request, db: Session = Depends(get_db
 
 @router.post("/admin/db/{slug}/new")
 async def admin_db_create(slug: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
+    if slug == CATEGORY_SLUG:  # nothing is written here any more
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)
         return RedirectResponse(f"/admin/db/{slug}", status_code=303)
@@ -757,6 +626,8 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
     admin = _require_admin(request, db)
     if isinstance(admin, RedirectResponse):
         return admin
+    if slug == CATEGORY_SLUG:
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if not _known_slug(slug):
         return RedirectResponse("/admin/db", status_code=303)
     obj = _load(db, slug, pk)
@@ -783,9 +654,11 @@ async def admin_db_edit(slug: str, pk: str, request: Request, db: Session = Depe
 
 @router.post("/admin/db/{slug}/{pk}")
 async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
+    if slug == CATEGORY_SLUG:  # nothing is written here any more
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)
         return RedirectResponse(f"/admin/db/{slug}", status_code=303)
@@ -819,9 +692,11 @@ async def admin_db_save(slug: str, pk: str, request: Request, db: Session = Depe
 
 @router.post("/admin/db/{slug}/{pk}/delete")
 async def admin_db_delete(slug: str, pk: str, request: Request, db: Session = Depends(get_db)):
-    admin = _require_admin(request, db)
-    if isinstance(admin, RedirectResponse):
+    admin = _require_admin_write(request, db)
+    if not isinstance(admin, User):
         return admin
+    if slug == CATEGORY_SLUG:  # nothing is written here any more
+        return RedirectResponse(CATEGORIES_PAGE, status_code=303)
     if slug in READ_ONLY_SLUGS:
         _ui().flash(request, READ_ONLY_ERROR, error=True)
         return RedirectResponse(f"/admin/db/{slug}", status_code=303)

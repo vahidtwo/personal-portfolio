@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import User, utcnow
 from app import rate_limit
+from app.formatting import persian_digits
 from app import security
 from app.security import (
     attach_session_cookie_deletion,
@@ -139,17 +140,24 @@ async def login(
     if rate_limit.is_limited(user_key, rate_limit.LOGIN_FAILS_PER_USER, window) or rate_limit.is_limited(
         ip_key, rate_limit.LOGIN_FAILS_PER_IP, window
     ):
-        return render(
+        wait = max(
+            rate_limit.retry_after(user_key, rate_limit.LOGIN_FAILS_PER_USER, window),
+            rate_limit.retry_after(ip_key, rate_limit.LOGIN_FAILS_PER_IP, window),
+        )
+        resp = render(
             request,
             "login.html",
             db,
-            error="تلاش‌های ناموفق زیاد بود. ۱۵ دقیقه دیگر دوباره امتحان کنید",
+            error=f"تلاش‌های ناموفق زیاد بود. {persian_digits(str(max(1, -(-wait // 60))))} دقیقه دیگر دوباره امتحان کنید",
             form={"username": username},
         )
+        resp.status_code = 429
+        resp.headers["Retry-After"] = str(wait)
+        return resp
     user = db.query(User).filter(User.username == username).first()
     if user is None or not verify_password(password, user.password_hash):
-        rate_limit.record(user_key, window)
-        rate_limit.record(ip_key, window)
+        rate_limit.record(user_key, window, rate_limit.LOGIN_FAILS_PER_USER)
+        rate_limit.record(ip_key, window, rate_limit.LOGIN_FAILS_PER_IP)
         return render(
             request,
             "login.html",
@@ -158,6 +166,7 @@ async def login(
             form={"username": username},
         )
     rate_limit.clear(user_key)
+    rate_limit.clear(ip_key)
     user.last_login_at = utcnow()
     db.commit()
     request.session["user_id"] = user.id

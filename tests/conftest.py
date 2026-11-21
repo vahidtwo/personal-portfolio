@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Faster password hashing in tests only (production default stays 12; see test_bcrypt_cost_default).
+os.environ.setdefault("BCRYPT_ROUNDS", "4")
+# The app refuses to start without a real SECRET_KEY; tests use an explicit fixed test key.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-fixed-for-sessions")
+# HTTPS_ONLY is on by default; the test client talks plain http, so tests turn it off unless they opt in.
+os.environ.setdefault("HTTPS_ONLY", "0")
 
 
 def _purge_app_modules() -> None:
@@ -56,6 +64,7 @@ def _per_worker_data_dir(tmp_path_factory: pytest.TempPathFactory, worker_id: st
     mp.setenv("DATA_DIR", str(d))
     mp.setenv("DATABASE_URL", f"sqlite:///{d / 'inventory.db'}")
     mp.setenv("ENABLE_INTERNAL_SCHEDULER", "0")
+    mp.setenv("SECRET_KEY", "test-secret-key-fixed-for-sessions")
     yield d
     mp.undo()
 

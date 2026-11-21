@@ -9,7 +9,7 @@ SRC = ROOT / "android/app/src/main/java/app/myinventory"
 
 def test_version_9_in_gradle_and_release_json():
     gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
-    assert re.search(r"\?\.toInt\(\) \?: (9|1\d)\b", gradle)
+    assert re.search(r"\?\.toInt\(\) \?: (9|[1-9]\d)\b", gradle)
     rel = json.loads((ROOT / "app/android_release.json").read_text(encoding="utf-8"))
     assert rel["versionCode"] >= 9
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
@@ -52,7 +52,7 @@ def test_health_and_app_version_and_apk_ok_on_both_hosts():
     for host in ("portfolio.vahidtwo.ir", "daraiito.ir"):
         c = TestClient(app, base_url=f"https://{host}")
         r = c.get("/health")
-        assert r.status_code == 200 and r.json() == {"ok": True}
+        assert r.status_code == 200 and r.json()["ok"] is True and isinstance(r.json()["commit"], str)
         v = c.get("/api/app-version")
         assert v.status_code == 200 and v.json()["versionCode"] >= 9
         assert not v.json()["url"].startswith("http")  # relative: each host serves its own APK
@@ -99,7 +99,8 @@ def test_anonymous_auth_visit_sets_session_cookie_but_no_marker():
 def test_sms_no_session_never_silent():
     src = (SRC / "SmsReceiver.kt").read_text(encoding="utf-8")
     assert "catch (t: Throwable)" in src and "KEY_LOGIN_NEEDED" in src
-    assert "instanceFollowRedirects = false" in src
+    assert "instanceFollowRedirects = false" in (SRC / "SmsQueue.kt").read_text(encoding="utf-8")
+    assert "SmsQueue.add(context, entry)" in src
     main = (SRC / "MainActivity.kt").read_text(encoding="utf-8")
     assert "showSmsLoginPromptIfNeeded()" in main
 

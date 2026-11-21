@@ -16,7 +16,7 @@
   {'key': 'debts', 'label': 'بدهی‌ها', 'full': 'بدهی‌ها و هزینهٔ ماهانه', 'href': '/profile?tab=debts',
    'active': _on_profile and _tab == 'debts'},
   {'key': 'settings', 'label': 'تنظیمات', 'full': 'تنظیمات', 'href': '/profile?section=settings#account-settings',
-   'active': _on_profile and _tab != 'debts'},
+   'active': (_on_profile and _tab != 'debts') or _path.startswith('/admin')},
 ] -%}
 <nav class="main-nav" id="main-nav" aria-label="بخش‌های اصلی" data-main-nav>
   {%- for item in nav_items %}

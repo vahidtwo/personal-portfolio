@@ -1,18 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Long-press the app icon -> «تنظیمات اتصال»: always reaches the address box,
-     even if a wrong-but-working site was saved. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
-    <shortcut
-        android:shortcutId="connection_settings"
-        android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
-        android:shortcutShortLabel="@string/shortcut_settings_short"
-        android:shortcutLongLabel="@string/shortcut_settings_long">
-        <intent
-            android:action="app.myinventory.OPEN_SETUP"
-            android:targetPackage="app.myinventory"
-            android:targetClass="app.myinventory.MainActivity" />
-    </shortcut>
     <shortcut
         android:shortcutId="sms_settings"
         android:enabled="true"

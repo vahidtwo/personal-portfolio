@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import secrets
 from decimal import Decimal, InvalidOperation
@@ -22,8 +23,12 @@ SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_SAMESITE = "lax"
 
 
+# Production cost is 12. The test suite sets BCRYPT_ROUNDS=4 (bcrypt's minimum) for speed only.
+BCRYPT_ROUNDS = max(4, int(os.environ.get("BCRYPT_ROUNDS", "12")))
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:

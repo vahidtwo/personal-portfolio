@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>دارایی‌تو — اتصال برقرار نشد</title>
+  <style>
+    @font-face { font-family: "Vazirmatn"; src: url("static/fonts/vazirmatn-arabic.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+    @font-face { font-family: "Vazirmatn"; src: url("static/fonts/vazirmatn-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF; }
+    :root { --bg: #050608; --surface: #11141C; --text: #F4F6FB; --muted: #A3ABBD; --accent: #3EE0B8; --on-accent: #04120E; --danger: #FF8A7A; }
+    html[data-theme="light"] { --bg: #EEF1F8; --surface: #FFFFFF; --text: #0B1220; --muted: #4F5869; --accent: #08735A; --on-accent: #FFFFFF; --danger: #B42318; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Vazirmatn", sans-serif; }
+    main { min-height: 100vh; display: grid; place-content: center; gap: 16px; padding: 24px 20px; max-width: 480px; margin: 0 auto; text-align: center; }
+    .card { background: var(--surface); border-radius: 16px; padding: 20px; border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent); }
+    h1 { font-size: 18px; margin: 0 0 6px; color: var(--danger); }
+    p { font-size: 14px; line-height: 1.8; margin: 0; color: var(--muted); }
+    button { font: inherit; font-weight: 700; font-size: 16px; min-height: 52px; width: 100%; border: 0; border-radius: 14px; background: var(--accent); color: var(--on-accent); }
+    button:disabled { opacity: .6; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card" role="alert">
+      <h1>اتصال برقرار نشد</h1>
+      <p>اینترنت را بررسی کنید و دوباره امتحان کنید.</p>
+    </div>
+    <button type="button" id="retry">تلاش دوباره</button>
+  </main>
+  <script>
+    (function () {
+      var m = /[?&]theme=(light|dark)\b/.exec(location.search);
+      document.documentElement.setAttribute("data-theme", m ? m[1] : "dark");
+      var btn = document.getElementById("retry");
+      btn.addEventListener("click", function () {
+        if (btn.disabled) return;
+        btn.disabled = true; btn.textContent = "در حال اتصال…";
+        if (window.AndroidBridge && window.AndroidBridge.retry) window.AndroidBridge.retry();
+        setTimeout(function () { btn.disabled = false; btn.textContent = "تلاش دوباره"; }, 8000);
+      });
+    })();
+  </script>
+</body>
+</html>

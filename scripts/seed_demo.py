@@ -140,7 +140,7 @@ def seed() -> None:
     db.add(MonthlyExpense(user_id=user.id, title="اجاره", amount_toman=Decimal(12_000_000), due_day=1))
     db.commit()
     ensure_spend_categories(db, user)
-    by_slug = {c.slug: c for c in db.query(SpendCategory).filter(SpendCategory.user_id == user.id)}
+    by_slug = {c.slug: c for c in db.query(SpendCategory)}
     today = FROZEN_NOW.astimezone(timezone(timedelta(hours=3, minutes=30))).date()
     for days, _parent, child, note, amount, from_sms in SPENDS:
         cat = by_slug[child]

@@ -12,6 +12,12 @@ object ServerAddress {
     /** Hosts the WebView main frame may open (exact match, https only). */
     val KNOWN_HOSTS = setOf("portfolio.vahidtwo.ir", "daraiito.ir")
 
+    /** Hosts that always open in the external browser, never inside the WebView (exact match, https only). */
+    val EXTERNAL_HOSTS = setOf("github.com")
+
+    fun opensExternally(scheme: String?, host: String?): Boolean =
+        scheme?.lowercase() == "https" && host?.lowercase() in EXTERNAL_HOSTS
+
     /**
      * Returns the https origin (scheme://host[:port]) for [raw], or null when it can't be used.
      * - blank -> null (callers fall back to [DEFAULT])
@@ -152,6 +158,9 @@ object ServerAddress {
         code == 401 || code == 403 -> SmsOutcome.LOGIN_NEEDED
         else -> SmsOutcome.FAILED
     }
+
+    /** A failed live send worth retrying later from the queue: network error/exception (null) or 5xx. */
+    fun retryLater(code: Int?): Boolean = code == null || code >= 500
 
     /**
      * Cold launch on the moved-to new host that is not confirmed yet: probe /health natively

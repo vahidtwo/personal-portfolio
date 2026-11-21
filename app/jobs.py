@@ -65,7 +65,7 @@ async def fetch_and_store_prices() -> None:
         raise
     price_fetch_state.record(True)
 
-async def run_hourly_job(take_snapshots: bool = True) -> None:
+async def run_hourly_job(take_snapshots: bool = True, send_reminders: bool = True) -> None:
     with _job_lock() as acquired:
         if not acquired:
             logger.info("Hourly job already running; skip")
@@ -80,6 +80,17 @@ async def run_hourly_job(take_snapshots: bool = True) -> None:
             await refresh_all_sanjeh_cars()
         except Exception:
             logger.exception("Failed to refresh Sanjeh car values")
+        if send_reminders:
+            try:
+                from app.db import SessionLocal
+                from app.due_reminders import send_due_reminders
+
+                with SessionLocal() as db:
+                    sent = send_due_reminders(db)
+                if sent:
+                    logger.info("Sent %s due reminders", sent)
+            except Exception:
+                logger.exception("Failed to send due reminders")
         if not take_snapshots:
             logger.info("Hourly job finished (no snapshots)")
             return

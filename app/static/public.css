@@ -559,3 +559,7 @@ body{min-height:100vh}
 .step-dots i.on{background:var(--accent)}
 .btn[disabled]{opacity:1;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--inp-border);cursor:not-allowed}
 .auth .sub b{color:var(--text)}
+.theme-btn{width:44px;height:44px;padding:0;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:18px;cursor:pointer}
+.theme-btn:hover{background:rgba(127,127,127,.12)}
+.theme-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[data-theme=dark] .theme-icon-light,[data-theme=light] .theme-icon-dark{display:none}

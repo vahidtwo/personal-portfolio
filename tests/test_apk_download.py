@@ -1,4 +1,4 @@
-"""«دریافت اپ اندروید» row for logged-in users (settings + avatar/side menu); route unchanged."""
+"""«دریافت اپ اندروید» row for logged-in users (settings); route unchanged."""
 import re
 import zipfile
 from pathlib import Path
@@ -13,16 +13,16 @@ def _fake_info(monkeypatch, info={"size": "۴ مگابایت", "version": "۳٫�
     monkeypatch.setitem(templates.env.globals, "android_apk_info", lambda: info)
 
 
-def test_download_row_renders_for_logged_in_user_in_settings_and_menu(client, no_network, monkeypatch):
+def test_download_row_renders_for_logged_in_user_in_settings(client, no_network, monkeypatch):
     _fake_info(monkeypatch)
     _register(client)
     html = client.get("/profile").text
     links = re.findall(r'<a class="([^"]+) apk-download" href="/download/my-inventory\.apk" data-apk-download>', html)
-    assert sorted(links) == ["nav-link", "settings-row v2-row"]  # avatar/side menu + Settings
-    assert html.count('<span class="settings-row-label">دریافت اپ اندروید</span>') == 2
+    assert sorted(links) == ["settings-row v2-row"]
+    assert html.count('<span class="settings-row-label">دریافت اپ اندروید</span>') == 1
     # version and size in their own isolated spans, so the digits can never run together («نسخهٔ ۴۰۳٫۰ مگابایت»)
     metas = re.findall(r'<span class="apk-meta">(.*?)</span>\s*<span class="apk-note">', html)
-    assert len(metas) == 2
+    assert len(metas) == 1
     for meta in metas:
         assert '<span class="apk-version">نسخهٔ <bdi>۳٫۰</bdi></span>' in meta
         assert '<span class="apk-size"><bdi>۴ مگابایت</bdi></span>' in meta
@@ -32,7 +32,6 @@ def test_download_row_renders_for_logged_in_user_in_settings_and_menu(client, no
     assert "کروم" in rows and rows.index("دریافت اپ اندروید") < rows.index("خروج از حساب")  # logout stays last
     assert "روی گوشی اندروید باز کنید" in html and "data-apk-hint hidden" in html
     assert "/Android/i.test(navigator.userAgent)" in html
-    assert "data-apk-download" in client.get("/dashboard").text  # side menu on every logged-in page
 
 
 def test_download_row_not_for_anonymous_and_hidden_without_apk(client, monkeypatch):

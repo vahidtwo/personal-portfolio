@@ -50,4 +50,3 @@ def test_png_favicons_linked_and_avatar_flat(client):
         assert "/static/icons/favicon-16.png" in html and "/static/icons/favicon-32.png" in html
     pub = (STATIC / "public.css").read_text(encoding="utf-8")
     assert ".avatar{" in pub and "background:#3ee0b8}" in pub.split(".avatar{", 1)[1].split("\n", 1)[0]
-    assert "--avatar-bg: #3ee0b8;" in (STATIC / "style.css").read_text(encoding="utf-8")

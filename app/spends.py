@@ -8,6 +8,7 @@ from decimal import Decimal
 import jdatetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.daily_spend import (
@@ -17,8 +18,11 @@ from app.daily_spend import (
     ensure_spend_categories,
     jalali_month_bounds,
     month_chart,
+    next_sort_order,
+    picker_categories,
     shift_jalali_month,
 )
+from app.category_style import group_badge
 from app.db import get_db
 from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
@@ -29,19 +33,152 @@ from app.web import flash, render
 
 import re as _re
 
-# A spend saved by the Android app from an SMS: category «بانک» (slug sms_bank) and the note starts with
-# the app's idempotency key «[<64 hex>]» (see api_sms_spend). No DB column needed; manual spends never
-# get this prefix from the web form.
-_SMS_KEY_PREFIX = _re.compile(r"^\[[0-9a-f]{64}\]\s*")
+# A spend saved by the Android app from an SMS: an SMS category and the note carries the app's
+# idempotency key «[<64 hex>]» (see api_sms_spend). Older notes start with the key; newer ones are
+# «<merchant> [key] <SMS text>» so the merchant survives the 120-character cut. No DB column needed.
+_SMS_KEY = _re.compile(r"\s*\[[0-9a-f]{64}\]\s*")
+SMS_NOTE_MAX = 120
+SMS_MERCHANT_MAX = 40
+
+def _sms_merchant(body: str) -> str:
+    """Merchant or description in an SMS text (see sms_note_text), cut to SMS_MERCHANT_MAX."""
+    return sms_note_text(body)[:SMS_MERCHANT_MAX].strip()
 
 
-def sms_spend_parts(note: str | None, category_slug: str | None) -> tuple[bool, str]:
-    """(from_sms, note without the internal key) for one spend."""
+def sms_note_for_storage(raw_note: str, idem: str) -> str:
+    """Stored note for a new SMS spend: merchant first, then the key, then as much SMS text as fits."""
+    raw_note = (raw_note or "").strip()
+    if not idem:
+        return raw_note[:SMS_NOTE_MAX]
+    key = f"[{idem}]"
+    merchant = _sms_merchant(raw_note) if _re.fullmatch(r"[0-9a-f]{64}", idem) else ""
+    head = f"{merchant} {key}" if merchant else key
+    return f"{head} {raw_note}".strip()[:SMS_NOTE_MAX]
+
+
+def sms_note_key(note: str | None) -> tuple[str, str] | None:
+    """(merchant, SMS text) around the key in a stored SMS note, old or new layout.
+
+    None without a key, or when the text before the key could not be a stored merchant (digits, bank words).
+    """
     note = note or ""
-    m = _SMS_KEY_PREFIX.match(note)
-    if m and category_slug == "sms_bank":
-        return True, note[m.end():]
-    return False, note
+    m = _SMS_KEY.search(note)
+    if m is None:
+        return None
+    merchant = note[:m.start()].strip()
+    if merchant and (len(merchant) > SMS_MERCHANT_MAX or sms_note_text(merchant) != merchant):
+        return None
+    return merchant, note[m.end():].strip()
+
+
+_SMS_KEY_ANY = _re.compile(r"\[[0-9a-fA-F]{64}\]")
+
+
+_D = "0-9۰-۹٠-٩"
+_SMS_DROP = [
+    _re.compile(r"\[[0-9a-fA-F]{64}\]"),
+    _re.compile(rf"(?:مانده|موجودی|موجود|بالانس)\s*[:：]?[^{_D}]{{0,20}}[{_D}][{_D},٬.]*\s*(?:ریال|تومان)?"),
+    _re.compile(rf"[{_D}]{{1,4}}[/\-.][{_D}]{{1,2}}(?:[/\-.][{_D}]{{1,4}})?"),
+    _re.compile(rf"[{_D}]{{1,2}}[:：][{_D}]{{2}}(?::[{_D}]{{2}})?"),
+    _re.compile(rf"[-+]?[{_D}*][{_D}*,٬.\-]*[{_D}*]\s*[-+]?|\*+|[{_D}]"),
+]
+_SMS_WORDS = set("""بانک ملت ملی صادرات تجارت سامان پاسارگاد رسالت مسکن سپه کشاورزی پارسیان آینده شهر رفاه اقتصاد نوین
+بلو بلوبانک توسعه تعاون پست سینا کارآفرین دی خاورمیانه گردشگری ایران زمین قوامین مهر انصار حکمت
+برداشت برداشت: واریز انتقال کارت حساب حساو شبا مبلغ ریال تومان تاریخ ساعت پایانه کد پیگیری مرجع شماره
+خرید پرداخت مانده موجودی بابت به از در با و ـ : - — + / . ، , ؛ ; ( ) ATM POS پوز خودپرداز""".split())
+_SMS_EDGE = {"به", "از", "در", "با", "و", "بابت"}
+
+
+def sms_note_text(body: str) -> str:
+    """Merchant or description left in an SMS body once bank boilerplate, digits, dates, times and balance go."""
+    s = body or ""
+    for rx in _SMS_DROP:
+        s = rx.sub(" ", s)
+    tokens = [t.strip("،,:;؛()[]-_") for t in s.split()]
+    kept = [t for t in tokens if t and t not in _SMS_WORDS]
+    if not kept:
+        return ""
+    words = [t for t in tokens if t]
+    first = words.index(kept[0])
+    last = len(words) - 1 - words[::-1].index(kept[-1])
+    span = [t for t in words[first:last + 1] if t not in _SMS_WORDS or t in _SMS_EDGE]
+    while span and span[0] in _SMS_EDGE:
+        span.pop(0)
+    while span and span[-1] in _SMS_EDGE:
+        span.pop()
+    return " ".join(span)
+
+
+SMS_COMMISSION_MAX_TOMAN = Decimal("50000")
+SMS_COMMISSION_NAME = "کارمزد"
+SMS_COMMISSION_SLUG = "sms_fee"
+
+
+def is_sms_commission(amount_toman) -> bool:
+    """An SMS spend strictly below SMS_COMMISSION_MAX_TOMAN toman is a bank fee; exactly the limit is not."""
+    return Decimal(amount_toman) < SMS_COMMISSION_MAX_TOMAN
+
+
+def _normalize_category_name(name: str | None) -> str:
+    """Arabic ك/ي to Persian ک/ی, no ZWNJ, no whitespace."""
+    text = (name or "").replace("\u0643", "\u06a9").replace("\u064a", "\u06cc").replace("\u200c", "")
+    return "".join(text.split())
+
+
+def commission_category(db: Session, user: User | None = None) -> SpendCategory:
+    """The global «کارمزد» subcategory: the row with slug sms_fee; else one named «کارمزد» (an active one first),
+    else created once under «پیامک». Found by slug first, so a renamed row keeps getting the fees."""
+    by_slug = db.query(SpendCategory).filter(SpendCategory.slug == SMS_COMMISSION_SLUG).one_or_none()
+    if by_slug is not None:
+        return by_slug
+    target = _normalize_category_name(SMS_COMMISSION_NAME)
+    subcategories = (
+        db.query(SpendCategory)
+        .filter(SpendCategory.parent_id.isnot(None))
+        .order_by(SpendCategory.archived.asc(), SpendCategory.id.asc())
+        .all()
+    )
+    found = next((row for row in subcategories if _normalize_category_name(row.name) == target), None)
+    if found is not None:
+        return found
+    parent = db.query(SpendCategory).filter(SpendCategory.slug == "sms").one()
+    slug_taken = db.query(SpendCategory.id).filter(SpendCategory.slug == SMS_COMMISSION_SLUG).first() is not None
+    row = SpendCategory(
+        parent_id=parent.id,
+        name=SMS_COMMISSION_NAME,
+        slug=None if slug_taken else SMS_COMMISSION_SLUG,
+        is_seed=False,
+        sort_order=next_sort_order(db, parent.id),
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def sms_spend_category(db: Session, user: User | None, amount_toman) -> SpendCategory | None:
+    """Category for a new SMS spend: «کارمزد» below the limit, otherwise «بانک»."""
+    if is_sms_commission(amount_toman):
+        return commission_category(db, user)
+    return db.query(SpendCategory).filter(SpendCategory.slug == "sms_bank").one_or_none()
+
+
+def sms_spend_parts(
+    note: str | None, category_slug: str | None, category_name: str | None = None
+) -> tuple[bool, str]:
+    """(from_sms, note shown to the user) for one spend.
+
+    A note that carries the app's SMS key (at the start, or after the merchant in newer notes) marks an SMS
+    spend in any category (bank, «کارمزد» or one the user picked later): only its merchant or description
+    part is shown (see sms_note_text), a stored merchant once and as is; when nothing is left, the
+    «از پیامک» tag alone stands for it.
+    Any other note is shown as saved, minus a stray key. Stored notes are not changed.
+    """
+    note = note or ""
+    parts = sms_note_key(note)
+    if parts:
+        merchant, text = parts
+        return True, merchant or sms_note_text(text)
+    return False, _re.sub(r"\s{2,}", " ", _SMS_KEY_ANY.sub("", note)).strip()
 
 router = APIRouter()
 
@@ -136,11 +273,11 @@ def daily_view(
                 "child_name": name,
                 "name": name,
                 "color": _color_for(parent, parent_index.get(parent.id, 0)) if parent else "#475569",
-                "initial": parent_name[:1],
+                "initial": group_badge(parent.icon if parent else None, parent_name),
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
-                "from_sms": sms_spend_parts(row.note, child.slug if child else None)[0],
-                "note_display": sms_spend_parts(row.note, child.slug if child else None)[1],
+                "from_sms": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[0],
+                "note_display": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[1],
                 "year": spent.year,
                 "month": spent.month,
                 "day": spent.day,
@@ -182,12 +319,14 @@ def daily_view(
             "day": str(editing["day"]),
             "parent_id": str(editing["parent_id"]),
             "category_id": str(editing["category_id"]),
-            "note": editing["note"],
+            "note": editing["note_display"],
         }
+    keep_id = editing["category_id"] if editing else None
+    picker_parents, picker_children = picker_categories(parents, children, keep_id)
     if spend_form is None:
         today = tehran_today()
-        first_parent = parents[0].id if parents else ""
-        first_child = next((child.id for child in children if child.parent_id == first_parent), "")
+        first_parent = picker_parents[0].id if picker_parents else ""
+        first_child = next((child.id for child in picker_children if child.parent_id == first_parent), "")
         spend_form = {
             "amount_toman": "",
             "year": str(today.year),
@@ -206,11 +345,11 @@ def daily_view(
         "daily_page_label": persian_digits(str(page)),
         "daily_page_count_label": persian_digits(str(page_count)),
         "daily_parents": [
-            {"id": row.id, "name": row.name, "color": _color_for(row, i), "slug": row.slug or ""}
-            for i, row in enumerate(parents)
+            {"id": row.id, "name": row.name, "color": _color_for(row, parent_index[row.id]), "slug": row.slug or ""}
+            for row in picker_parents
         ],
         "daily_children": [
-            {"id": row.id, "name": row.name, "parent_id": row.parent_id} for row in children
+            {"id": row.id, "name": row.name, "parent_id": row.parent_id} for row in picker_children
         ],
         "daily_today_label": format_toman(today_total),
         "daily_month_label": format_toman(month_total),
@@ -242,6 +381,7 @@ def daily_view(
         "spend_form": spend_form,
         "editing_spend_id": editing["id"] if editing else editing_spend_id,
         "spend_orig_amount": _orig_amount(db, user, editing["id"] if editing else editing_spend_id),
+        "spend_open_add": request.query_params.get("add") == "1",
     }
 
 
@@ -286,15 +426,18 @@ def _save_daily_spend(
     form = _spend_form_dict(amount_toman, year, month, day, category_id, note, parent_id)
     # Every bad field at once ({field: message}); the old single `error` stays for old clients.
     existing_amount = None
+    current_category_id = None
     if spend_id is not None:
         current = db.get(DailySpend, spend_id)
         if current is not None and current.user_id == user.id:
             existing_amount = Decimal(current.amount_toman)
+            current_category_id = current.category_id
     errors, amount, spent = validate_spend(amount_toman, year, month, day, existing_amount)
     child = None
     if category_id.isdigit():
         child = db.get(SpendCategory, int(category_id))
-    if child is None or child.user_id != user.id or child.parent_id is None:
+    kept_archived = child is not None and current_category_id == child.id
+    if child is None or child.parent_id is None or (child.archived and not kept_archived):
         errors["category_id"] = CATEGORY_MSG
         child = None
     wants_json = "application/json" in request.headers.get("accept", "")
@@ -335,7 +478,8 @@ def _save_daily_spend(
         item.category_id = child.id
         item.amount_toman = amount
         item.spent_on = spent.togregorian()
-        item.note = form["note"]
+        if form["note"] != sms_spend_parts(item.note, None)[1]:
+            item.note = form["note"]
         flash(request, "خرج روزانه به‌روز شد.")
     db.commit()
     target = f"/dashboard?tab=daily&jy={spent.year}&jm={spent.month}"
@@ -453,6 +597,28 @@ async def profile_delete_spend(
     return RedirectResponse(target, status_code=303)
 
 
+SMS_QUEUE_MAX_AGE_DAYS = 7
+
+
+def sms_spent_on(sms_at, today):
+    """A spend queued on the phone while logged out keeps the SMS's own Tehran date (sms_at = epoch ms).
+
+    Missing, invalid, future or older than SMS_QUEUE_MAX_AGE_DAYS -> today, as before.
+    """
+    from datetime import datetime, timezone
+
+    from app.formatting import TEHRAN
+
+    try:
+        ms = int(sms_at)
+        day = datetime.fromtimestamp(ms / 1000, tz=timezone.utc).astimezone(TEHRAN).date()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return today
+    if day > today or (today - day).days > SMS_QUEUE_MAX_AGE_DAYS:
+        return today
+    return day
+
+
 @router.post("/api/sms-spend")
 async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     user = get_authenticated_user(request, db)
@@ -472,22 +638,15 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
         return JSONResponse({"ok": False, "error": "amount"}, status_code=400)
     raw_note = str(payload.get("note") or "").strip()
     idem = str(payload.get("idempotency_key") or "").strip()[:64]
-    note = raw_note[:120]
-    if idem:
-        note = f"[{idem}] {note}".strip()[:120]
+    note = sms_note_for_storage(raw_note, idem)
     ensure_spend_categories(db, user)
-    child = (
-        db.query(SpendCategory)
-        .filter(SpendCategory.user_id == user.id, SpendCategory.slug == "sms_bank")
-        .one_or_none()
-    )
+    child = sms_spend_category(db, user, amount)
     if child is None:
         return JSONResponse({"ok": False, "error": "category"}, status_code=500)
-    today = tehran_today()
-    spent_on = today.togregorian()
+    spent_on = sms_spent_on(payload.get("sms_at"), tehran_today().togregorian())
     duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
     if idem:
-        duplicate = duplicate_query.filter(DailySpend.note.like(f"[{idem}]%")).first()
+        duplicate = duplicate_query.filter(func.instr(DailySpend.note, f"[{idem}]") > 0).first()
     else:
         duplicate = duplicate_query.filter(
             DailySpend.category_id == child.id,

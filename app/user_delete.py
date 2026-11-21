@@ -67,13 +67,7 @@ def _user_tables(conn) -> list[str]:
 def _sql_counts(conn, user_id: int) -> dict[str, int]:
     counts: dict[str, int] = {}
     for t in _user_tables(conn):
-        if t == "spend_categories":
-            counts["spend_categories_custom"] = conn.execute(
-                "SELECT count(*) FROM spend_categories WHERE user_id=? AND NOT COALESCE(is_seed, 0)", (user_id,)).fetchone()[0]
-            counts["spend_categories_seed"] = conn.execute(
-                "SELECT count(*) FROM spend_categories WHERE user_id=? AND COALESCE(is_seed, 0)", (user_id,)).fetchone()[0]
-        else:
-            counts[t] = conn.execute(f'SELECT count(*) FROM "{t}" WHERE user_id=?', (user_id,)).fetchone()[0]
+        counts[t] = conn.execute(f'SELECT count(*) FROM "{t}" WHERE user_id=?', (user_id,)).fetchone()[0]
     return counts
 
 
@@ -266,11 +260,9 @@ def delete_users(
             for uid in ids:
                 conn.execute("DELETE FROM daily_spends WHERE user_id = ?", (uid,))
                 for table in _user_tables(conn):
-                    if table in ("users", "spend_categories", "daily_spends"):
+                    if table in ("users", "daily_spends"):
                         continue
                     conn.execute(f'DELETE FROM "{table}" WHERE user_id = ?', (uid,))
-                conn.execute("DELETE FROM spend_categories WHERE user_id = ? AND parent_id IS NOT NULL", (uid,))
-                conn.execute("DELETE FROM spend_categories WHERE user_id = ?", (uid,))
                 conn.execute("DELETE FROM users WHERE id = ?", (uid,))
             conn.execute(
                 "INSERT INTO admin_audit_log (actor_username, action, targets_json, counts_json, backup_filename, created_at) "

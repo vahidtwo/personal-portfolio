@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
+import app.config as config
 from app.config import (
     FIREBASE_CLIENT_EMAIL,
     FIREBASE_PRIVATE_KEY,
@@ -157,12 +160,15 @@ def remove_device_token(db: Session, user: User, token: str) -> None:
 
 
 def service_worker_firebase_snippet() -> str:
+    """Prepended to /sw.js: the click owner first, then the Firebase SDK, before any other worker code."""
+    click = """// Registered before the Firebase SDK so this handler, not the SDK's, opens every push tap.
+self.addEventListener("notificationclick", onPushNotificationClick);
+"""
     cfg = firebase_web_config()
     if cfg is None:
-        return ""
+        return click
     cfg_json = json.dumps(cfg, ensure_ascii=False)
-    return f"""
-
+    return click + f"""
 // Firebase is optional here: if gstatic cannot load, offline caching must still work.
 let firebaseMessaging = null;
 try {{
@@ -173,18 +179,161 @@ try {{
 }} catch (err) {{
   firebaseMessaging = null;
 }}
+// One display owner: a message with a notification part is shown by the SDK, so it is never shown here too.
 if (firebaseMessaging) firebaseMessaging.onBackgroundMessage(function (payload) {{
-  const title = (payload.notification && payload.notification.title) || "دارایی‌تو";
-  const body = (payload.notification && payload.notification.body) || "";
-  const options = {{
-    body: body,
-    icon: "/static/icons/icon-192.png",
-    badge: "/static/icons/icon-192.png",
-    data: payload.data || {{}},
-  }};
-  return self.registration.showNotification(title, options);
+  if (payload.notification) return;
+  return showPushNotification(payload.data || {{}});
 }});
+// Without the SDK (gstatic blocked) nothing else shows the message: show it once here.
+if (!firebaseMessaging) self.addEventListener("push", function (event) {{
+  let msg = {{}};
+  try {{ msg = event.data ? event.data.json() : {{}}; }} catch (err) {{ msg = {{}}; }}
+  event.waitUntil(showPushNotification(pushMessageData(msg)));
+}});
+
 """
+
+
+def push_link_base() -> str:
+    """Absolute https origin for web push links: PUBLIC_BASE_URL, else the main public host."""
+    base = (config.PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if not base.startswith("https://"):
+        base = config.MOVE_NEW_URL.rstrip("/")
+    return base
+
+
+def push_app_hosts() -> list[str]:
+    """Hosts this app answers on (the public host, the main host, the old host kept for older installs)."""
+    hosts: list[str] = []
+    for url in (push_link_base(), config.MOVE_NEW_URL, "https://" + config.MOVE_NOTICE_OLD_HOST):
+        host = urlsplit(url).netloc.lower()
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+def push_link(path: str | None) -> str:
+    p = (path or "").strip()
+    if not p.startswith("/") or p.startswith("//") or "\\" in p or any(c.isspace() for c in p):
+        p = "/dashboard"
+    return push_link_base() + p
+
+
+PLATFORMS = ("web", "android")
+
+
+@dataclass
+class PushResult:
+    sent: dict[str, int] = field(default_factory=lambda: {p: 0 for p in PLATFORMS})
+    failed: dict[str, int] = field(default_factory=lambda: {p: 0 for p in PLATFORMS})
+    devices: dict[str, int] = field(default_factory=lambda: {p: 0 for p in PLATFORMS})
+    removed: int = 0
+    error: str | None = None
+
+    @property
+    def total(self) -> int:
+        return sum(self.sent.values())
+
+
+def _push_data(title: str, body: str, data: dict[str, str] | None) -> dict[str, str]:
+    out = {str(k): str(v) for k, v in (data or {}).items()}
+    out["title"] = title
+    out["body"] = body
+    return out
+
+
+WEB_ICON = "/static/icons/icon-192.png"
+
+
+def build_message(token: str, platform: str, *, title: str, body: str, data: dict[str, str] | None):
+    """Android: data-only, the app shows it. Web: a webpush notification the Firebase SDK shows, plus a link."""
+    from firebase_admin import messaging
+
+    payload = _push_data(title, body, data)
+    if platform == "android":
+        return messaging.Message(
+            token=token,
+            data=payload,
+            android=messaging.AndroidConfig(priority="high", ttl=24 * 60 * 60),
+        )
+    return messaging.Message(
+        token=token,
+        data=payload,
+        webpush=messaging.WebpushConfig(
+            headers={"Urgency": "high", "TTL": str(24 * 60 * 60)},
+            notification=messaging.WebpushNotification(
+                title=title,
+                body=body,
+                icon=WEB_ICON,
+                tag=payload.get("type") or None,
+            ),
+            fcm_options=messaging.WebpushFCMOptions(link=push_link(payload.get("url"))),
+        ),
+    )
+
+
+def _is_stale_token_error(exc: BaseException | None) -> bool:
+    if exc is None:
+        return False
+    from firebase_admin import messaging
+
+    if isinstance(exc, (messaging.UnregisteredError, messaging.SenderIdMismatchError)):
+        return True
+    code = str(getattr(exc, "code", "") or "").lower()
+    text = str(exc).lower()
+    return code == "invalid-argument" and "registration token" in text
+
+
+def send_push_detailed(
+    db: Session,
+    user_id: int,
+    *,
+    title: str,
+    body: str,
+    data: dict[str, str] | None = None,
+) -> PushResult:
+    result = PushResult()
+    rows = db.query(PushDeviceToken).filter(PushDeviceToken.user_id == user_id).all()
+    for row in rows:
+        platform = row.platform if row.platform in PLATFORMS else "web"
+        result.devices[platform] += 1
+    if not rows:
+        result.error = "no-devices"
+        return result
+    if not firebase_admin_ready():
+        result.error = "unconfigured"
+        return result
+    from firebase_admin import messaging
+
+    entries = [(row.token, row.platform if row.platform in PLATFORMS else "web") for row in rows]
+    messages = [build_message(t, p, title=title, body=body, data=data) for t, p in entries]
+    try:
+        response = messaging.send_each(messages)
+    except Exception:
+        logger.exception("Push send failed for user %s", user_id)
+        result.error = "send-failed"
+        return result
+    stale: list[str] = []
+    for (token, platform), item in zip(entries, response.responses):
+        if item.success:
+            result.sent[platform] += 1
+            continue
+        result.failed[platform] += 1
+        exc = item.exception
+        logger.warning(
+            "Push to a %s device of user %s failed: %s %s",
+            platform, user_id, type(exc).__name__, getattr(exc, "code", ""),
+        )
+        if _is_stale_token_error(exc):
+            stale.append(token)
+    for token in stale:
+        db.query(PushDeviceToken).filter(PushDeviceToken.token == token).delete()
+    if stale:
+        db.commit()
+        result.removed = len(stale)
+    if not result.total:
+        result.error = "not-delivered"
+    return result
 
 
 def send_push_to_user(
@@ -195,33 +344,11 @@ def send_push_to_user(
     body: str,
     data: dict[str, str] | None = None,
 ) -> int:
-    if not firebase_admin_ready():
-        return 0
-    from firebase_admin import messaging
+    return send_push_detailed(db, user_id, title=title, body=body, data=data).total
 
-    tokens = [
-        row.token
-        for row in db.query(PushDeviceToken).filter(PushDeviceToken.user_id == user_id).all()
-    ]
-    if not tokens:
-        return 0
-    note = messaging.Notification(title=title, body=body)
-    message = messaging.MulticastMessage(
-        notification=note,
-        data=data or {},
-        tokens=tokens,
-    )
-    response = messaging.send_each_for_multicast(message)
-    stale: list[str] = []
-    for idx, result in enumerate(response.responses):
-        if result.success:
-            continue
-        exc = result.exception
-        code = getattr(exc, "code", "") or str(exc)
-        if "registration-token-not-registered" in str(code).lower() or "invalid" in str(code).lower():
-            stale.append(tokens[idx])
-    for token in stale:
-        db.query(PushDeviceToken).filter(PushDeviceToken.token == token).delete()
-    if stale:
-        db.commit()
-    return response.success_count
+
+def device_counts(db: Session, user_id: int) -> dict[str, int]:
+    counts = {p: 0 for p in PLATFORMS}
+    for row in db.query(PushDeviceToken).filter(PushDeviceToken.user_id == user_id).all():
+        counts[row.platform if row.platform in PLATFORMS else "web"] += 1
+    return counts

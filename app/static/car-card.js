@@ -135,6 +135,7 @@
           var card = section.querySelector("[data-car-card]");
           card.replaceWith(holder.firstElementChild);
           initCard();
+          if (window.Amounts) window.Amounts.refresh().then(function (ok) { if (!ok) window.Amounts.need(); });
         }
         closeAll();
         if (isDisconnect && data.ok) showToast();

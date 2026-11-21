@@ -4,6 +4,14 @@
         <item name="android:statusBarColor">#050608</item>
         <item name="android:navigationBarColor">#050608</item>
     </style>
+    <!-- v11: native launch splash (androidx core-splashscreen), logo B on the app background. MainActivity keeps
+         it up until the WebView's first paint (onPageCommitVisible), at most SPLASH_MAX_MS. -->
+    <style name="Theme.MyInventory.Starting" parent="Theme.SplashScreen.IconBackground">
+        <item name="windowSplashScreenBackground">#050608</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#3ee0b8</item>
+        <item name="postSplashScreenTheme">@style/Theme.MyInventory</item>
+    </style>
     <!-- Update notice bottom sheet: dimmed scrim (#050608 at 62%), fade only. -->
     <style name="Theme.MyInventory.UpdateSheet" parent="Theme.AppCompat.Dialog">
         <item name="android:windowBackground">@android:color/transparent</item>

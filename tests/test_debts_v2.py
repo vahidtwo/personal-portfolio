@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
+from tests.amounts_helper import with_amounts
 
 P = "/profile?tab=debts"
 MEHR28 = datetime(2026, 10, 20, 8, 30, tzinfo=timezone.utc)  # 1405/07/28 12:00 Tehran
@@ -137,12 +138,12 @@ def test_rows_sorted_by_next_due_with_badges_and_end_month(client, no_network, c
     _seed([("وام مسکن", 12500000, 34, 1405, 8, 5), ("وام ازدواج", 1150000, 52, 1405, 8, 1), ("اسنپ‌پی", 890000, 2, 1405, 8, 3),
            ("صندوق", 3000000, 1, 1405, 8, 25), ("تمام‌شده", 500000, 0, 1405, 1, 1)],
           expenses=[("بیمه", 1100000, 28), ("اجاره", 18000000, 1), ("قبض", 700000, 31)])
-    html = client.get(P).text
+    html = with_amounts(client, P)
     titles = re.findall(r'<li class="dv-row[^"]*" data-dv-row="\d+">\s*<div class="t"><b>([^<]+)</b>', html)
     assert titles == ["وام ازدواج", "اسنپ‌پی", "وام مسکن", "صندوق", "تمام‌شده"]
     assert "۳۴ قسط مانده، تا مرداد ۱۴۰۸" in html  # 1405/08 + 33 months (spec example)
     assert '<span class="dv-badge end">آخرین قسط</span>' in html and '<span class="dv-badge soon">۲ قسط مانده</span>' in html
-    assert "قسط بعدی: <b>وام ازدواج</b>، ۱ آبان، <bdi class=\"num\">۱٬۱۵۰٬۰۰۰</bdi> تومان" in html and "۳ روز دیگر" in html
+    assert "قسط بعدی: <b>وام ازدواج</b>، ۱ آبان، <bdi class=\"num mask-sm\" data-mask=\"portfolio\" data-amount>۱٬۱۵۰٬۰۰۰</bdi> تومان" in html and "۳ روز دیگر" in html
     exp = re.findall(r'data-dv-row="x\d+">\s*<div class="t"><b>([^<]+)</b><small>روز ([^ ]+) هر ماه', html)
     assert exp == [("اجاره", "۱"), ("بیمه", "۲۸"), ("قبض", "۳۱")]
     assert "نوبت بعدی: <b>۳۰ مهر</b>" in html  # day 31 in a 30-day month counts the last day
@@ -156,10 +157,10 @@ def test_paid_moves_one_instalment_and_undo_restores(client, no_network, clock):
     t = _csrf(client, P)
     r = client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "52", "csrf": t}, follow_redirects=False)
     assert r.status_code == 303 and _debt(debt_id) == (51, 1405, 9, 1)
-    page = client.get(P).text
+    page = with_amounts(client, P)
     assert "یک قسط از «وام ازدواج» کم شد. قسط بعدی به ماه بعد رفت." in page and f'action="/profile/debts/{debt_id}/unpaid"' in page
     assert "قسط بعدی: <b>وام ازدواج</b>، ۱ آذر" in page
-    assert "یک قسط از" not in client.get(P).text  # banner shown once
+    assert "یک قسط از" not in with_amounts(client, P)  # banner shown once
     # double tap / stale tab: the count the user saw no longer matches -> nothing changes
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "52", "csrf": t})
     assert _debt(debt_id) == (51, 1405, 9, 1)
@@ -182,11 +183,11 @@ def test_paid_needs_csrf_and_ownership(client, no_network, clock):
 
 def test_day_31_loan_keeps_its_day_and_last_payment_ends_it(client, no_network, clock):
     _register(client)
-    (debt_id,) = _seed([("روز ۳۱", 1000, 2, 1405, 6, 31)])  # stored date in the past: next due is from the calendar
+    (debt_id,) = _seed([("روز ۳۱", 1000, 2, 1405, 6, 31)])  # stored شهریور 31 is overdue on 1405/07/28
     t = _csrf(client, P)
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "2", "csrf": t})
-    assert _debt(debt_id) == (1, 1405, 8, 31)  # next due was 30 مهر (clamped); moved to آبان, day 31 kept
-    assert "قسط بعدی: <b>۳۰ آبان</b>" in client.get(P).text
+    assert _debt(debt_id) == (1, 1405, 7, 31)  # the missed شهریور one is paid; مهر is next, day 31 kept
+    assert "قسط بعدی: <b>۳۰ مهر</b>" in with_amounts(client, P)  # clamped to the 30-day month, due in 2 days
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "1", "csrf": t})
     assert _debt(debt_id)[0] == 0
     client.post(f"/profile/debts/{debt_id}/paid", data={"expect": "0", "csrf": t})
@@ -199,12 +200,12 @@ def test_zero_left_debts_drop_out_of_all_totals(client, no_network, clock):
     from app.mcp_http import _debts, _monthly_left
 
     _register(client)
-    _seed([("فعال", 1000000, 3, 1405, 8, 5), ("تمام‌شده", 9000000, 0, 1405, 8, 2)], expenses=[("اجاره", 2000000, 1)], salary=10000000)
-    page = client.get(P).text
-    assert '<b class="num" data-dv-num><bdi dir="ltr">۱٬۰۰۰٬۰۰۰</bdi></b>' in page  # قسط‌های این ماه
-    assert '<b class="num" data-dv-num><bdi dir="ltr">۳٬۰۰۰٬۰۰۰</bdi></b>' in page  # جمع بدهی مانده
+    _seed([("فعال", 1000000, 3, 1405, 7, 30), ("تمام‌شده", 9000000, 0, 1405, 5, 2)], expenses=[("اجاره", 2000000, 1)], salary=10000000)
+    page = with_amounts(client, P)
+    assert '<b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">۱٬۰۰۰٬۰۰۰</bdi></b>' in page  # قسط‌های این ماه
+    assert '<b class="num" data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">۳٬۰۰۰٬۰۰۰</bdi></b>' in page  # جمع بدهی مانده
     assert "قسط بعدی: <b>فعال</b>" in page
-    dash = client.get("/dashboard").text
+    dash = with_amounts(client, "/dashboard")
     tile = dash[dash.index('id="tile-next-debt"'):dash.index('id="tile-month-spend"')]
     assert "فعال" in tile and "تمام‌شده" not in tile and "۹٬۰۰۰٬۰۰۰" not in tile
     assert client.get("/api/salary").json()["left"] == "۷٬۰۰۰٬۰۰۰"  # 10M − 1M − 2M
@@ -226,12 +227,13 @@ def test_legacy_rows_load_edit_and_never_count_down_by_themselves(client, no_net
 
     _register(client)
     (debt_id,) = _seed([("قدیمی", "1500000.5", 10, 1404, 1, 15)])  # past date and a fraction, as old versions saved
-    page = client.get(P).text
-    assert "۱۰ قسط مانده" in page and "قسط بعدی: <b>۱۵ آبان</b>" in page
-    snapshot = re.findall(r'data-dv-num><bdi dir="ltr">([^<]+)<', page)
+    page = with_amounts(client, P)
+    assert "۱۰ قسط مانده" in page and "قسط بعدی: <b>۱۵ فروردین</b>" in page  # an old unpaid date stays overdue
+    assert '<span class="dv-badge late">' in page
+    snapshot = re.findall(r'data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">([^<]+)<', page)
     clock["now"] = datetime(2026, 11, 25, 8, 30, tzinfo=timezone.utc)  # a month later, no «پرداخت شد»
-    later = client.get(P).text
-    assert re.findall(r'data-dv-num><bdi dir="ltr">([^<]+)<', later) == snapshot and "۱۰ قسط مانده" in later
+    later = with_amounts(client, P)
+    assert re.findall(r'data-dv-num data-mask="portfolio" data-amount><bdi dir="ltr">([^<]+)<', later) == snapshot and "۱۰ قسط مانده" in later
     assert _debt(debt_id) == (10, 1404, 1, 15)  # nothing written by reading
     edit = client.get(f"{P}&edit={debt_id}").text
     amount = format_amount_input(Decimal("1500000.5"))
@@ -251,12 +253,13 @@ def test_legacy_rows_load_edit_and_never_count_down_by_themselves(client, no_net
 def test_page_contract(client, no_network, clock):
     _register(client)
     _seed([("لپ‌تاپ", 1750000, 9, 1405, 8, 10)], expenses=[("اجاره", 18000000, 1)])
-    html = client.get(P).text
+    html = with_amounts(client, P)
     assert 'class="tabs"' not in html and "رفتن به فرم" not in html and "confirm(" not in html
     assert 'data-salary-reveal' in html and 'data-salary-field="left">••••••' in html and 'data-salary-field="salary">••••••' in html
     assert 'role="menu"' in html and 'aria-label="گزینه‌های لپ‌تاپ"' in html and 'role="alertdialog"' in html
     assert 'id="debt-form"' in html and 'id="expense-form"' in html and 'data-dv-close>انصراف</button>' in html
     assert "پرداخت شد، یک قسط کم کن" in html and 'name="expect" value="9"' in html
-    assert "۹ قسط ۱٬۷۵۰٬۰۰۰ تومانی، جمعاً ۱۵٬۷۵۰٬۰۰۰ تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد." in html
+    assert "۹ قسط {monthly} تومانی، جمعاً {total} تومان، از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد." in html
+    assert 'data-body-masked="۹ قسط باقی‌مانده از فهرست و از جمع بدهی برداشته می‌شود. حذف برگشت ندارد."' in html
     from app.config import STATIC_ASSET_VERSION
     assert f"/static/debts-page.js?v={STATIC_ASSET_VERSION}" in html

@@ -73,7 +73,7 @@ def test_endpoint_returns_owner_value_with_no_store(client, no_network):
 
 def test_endpoint_is_same_user_only(client, no_network):
     _setup(client)
-    client.post("/logout", data={"csrf": _csrf(client, "/dashboard")})
+    client.post("/logout", data={"csrf": _csrf(client, "/profile")})
     _register(client, "bob")
     r = client.get("/api/salary")
     assert r.status_code == 200

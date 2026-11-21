@@ -23,8 +23,6 @@
     if (!btn) return;
     const now = effective();
     const next = now === "dark" ? "light" : "dark";
-    const text = btn.querySelector(".theme-toggle-label");
-    if (text) text.textContent = "پوسته: " + NAME[now];
     btn.setAttribute("aria-label", "پوسته: " + NAME[now] + ". تغییر به " + NAME[next]);
   }
 

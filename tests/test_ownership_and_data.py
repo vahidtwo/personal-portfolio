@@ -40,7 +40,7 @@ def victim_rows(client: TestClient):
     with SessionLocal() as db:
         alice = db.query(User).filter_by(username="alice").one()
         ensure_spend_categories(db, alice)
-        cat = db.query(SpendCategory).filter(SpendCategory.user_id == alice.id, SpendCategory.parent_id.isnot(None)).first()
+        cat = db.query(SpendCategory).filter(SpendCategory.parent_id.isnot(None)).order_by(SpendCategory.id).first()
         debt = Debt(user_id=alice.id, title="loan", monthly_toman=Decimal("100"), months_left=3, due_year=1405, due_month=1, due_day=1)
         exp = MonthlyExpense(user_id=alice.id, title="rent", amount_toman=Decimal("200"), due_day=5)
         spend = DailySpend(user_id=alice.id, category_id=cat.id, amount_toman=Decimal("300"), spent_on=date.today(), note="x")
@@ -156,17 +156,19 @@ def test_owner_can_edit_own_rows(client: TestClient, victim_rows):
         assert (spend.amount_toman, spend.note) == (Decimal("350"), "y")
 
 
-def test_cannot_file_spend_under_another_users_category(client: TestClient, victim_rows):
+def test_spend_under_shared_category_belongs_to_the_poster(client: TestClient, victim_rows):
     from app.db import SessionLocal
     from app.models import DailySpend, SpendCategory, User
 
     with SessionLocal() as db:
         alice_id = db.query(User).filter_by(username="alice").one().id
-        alice_child = db.query(SpendCategory).filter(SpendCategory.user_id == alice_id, SpendCategory.parent_id.isnot(None)).first()
-        ids = (alice_child.parent_id, alice_child.id)
+        mallory_id = db.query(User).filter_by(username="mallory").one().id
+        child = db.get(SpendCategory, db.get(DailySpend, victim_rows["spend"]).category_id)
+        ids = (child.parent_id, child.id)
     client.post("/profile/spends", data={"amount_toman": "999", "year": "1405", "month": "1", "day": "1", "parent_id": str(ids[0]), "category_id": str(ids[1]), "note": "", "csrf": _csrf(client)})
     with SessionLocal() as db:
-        assert db.query(DailySpend).filter(DailySpend.category_id == ids[1], DailySpend.user_id != alice_id).count() == 0
+        assert db.query(DailySpend).filter(DailySpend.category_id == ids[1], DailySpend.user_id == mallory_id).count() == 1
+        assert db.query(DailySpend).filter(DailySpend.user_id == alice_id).count() == 1
 
 
 def test_same_idempotency_key_is_per_user(client: TestClient):

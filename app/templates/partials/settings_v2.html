@@ -107,10 +107,10 @@
     <div class="landing-actions">
       <button type="button" class="btn btn-primary" id="push-enable">فعال‌سازی اعلان</button>
     </div>
-    <p id="push-status" class="toast toast-ok" role="status" hidden></p>
-    <form method="post" action="/profile/push-test" class="inline-form">
+    <p id="push-status" class="toast toast-ok" role="status" aria-live="polite" hidden></p>
+    <form method="post" action="/profile/push-test" class="inline-form" id="push-test-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit" class="btn btn-ghost btn-sm">ارسال آزمایشی</button>
+      <button type="submit" class="btn btn-ghost btn-sm" id="push-test">ارسال اعلان آزمایشی</button>
     </form>
   </section>
   {% endif %}
@@ -137,6 +137,7 @@
     <h2 id="v2-app">اپ و اتصال‌ها</h2>
     <div class="v2-rows">
       {% with cls="settings-row v2-row" %}{% include "partials/apk_download.html" %}{% endwith %}
+      <button type="button" class="settings-row v2-row" id="pwa-install" hidden>{{ nav_icon('download') }}<span class="settings-row-label">نصب اپ</span>{{ nav_icon('chev', size='sm') }}</button>
       {% if is_admin %}
       <a class="settings-row v2-row" href="/admin">{{ nav_icon('shield') }}<span class="settings-row-label">مدیریت</span>{{ nav_icon('chev', size='sm') }}</a>
       {% endif %}

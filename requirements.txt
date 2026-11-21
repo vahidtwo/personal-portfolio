@@ -11,3 +11,4 @@ jdatetime==5.2.0
 firebase-admin==6.6.0
 
 alembic==1.14.1
+cryptography>=42  # already pulled in by firebase-admin (google-auth); used for the Sanjeh token encryption

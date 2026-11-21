@@ -81,11 +81,12 @@ def test_settings_anchor_exists_and_profile_features_unchanged(client, no_networ
     assert 'localStorage.getItem("privacy-portfolio") !== "1"' in html
 
 
-def test_admin_link_and_logout_still_in_side_menu(client, no_network):
+def test_header_has_no_menu_and_logout_lives_in_settings(client, no_network):
     _register(client)
     html = client.get("/dashboard").text
-    assert 'action="/logout"' in html and 'id="menu-toggle"' in html
-    assert 'href="/profile">تنظیمات</a>' in html  # settings v2: one name for one page
+    assert 'id="menu-toggle"' not in html and 'id="side-panel"' not in html and "منو" not in html
+    assert 'href="/profile?section=settings#account-settings"' in html
+    assert 'action="/logout"' in client.get("/profile?section=settings").text
 
 
 def _make_admin(monkeypatch, name="boss"):
@@ -102,9 +103,7 @@ def test_settings_has_logout_row_and_no_admin_link_for_regular_user(client, no_n
     # admin entry is decided on the server: not in the HTML at all for non-admins
     assert 'href="/admin"' not in html
     assert "مدیریت" not in html
-    # desktop avatar menu (side panel) also offers logout
-    assert html.count("خروج از حساب") == 2
-    assert 'class="avatar"' in html
+    assert html.count("خروج از حساب") == 1
 
 
 def test_admin_sees_admin_row_in_settings_and_menu(client, no_network, monkeypatch):
@@ -115,7 +114,7 @@ def test_admin_sees_admin_row_in_settings_and_menu(client, no_network, monkeypat
     rows = rows[:rows.index("</section>", rows.index('id="logout"'))]
     assert 'href="/admin"' in rows and "مدیریت" in rows
     assert rows.index("مدیریت") < rows.index("خروج از حساب")  # logout is the last row
-    assert html.count('href="/admin"') == 2  # settings row + avatar/side menu
+    assert html.count('href="/admin"') == 1
     assert client.get("/admin").status_code == 200
 
 

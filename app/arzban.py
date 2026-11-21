@@ -58,7 +58,7 @@ def _usd_price(row: dict) -> Decimal | None:
 async def fetch_arzban_prices() -> list[FetchedPrice]:
     headers = {
         "Accept": "application/json",
-        "User-Agent": "my-inventory/1.0 (+https://fm5.ir/)",
+        "User-Agent": "daraiito/1.0 (+https://daraiito.ir)",
     }
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
         response = await client.get(ARZBAN_PRICES_URL, headers=headers)

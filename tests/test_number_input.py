@@ -70,7 +70,7 @@ def test_every_form_endpoint_parses_the_same(client, no_network, raw, want):
     client.post("/profile/expenses", data={"title": "اجاره", "amount_toman": toman_raw, "due_day": "۵", "csrf": _csrf(client)})
     client.get("/dashboard?tab=daily")
     db, alice = _alice()
-    child = db.query(SpendCategory).filter(SpendCategory.user_id == alice.id, SpendCategory.parent_id.is_not(None)).first()
+    child = db.query(SpendCategory).filter(SpendCategory.parent_id.is_not(None)).order_by(SpendCategory.id).first()
     parent_id, child_id = child.parent_id, child.id
     db.close()
     # Spends are whole toman (spending v2 spec): a decimal amount is rejected at the field, not rounded.
@@ -149,7 +149,7 @@ def test_admin_price_uses_shared_parser(client, monkeypatch):
     db.merge(MarketPrice(symbol="btc", price_toman=Decimal("1"), fetched_at=datetime.now(timezone.utc)))
     db.commit(); db.close()
     client.post("/admin/db/market-prices/btc", data={"price_toman": "۷٬۲۰۰٬۰۰۰٬۰۰۰٫۵", "fetched_at": "",
-                                                     "csrf": _csrf(client, "/admin")})
+                                                     "csrf": _csrf(client, "/profile")})
     db = SessionLocal()
     try:
         assert db.get(MarketPrice, "btc").price_toman == Decimal("7200000000.5")
@@ -186,7 +186,7 @@ def test_unchanged_profile_resubmit_keeps_every_value(client, no_network):
     html = client.get("/assets").text  # Phase 1: the assets form lives on /assets, still posting to /profile
     assets = _form_fields(html, "/profile")
     assert assets["ada"] == "۰٫۱۲۳۴۵۶۷۸" and assets["gold_grams"] == "۱۲٫۵"
-    assert assets["btc"] == "۰٫۰۰۰۰۰۰۰۱" and assets["cash_toman"] == "۱۸٬۵۰۰٬۰۰۰٬۰۰۰"
+    assert assets["btc"] == "۰٫۰۰۰۰۰۰۰۱" and assets.get("cash_toman", "") == "" and assets["cash_toman_keep"] == "1"  # cash comes from /api/amounts
     assert client.post("/profile", data=assets).status_code == 200
     account = _form_fields(client.get("/profile").text, "/profile/account")
     assert "salary_toman" not in account  # privacy + section saves: the account form never carries the salary

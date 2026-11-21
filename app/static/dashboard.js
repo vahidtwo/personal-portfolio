@@ -1,4 +1,23 @@
 (function () {
+  // «معادل دلاری» 7-day line: its points and label come from /api/amounts, never from the page HTML.
+  function drawUsdSpark() {
+    const svg = document.querySelector("[data-usd-spark]");
+    const src = document.querySelector('[data-amt-json="usd-spark"]');
+    if (!svg || !src) return;
+    let sp = null;
+    try { sp = JSON.parse(src.textContent || "null"); } catch (e) { sp = null; }
+    if (!sp || !sp.path) { svg.hidden = true; return; }
+    svg.setAttribute("class", "mc " + sp.kind);
+    svg.setAttribute("aria-label", sp.label);
+    svg.querySelector("title").textContent = sp.label;
+    svg.querySelector("path").setAttribute("d", sp.path);
+    const dot = svg.querySelector("circle");
+    dot.setAttribute("cx", sp.x);
+    dot.setAttribute("cy", sp.y);
+    svg.hidden = false;
+  }
+  document.addEventListener("amounts:filled", drawUsdSpark);
+
   const ASSET_COLORS = {
     gold: "#f59e0b",
     coin_emami: "#d97706",
@@ -141,10 +160,18 @@
     return sign + body + "٪";
   }
 
+  const CHANGE_LABEL_PREFIX = "تغییر نسبت به قبل: ";
+  const LTR_ISOLATE = "\u2066";
+  const POP_ISOLATE = "\u2069";
+
+  function isolateLtr(value) {
+    return LTR_ISOLATE + value + POP_ISOLATE;
+  }
+
   function changeLabelForPoint(ctx) {
     const idx = ctx.dataIndex;
     if (idx <= 0) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + isolateLtr("—");
     }
     const series = ctx.dataset.data;
     const current = ctx.parsed.y;
@@ -152,9 +179,11 @@
     const previous = Number(prevPoint && typeof prevPoint === "object" ? prevPoint.y : prevPoint);
     const change = formatChangeFromPrevious(current, previous);
     if (change == null) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + isolateLtr("—");
     }
-    return "تغییر نسبت به قبل: " + change;
+    // LRI…PDI keeps «−۲۰٪» as an LTR run inside the RTL tooltip, so the minus
+    // sits before the digits and the colon stays after «قبل».
+    return CHANGE_LABEL_PREFIX + isolateLtr(change);
   }
 
   let pieChartInited = false;
@@ -300,7 +329,13 @@
     return out;
   }
 
+  /** True while the user has amounts hidden: the chart then keeps only its line, no values. */
+  function amountsHidden() {
+    return document.documentElement.getAttribute("data-show-portfolio") !== "1";
+  }
+
   function chartOptions(view, opts) {
+    const hideValues = amountsHidden();
     const { labels, datasets, unit, first, last, nowMs } = view;
     const { rangeSelect, zoomOn, height } = opts;
     const muted = cssVar("--text-muted") || "#9aa3b2";
@@ -315,9 +350,10 @@
     const plugins = {
       legend: { display: false },
       tooltip: {
-        enabled: !rangeSelect,
+        enabled: !rangeSelect && !hideValues,
         position: "nearest",
         rtl: true,
+        textDirection: "rtl",
         backgroundColor: surface,
         titleColor: text,
         bodyColor: text,
@@ -332,7 +368,9 @@
         callbacks: {
           title: function (items) {
             if (!items.length) return "";
-            return labels[items[0].dataIndex] ?? "";
+            const title = labels[items[0].dataIndex] ?? "";
+            // LRI keeps the date before the time when the tooltip is rtl.
+            return title ? isolateLtr(title) : "";
           },
           label: function (ctx) {
             const v = ctx.parsed.y;
@@ -413,6 +451,7 @@
           max: yScale.max,
           beginAtZero: false,
           ticks: {
+            display: !hideValues,
             color: muted,
             font: { size: 11.5, weight: "500" },
             stepSize: yScale.stepSize,
@@ -677,6 +716,13 @@
     assetSelect?.addEventListener("input", onSeriesChange);
 
     renderChart();
+    // Hiding or showing amounts redraws the chart without (or with) its axis values and tooltip.
+    if (window.MutationObserver) {
+      new MutationObserver(() => renderChart()).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-show-portfolio"],
+      });
+    }
     // Re-draw once Vazirmatn has loaded (font-display: swap), so axis/tooltip digits match.
     if (document.fonts && document.fonts.load) {
       Promise.all([document.fonts.load('12px Vazirmatn', "۱٬۲۳۴٫۵"), document.fonts.ready])
@@ -747,9 +793,22 @@
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => boot(25));
-  } else {
+  // Chart numbers arrive with the other amounts (amounts.js); draw once they are in.
+  function start() {
+    const slot = document.getElementById("chart-data") || document.getElementById("pie-data");
+    if (slot && slot.hasAttribute("data-amt-json") && !slot.hasAttribute("data-amt-filled")) {
+      document.addEventListener("amounts:filled", function once() {
+        document.removeEventListener("amounts:filled", once);
+        boot(25);
+      });
+      return;
+    }
     boot(25);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
   }
 })();

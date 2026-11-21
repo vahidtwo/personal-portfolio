@@ -1,10 +1,12 @@
+import re
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship
+from sqlalchemy.orm import Mapped, attribute_keyed_dict, mapped_column, relationship, validates
 
 from app.db import Base
+from app.token_crypto import EncryptedToken
 
 
 def utcnow() -> datetime:
@@ -37,7 +39,8 @@ class User(Base):
     _legacy_cash_toman: Mapped[Decimal] = mapped_column("cash_toman", Numeric(20, 2), default=Decimal("0"))
     car_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0"))
     _legacy_car_count: Mapped[int] = mapped_column("car_count", default=0)
-    sanjeh_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Encrypted at rest ("enc1:" + Fernet); the attribute is always plaintext (or None if unreadable).
+    sanjeh_token: Mapped[str | None] = mapped_column(EncryptedToken(512), nullable=True)
     # last Sanjeh fetch outcome: 'ok' | 'rejected' | 'failed'; NULL (rows before 0004) = treated as connected
     sanjeh_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mcp_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
@@ -48,7 +51,6 @@ class User(Base):
     snapshots: Mapped[list["PortfolioSnapshot"]] = relationship(back_populates="user")
     debts: Mapped[list["Debt"]] = relationship(back_populates="user")
     monthly_expenses: Mapped[list["MonthlyExpense"]] = relationship(back_populates="user")
-    spend_categories: Mapped[list["SpendCategory"]] = relationship(back_populates="user")
     daily_spends: Mapped[list["DailySpend"]] = relationship(back_populates="user")
     push_tokens: Mapped[list["PushDeviceToken"]] = relationship(back_populates="user")
     holdings: Mapped[dict[str, "Holding"]] = relationship(
@@ -145,6 +147,8 @@ class Debt(Base):
     due_year: Mapped[int] = mapped_column()
     due_month: Mapped[int] = mapped_column()
     due_day: Mapped[int] = mapped_column()
+    # Upcoming push N days before each due date. NULL = default (1), 0 = same day, -1 = off.
+    reminder_days_before: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="debts")
@@ -166,22 +170,39 @@ class MonthlyExpense(Base):
 
 
 class SpendCategory(Base):
-    """Parent or subcategory for one-off daily spends. Seed rows stay; users may add more."""
+    """Global parent or subcategory for one-off daily spends, shared by every user; only admins change it.
+
+    Archived rows are hidden from pickers but old spends still show their name.
+    (COALESCE(parent_id, 0), name_key) is unique through an index created by the migration.
+    """
 
     __tablename__ = "spend_categories"
-    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_spend_category_user_slug"),)
+    __table_args__ = (UniqueConstraint("slug", name="uq_spend_categories_slug"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("spend_categories.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(64))
+    name_key: Mapped[str] = mapped_column(String(64), default="", server_default="")
     slug: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_seed: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    icon: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    user: Mapped[User] = relationship(back_populates="spend_categories")
     parent: Mapped["SpendCategory | None"] = relationship(remote_side="SpendCategory.id")
+
+    @validates("name")
+    def _keep_name_key(self, _key, value):
+        self.name_key = category_name_key(value)
+        return value
+
+
+def category_name_key(name: str | None) -> str:
+    """Matching key for category names: Arabic ي/ك as Persian ی/ک, no ZWNJ, spaces collapsed, case-folded."""
+    text = (name or "").replace("\u064a", "\u06cc").replace("\u0643", "\u06a9").replace("\u200c", "")
+    return re.sub(r"\s+", " ", text).strip().casefold()
 
 
 class DailySpend(Base):
@@ -213,3 +234,17 @@ class AdminAuditLog(Base):
     counts_json: Mapped[str] = mapped_column(Text)
     backup_filename: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class DueReminder(Base):
+    """One row per reminder sent: (loan, kind, Jalali due date) is sent at most once."""
+
+    __tablename__ = "due_reminders"
+    __table_args__ = (UniqueConstraint("debt_id", "kind", "due_date", name="uq_due_reminders_once"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    debt_id: Mapped[int] = mapped_column(Integer, index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    due_date: Mapped[str] = mapped_column(String(10))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -15,8 +15,10 @@ def test_danger_bg_is_never_redefined_solid():
 
 def test_next_due_badge_label_rendered(client, no_network):
     import jdatetime
+
+    from app.formatting import tehran_today
     _register(client)
-    due = jdatetime.date.today() + jdatetime.timedelta(days=2)
+    due = tehran_today() + jdatetime.timedelta(days=2)  # the app's Tehran day, not the runner's UTC day
     r = client.post("/profile/debts", data={"title": "رسالت", "monthly_toman": "30000000", "months_left": "10",
         "due_year": str(due.year), "due_month": str(due.month), "due_day": str(due.day),
         "csrf": _csrf(client, "/profile?tab=debts")})

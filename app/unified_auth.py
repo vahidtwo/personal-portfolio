@@ -153,11 +153,12 @@ async def auth_continue(
     user = db.query(User).filter(User.username == username).first()
     if user is not None:
         if not verify_password(password, user.password_hash):
-            rate_limit.record(user_key, window)
-            rate_limit.record(ip_key, window)
+            rate_limit.record(user_key, window, rate_limit.LOGIN_FAILS_PER_USER)
+            rate_limit.record(ip_key, window, rate_limit.LOGIN_FAILS_PER_IP)
             return _page(request, db, username=username, error=GENERIC_ERROR, alert_sub=GENERIC_HELP,
                          password_invalid=True, focus="password")
         rate_limit.clear(user_key)
+        rate_limit.clear(ip_key)
         user.last_login_at = utcnow()
         db.commit()
         request.session["user_id"] = user.id

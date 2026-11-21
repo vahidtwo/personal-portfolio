@@ -51,7 +51,7 @@ def normalize_price_toman(key: str, raw: Decimal) -> Decimal:
 async def _fetch_chande_prices_live() -> list[FetchedPrice]:
     headers = {
         "Accept": "application/json",
-        "User-Agent": "my-inventory/1.0 (+https://chande.net/)",
+        "User-Agent": "daraiito/1.0 (+https://daraiito.ir)",
     }
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
         response = await client.get(CHANDE_URL, headers=headers)
@@ -110,7 +110,7 @@ async def fetch_chande_currencies() -> dict:
     """Live currency rows from Chande. price_toman is priceToman, not divided."""
     headers = {
         "Accept": "application/json",
-        "User-Agent": "my-inventory/1.0 (+https://chande.net/)",
+        "User-Agent": "daraiito/1.0 (+https://daraiito.ir)",
     }
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
         response = await client.get(CHANDE_URL, headers=headers)

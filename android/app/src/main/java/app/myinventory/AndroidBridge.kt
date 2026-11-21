@@ -8,6 +8,7 @@ class AndroidBridge(
     private val context: Context,
     private val onServerConfigured: (String) -> Unit,
     private val onRetry: () -> Unit,
+    private val onEnablePush: () -> Unit = {},
 ) {
     /**
      * Asks the app to use this server. An empty address means the default server.
@@ -65,6 +66,19 @@ class AndroidBridge(
 
     @JavascriptInterface
     fun getDefaultServerUrl(): String = ServerAddress.DEFAULT
+
+    /** Settings «فعال‌سازی اعلان»: ask for the notification permission and register this install for push. */
+    @JavascriptInterface
+    fun enablePush() {
+        onEnablePush()
+    }
+
+    /** {"permission": "granted"|"off", "state": PushState.*, "detail": short reason}. No token or ids. */
+    @JavascriptInterface
+    fun pushState(): String {
+        val on = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+        return PushState.json(if (on) "granted" else "off", PushRegistrar.state(context), PushRegistrar.detail(context))
+    }
 
     companion object {
         fun normalizeBaseUrl(raw: String): String? = ServerAddress.normalize(raw)

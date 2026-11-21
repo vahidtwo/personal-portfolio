@@ -71,6 +71,15 @@
     totalEl.textContent = fmt(total);
   }
 
+  // The page HTML has no amounts: load them (the live totals need the saved values) and redo the sums,
+  // keeping anything already typed.
+  document.addEventListener("amounts:filled", function () {
+    form.querySelectorAll("[data-amt-keep]").forEach(function (el) { el.remove(); });
+    inputs.forEach(function (input) { input.defaultValue = input.getAttribute("value") || ""; });
+    refresh();
+  });
+  if (window.Amounts) window.Amounts.need();
+
   function dirtyCount() {
     var n = inputs.filter(isChanged).length;
     extras.forEach(function (el) {

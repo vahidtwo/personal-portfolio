@@ -15,7 +15,7 @@
     expDay: "روز بین ۱ تا ۳۱ است",
     day: function (n) { return "این ماه " + fa(n) + " روز دارد"; },
   };
-  var SHORT = { monthly_toman: "مبلغ هر قسط", months_left: "تعداد قسط مانده", due_year: "سال", due_month: "ماه", due_day: "روز", amount_toman: "مبلغ" };
+  var SHORT = { monthly_toman: "مبلغ هر قسط", months_left: "تعداد قسط مانده", due_year: "سال", due_month: "ماه", due_day: "روز", amount_toman: "مبلغ", reminder_days_before: "یادآوری قسط" };
   var DEBT_ORDER = ["monthly_toman", "months_left", "due_year", "due_month", "due_day"];
 
   function norm(raw) { try { return N().normalize(raw); } catch (e) { return null; } }
@@ -68,6 +68,15 @@
 
   var URL_ = "/profile?tab=debts";
   function $(s, r) { return (r || document).querySelector(s); }
+  // Amounts come from the row only while they are shown; a masked page uses the amount-free text.
+  function deleteBody(btn, row) {
+    var shown = document.documentElement.getAttribute("data-show-portfolio") === "1";
+    if (!shown || !row) return btn.getAttribute("data-body-masked");
+    function amt(sel) { var el = $(sel, row); return el ? el.textContent.trim() : ""; }
+    return btn.getAttribute("data-body")
+      .replace("{monthly}", amt(".a [data-amount]"))
+      .replace("{total}", amt(".dv-meta [data-amount]"));
+  }
   function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
   var page, scrim, openSheet = null, opener = null, openMenu = null;
 
@@ -114,7 +123,7 @@
     var v = formValues(form);
     return form.getAttribute("data-dv-form") === "expense" ? validateExpense(v) : validateDebt(v);
   }
-  function fields(form) { return form.getAttribute("data-dv-form") === "expense" ? ["amount_toman", "due_day"] : DEBT_ORDER; }
+  function fields(form) { return form.getAttribute("data-dv-form") === "expense" ? ["amount_toman", "due_day"] : DEBT_ORDER.concat(["reminder_days_before"]); }
   function showErrors(form, errs) {
     var sheet = form.closest("[data-dv-sheet]"), sum = $("[data-dv-summary]", sheet), p = prefix(form);
     fields(form).forEach(function (k) { setErr(form, k, errs[k]); });
@@ -157,6 +166,11 @@
         if (data && data.orig) i.setAttribute("data-dv-orig", data.orig); else i.removeAttribute("data-dv-orig");
         i.dispatchEvent(new Event("blur"));
       }
+    });
+    $$("select[data-default]", form).forEach(function (sel) {
+      var val = data && data[sel.name] != null && data[sel.name] !== "" ? String(data[sel.name]) : sel.getAttribute("data-default");
+      sel.value = val;
+      if (sel.selectedIndex < 0) sel.value = sel.getAttribute("data-default");
     });
     showErrors(form, {});
     $("[data-dv-fail]", form).hidden = true;
@@ -204,6 +218,7 @@
           return;
         }
         mine.forEach(function (el, i) { el.innerHTML = nums[i].innerHTML; });
+        if (W.Amounts) W.Amounts.refresh(URL_);
         var reveal = $('[data-salary-reveal][aria-pressed="false"]');
         if (reveal) reveal.click(); // مانده changed: mask again (privacy.js re-fetches on the next tap)
         fail.hidden = true;
@@ -268,6 +283,15 @@
     if (t.matches("[data-dv-add]")) {
       show(fillForm(t.getAttribute("data-dv-add"), null), t);
     } else if (t.matches("[data-dv-edit]")) {
+      // the form values come with the amounts: load them first; if that fails the link opens the server form
+      if (!t.getAttribute("data-form")) {
+        if (!W.Amounts) return;
+        ev.preventDefault();
+        W.Amounts.need().then(function () {
+          if (t.getAttribute("data-form")) t.click(); else location.href = t.href;
+        });
+        return;
+      }
       ev.preventDefault();
       var data = JSON.parse(t.getAttribute("data-form"));
       var kind = t.getAttribute("data-dv-edit");
@@ -285,7 +309,7 @@
     } else if (t.matches("[data-dv-del]")) {
       var sheet = $('[data-dv-sheet="delete"]'), btnRow = t.closest("[data-dv-row]");
       $("[data-dv-del-title]", sheet).textContent = "«" + t.getAttribute("data-title") + "» حذف شود؟";
-      $("[data-dv-del-body]", sheet).textContent = t.getAttribute("data-body");
+      $("[data-dv-del-body]", sheet).textContent = deleteBody(t, btnRow);
       var hint = $("[data-dv-del-hint]", sheet); hint.textContent = t.getAttribute("data-hint"); hint.hidden = !t.getAttribute("data-hint");
       $("[data-dv-del-form]", sheet).action = t.getAttribute("data-action");
       show(sheet, btnRow ? $("[data-dv-dots]", btnRow) : t);

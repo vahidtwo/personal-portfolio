@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}دسته‌های خرج · مدیریت{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin-categories.css?v={{ static_v }}">{% endblock %}
+{% block content %}
+{#- Spend categories manager. Counts only (all users together); no amounts, no usernames. JS (admin-categories.js)
+    takes over the list below for editing, ordering, archive and the picker preview; without JS it is read only. -#}
+<div class="ac-page" data-ac-page data-csrf="{{ csrf }}">
+  <nav class="ac-crumb" aria-label="مسیر"><a href="/admin">مدیریت</a><span aria-hidden="true">‹</span><a href="/admin/db">پایگاه داده</a><span aria-hidden="true">‹</span><span aria-current="page">دسته‌های خرج</span></nav>
+  <div class="ac-head">
+    <div>
+      <h1>دسته‌های خرج</h1>
+      <p class="ac-meta" data-ac-meta>مشترک برای همهٔ کاربران، {{ group_count | string | fa }} گروه، {{ child_count | string | fa }} زیردسته، {{ archived_count | string | fa }} بایگانی</p>
+    </div>
+    <button type="button" class="ac-btn ac-p ac-lg" data-ac-new hidden>
+      <svg class="ac-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>دستهٔ جدید</button>
+  </div>
+  <div class="ac-live ac-sr" role="status" aria-live="polite" data-ac-live></div>
+  <div data-ac-root>
+    <div class="ac-lay">
+      <section aria-label="فهرست دسته‌ها">
+        {% set groups = rows | selectattr("parent_id", "none") | list %}
+        {% if not rows %}
+        <div class="ac-card ac-state"><h2>هنوز دسته‌ای نیست</h2><p>با جاوااسکریپت می‌توانید دسته‌های پیش‌فرض را بسازید.</p></div>
+        {% endif %}
+        {% for g in groups %}
+        <div class="ac-card ac-grp">
+          <div class="ac-row ac-ghead">
+            <span class="ac-cic" style="background:{{ g.shown_color }}" aria-hidden="true">{{ g.badge }}</span>
+            <div class="ac-nm"><b>{{ g.name }}{% if g.system %} <span class="ac-bdg">سیستمی</span>{% endif %}{% if g.archived %} <span class="ac-bdg ac-arc">بایگانی</span>{% endif %}</b></div>
+          </div>
+          <ul class="ac-kids">
+            {% for k in rows if k.parent_id == g.id %}
+            <li><div class="ac-row ac-krow{% if k.archived %} ac-arch{% endif %}"><div class="ac-nm"><b>{{ k.name }}{% if k.system %} <span class="ac-bdg">سیستمی</span>{% endif %}{% if k.archived %} <span class="ac-bdg ac-arc">بایگانی</span>{% endif %}</b></div><span class="ac-cnt"><b>{{ k.spend_count | num }}</b> خرج</span></div></li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </section>
+    </div>
+  </div>
+  <script type="application/json" id="ac-data">{{ {"rows": rows, "config": config} | tojson }}</script>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/admin-categories.js?v={{ static_v }}" defer></script>{% endblock %}

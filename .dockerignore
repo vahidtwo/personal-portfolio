@@ -1,4 +1,8 @@
 .git
+# Only what the git-sha build stage needs to resolve the commit; nothing else from .git.
+!.git/HEAD
+!.git/refs/heads
+!.git/packed-refs
 .venv
 __pycache__
 *.pyc

@@ -212,7 +212,10 @@
       d.className = "sp-sheet sp-confirm"; d.setAttribute("role", "alertdialog");
       d.setAttribute("aria-labelledby", "sp-ct"); d.setAttribute("aria-describedby", "sp-cd");
       var note = row.getAttribute("data-sp-note");
-      var desc = row.getAttribute("data-sp-amount") + " تومان، " + row.getAttribute("data-sp-name") + (note ? "، " + note : "") + "، " + row.getAttribute("data-sp-rel") + ". حذف برگشت ندارد.";
+      // The amount is read from the row only while amounts are shown, so a masked page never prints it.
+      var shown = document.documentElement.getAttribute("data-show-portfolio") === "1";
+      var amt = shown ? $(".a [data-amount]", row) : null;
+      var desc = (amt ? amt.textContent.trim() + " تومان، " : "") + row.getAttribute("data-sp-name") + (note ? "، " + note : "") + "، " + row.getAttribute("data-sp-rel") + ". حذف برگشت ندارد.";
       d.innerHTML = '<h2 id="sp-ct">این خرج حذف شود؟</h2><p class="sp-hint" id="sp-cd"></p><div class="sp-actions"><button type="button" class="btn btn-danger" data-sp-yes>حذف</button><button type="button" class="btn btn-ghost" data-sp-no>انصراف</button></div>';
       $("#sp-cd", d).textContent = desc;
       document.body.appendChild(d);
@@ -325,6 +328,7 @@
             var nf = $("[data-sp-page]", doc); // hidden jy/jm for the form follow the month
             form.elements.jy.value = $("[name=jy]", nf).value; form.elements.jm.value = $("[name=jm]", nf).value; }
           if (history.replaceState) history.replaceState(null, "", url);
+          if (window.Amounts) window.Amounts.refresh(url);
         })
         .catch(function () {
           clearTimeout(skelTimer);

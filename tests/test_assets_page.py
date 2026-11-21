@@ -49,7 +49,7 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
     from app.profile import profile_save
     _register(client)
     form = _assets_form(client.get("/assets").text)
-    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "background_tasks", "db", "csrf", "clear_sanjeh", "next_url"}
+    handler_fields = set(inspect.signature(profile_save).parameters) - {"request", "background_tasks", "db", "csrf", "clear_sanjeh", "next_url", "cash_toman_keep"}
     assert handler_fields == set(QTY_FIELDS)  # Sanjeh token moved to /assets/car/connect (car card v2)
     for name in handler_fields:
         assert form.count(f'name="{name}"') == 1, name
@@ -60,7 +60,7 @@ def test_every_asset_field_of_the_save_handler_is_on_the_page(client, no_network
     assert heads == ["طلا و سکه", "ارز و نقد", "رمزارز", "خودرو"]
     # quantity inputs keep the old attributes (Persian/Latin input, LTR, exact values)
     for name in QTY_FIELDS:
-        assert re.search(rf'<input name="{name}" value="" placeholder="۰" inputmode="decimal" dir="ltr"', form), name
+        assert re.search(rf'<input name="{name}" (?:value=""|data-amt-attr="value=input-{name}") placeholder="۰" inputmode="decimal" dir="ltr"', form), name
     assert re.search(r'<input name="cash_toman"[^>]*data-thousands', form)
 
 
@@ -120,7 +120,8 @@ def test_header_total_and_row_values_match_the_dashboard_math(client, no_network
     row.price_toman, row.fetched_at = Decimal("10000000"), utcnow()
     db.add(row); db.commit(); db.close()
     client.post("/profile", data={"btc": "0.25", "cash_toman": "1000", "csrf": _csrf(client, "/assets")})
-    html = client.get("/assets").text
+    from tests.amounts_helper import with_amounts
+    html = with_amounts(client, "/assets")
     db, u = _user()
     view = build_portfolio(u, load_prices(db))
     db.close()

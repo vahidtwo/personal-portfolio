@@ -10,6 +10,7 @@ import jdatetime
 
 from tests.test_holdings import _csrf, _register, no_network  # noqa: F401
 from tests.test_phase0_ui import _set_price
+from tests.amounts_helper import with_amounts
 
 TEHRAN = ZoneInfo("Asia/Tehran")
 ROOT = Path(__file__).resolve().parent.parent
@@ -178,8 +179,8 @@ def test_next_instalment_due_chip(client):
     from app.models import Debt
 
     today = jdatetime.date(1405, 7, 25)
-    d1 = Debt(title="وام خودرو", monthly_toman=Decimal("4500000"), months_left=3, due_year=1405, due_month=1, due_day=5)
-    d2 = Debt(title="کارت", monthly_toman=Decimal("100"), months_left=3, due_year=1405, due_month=1, due_day=26)
+    d1 = Debt(title="وام خودرو", monthly_toman=Decimal("4500000"), months_left=3, due_year=1405, due_month=8, due_day=5)
+    d2 = Debt(title="کارت", monthly_toman=Decimal("100"), months_left=3, due_year=1405, due_month=7, due_day=26)
     n = next_instalment([d1, d2], today)
     assert n["chip"] == "فردا" and n["title"] == "کارت" and n["amount_label"] == "۱۰۰"
     n = next_instalment([d1], today)
@@ -241,10 +242,10 @@ def test_layout_css_contract():
 
 def test_cash_card_subtitle_says_cash_not_the_amount_again(client, no_network):
     _seed(client)
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     cards = html[html.index('id="asset-cards"'):html.index('id="portfolio-table"')]
     cash = cards[cards.index("وجه نقد") - 400:cards.index("وجه نقد") + 200]
-    assert "<span>وجه نقد</span>" in cash
+    assert "<span class=\"acard-base\">وجه نقد</span>" in cash
     assert cash.count("۱٬۵۰۰٬۰۰۰") == 1  # the value once, not repeated as the subtitle
 
 
@@ -259,7 +260,7 @@ def _seed(client):
     _set_price("usd", "100000")
     client.post("/profile", data={"btc": "2", "usd": "200", "cash_toman": "1500000", "csrf": _csrf(client)})
     client.post("/profile/debts", data={"title": "وام", "monthly_toman": "100000", "months_left": "3",
-                                        "due_year": "1405", "due_month": "1", "due_day": "1",
+                                        "due_year": "1499", "due_month": "1", "due_day": "1",
                                         "csrf": _csrf(client, "/profile?tab=debts")})
     db = SessionLocal()
     user = db.query(User).filter(User.username == "alice").one()
@@ -279,7 +280,7 @@ def test_dashboard_numbers_match_previous_formulas(client, no_network):
     from app.portfolio import build_portfolio, load_prices
 
     _seed(client)
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     db = SessionLocal()
     user = db.query(User).filter(User.username == "alice").one()
     view = build_portfolio(user, load_prices(db))
@@ -289,10 +290,11 @@ def test_dashboard_numbers_match_previous_formulas(client, no_network):
     old_total = format_toman(view.total_toman)                    # pre-Phase-2 total_label
     old_usd = format_number(view.total_toman / Decimal("100000"), 2)  # pre-Phase-2 usd label (trimmed)
     assert old_net == "۲۳٬۲۰۰٬۰۰۰" and old_total == "۲۳٬۵۰۰٬۰۰۰"
-    assert f'data-mask="portfolio">{old_net}</span>' in html
+    assert re.search(r'<span class="total-num"[^>]*data-mask="portfolio"[^>]*>' + re.escape(old_net) + '</span>', html)
     tfoot = html[html.index("<tfoot>"):html.index("</tfoot>")]
     assert old_total in tfoot
-    assert f"title=\"{format_toman(debt)} تومان\"" in html
+    # the exact debt total is no longer in a hover title (it showed while amounts were hidden)
+    assert f"title=\"{format_toman(debt)} تومان\"" not in html and '<dt>جمع بدهی</dt><dd data-mask="portfolio" data-amount>' in html
     assert old_usd == "۲۳۵" and "<bdi dir=\"ltr\">۲۳۵٫۰۰</bdi> <small>دلار آمریکا</small>" in html
     table = html[html.index('id="portfolio-table"'):html.index("</table>")]
     for row in view.rows:
@@ -302,7 +304,7 @@ def test_dashboard_numbers_match_previous_formulas(client, no_network):
 
 def test_dashboard_change_chips_and_tiles(client, no_network):
     _seed(client)
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     # 24h: 2 BTC × (1,000,000 − 900,000) = +200,000 on a past net worth of 23,300,000 − 300,000
     assert 'data-change="24h"><bdi>▲ ۰٫۸۷٪</bdi>' in html
     # 7d: +400,000 on 23,100,000 − 300,000
@@ -315,7 +317,7 @@ def test_dashboard_change_chips_and_tiles(client, no_network):
     assert 'class="acards only-mob"' in html and 'id="portfolio-table"' in html
     for rng in ("7", "30", "90", "365", "all"):
         assert f'data-range="{rng}"' in html
-    chart = json.loads(re.search(r'<script id="chart-data" type="application/json">(.*?)</script>', html, re.S).group(1))
+    chart = json.loads(re.search(r'<script id="chart-data" type="application/json"[^>]*>(.*?)</script>', html, re.S).group(1))
     assert len(chart["times"]) == len(chart["labels"]) == len(chart["series"][0]["data"])
     assert chart["times"] == sorted(chart["times"]) and chart["now"] == chart["times"][-1]
 
@@ -324,7 +326,7 @@ def test_dashboard_without_history_shows_dash(client, no_network):
     _register(client)
     _set_price("btc", "1000000")
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     assert 'data-change="24h"><bdi>—</bdi>' in html and 'data-change="7d"><bdi>—</bdi>' in html
     assert "سابقهٔ قیمت کافی نیست" in html
     assert "قسطی ثبت نشده" in html
@@ -348,7 +350,7 @@ def test_four_assets_with_different_moves_show_four_different_7d_chips(client, n
                              breakdown_json=json.dumps({"total": "1", "unit_price": then_prices})))
     db.commit()
     db.close()
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     table = html[html.index('id="portfolio-table"'):html.index("<tfoot>")]
     chips = dict(re.findall(r'<span>([^<]+?)(?: <span class="badge[^"]*">[^<]*</span>)?</span>\s*</div>.*?'
                             r'<span class="chg [a-z]+">([^<]+)</span>', table, re.S))
@@ -360,7 +362,7 @@ def test_hero_heading_title_and_muted_subline(client):
     """«خالص دارایی» is the title at every width; «دارایی منهای بدهی» is a muted line under it."""
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})  # home v2: an all-empty user gets the welcome card
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     assert '<h1 id="total-heading" aria-describedby="total-sub">خالص دارایی</h1>' in html
     assert '<p class="h-sub" id="total-sub">دارایی منهای بدهی</p>' in html
     assert "(دارایی منهای بدهی)" not in html
@@ -370,7 +372,7 @@ def test_side_cards_live_in_their_own_column(client, no_network):
     """Fix (live 1280px gaps): tiles, pie and report are stacked in .dash-side; hero, chart and assets in .dash-main."""
     _register(client)
     client.post("/profile", data={"btc": "1", "csrf": _csrf(client)})
-    html = client.get("/dashboard").text
+    html = with_amounts(client, "/dashboard")
     main = html[html.index('<div class="dash-main">'):html.index('<div class="dash-side">')]
     side = html[html.index('<div class="dash-side">'):]
     for cls in ("dash-hero", "dash-chart", "dash-assets"):

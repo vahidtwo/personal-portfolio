@@ -28,7 +28,7 @@ if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-schem
 <a class="skip-link" href="#main">رفتن به محتوا</a>
 <header class="top"><div class="top-inner">
   <a class="brand" href="/"><img class="logo-dark" src="/static/brand/daraiito-symbol-dark.svg" alt="" width="28" height="28"><img class="logo-light" src="/static/brand/daraiito-symbol-light.svg" alt="" width="28" height="28">دارایی‌تو</a>
-  <div class="top-actions"><a class="back-link" href="/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>صفحهٔ اصلی</a></div>
+  <div class="top-actions">{% include "partials/theme_button.html" %}<a class="back-link" href="/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>صفحهٔ اصلی</a></div>
 </div></header>
 <main id="main" class="auth">
 {% if step == "b" %}
@@ -61,6 +61,7 @@ if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-schem
 </form>
 {% endif %}
 </main>
+<script src="/static/theme.js?v={{ static_v }}" defer></script>
 <script src="/static/auth.js?v={{ static_v }}" defer></script>
 </body>
 </html>

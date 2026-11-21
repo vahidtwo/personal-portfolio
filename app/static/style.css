@@ -7,6 +7,9 @@
   --surface-hover: rgba(28, 32, 44, 0.9);
   --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.05);
+  --track: rgba(255, 255, 255, 0.06);
+  /* empty share track with hide-amounts on: >= 3:1 against the card (non-text contrast) */
+  --track-masked: #636a7c;
   --text: #f4f6fb;
   --text-muted: #8b93a8;
   --accent: #3ee0b8;
@@ -40,6 +43,8 @@
   --surface-hover: #f3f6fc;
   --border: rgba(20, 24, 40, 0.08);
   --border-subtle: rgba(20, 24, 40, 0.05);
+  --track: rgba(20, 24, 40, 0.1);
+  --track-masked: #8e93a3;
   --text: #0f1219;
   --text-muted: #5e6678;
   --accent: #0d9f7a;
@@ -166,111 +171,6 @@ a:hover { color: var(--accent-hover); }
   gap: 12px;
 }
 
-.menu-toggle {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-}
-
-.side-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.6); /* Dim the page at 60%; tap closes the menu */
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.28s ease, visibility 0.28s ease;
-}
-
-.side-backdrop.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.side-panel {
-  position: fixed;
-  z-index: 70;
-  top: 0;
-  bottom: 0;
-  inset-inline-start: 0;
-  width: min(320px, 88vw);
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
-  background: var(--bg); /* opaque page colour per theme; --surface is translucent and let the page show through */
-  border-inline-start: 1px solid var(--border-subtle);
-  box-shadow: var(--card-shadow);
-  overflow: auto;
-  transform: translate3d(100%, 0, 0);
-  visibility: hidden;
-  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.32s;
-}
-
-.side-panel.is-open {
-  transform: translate3d(0, 0, 0);
-  visibility: visible;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .side-backdrop,
-  .side-panel {
-    transition-duration: 0.01ms;
-  }
-}
-
-.side-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.side-nav .nav-link,
-.side-logout .btn,
-.side-nav .install-btn,
-.side-nav .theme-toggle {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: start;
-}
-
-.side-logout .btn,
-.side-nav .theme-toggle {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.side-logout .btn:hover,
-.side-nav .theme-toggle:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-
-.side-nav .theme-toggle {
-  height: auto;
-}
-
-.side-logout { margin: 0; }
-
-body.menu-open { overflow: hidden; }
-
 .brand {
   display: flex;
   align-items: center;
@@ -324,7 +224,6 @@ body.menu-open { overflow: hidden; }
   text-decoration: none;
   transition: color 0.15s, background 0.15s;
 }
-.install-btn { cursor: pointer; background: transparent; border: 0; font: inherit; color: var(--accent); }
 .pwa-offline-bar {
   position: sticky;
   top: calc(env(safe-area-inset-top) + 56px);
@@ -382,9 +281,8 @@ body.menu-open { overflow: hidden; }
 .tab:focus-visible,
 .nav-link:focus-visible,
 .chart-tool-btn:focus-visible,
-.menu-toggle:focus-visible,
 .privacy-btn:focus-visible,
-.theme-toggle:focus-visible,
+.theme-btn:focus-visible,
 .th-sort:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -907,10 +805,6 @@ p.total {
 }
 
 @media (max-width: 520px) {
-  .menu-toggle,
-  .side-panel-head .btn {
-    min-height: 44px;
-  }
   .debt-total {
     display: flex;
     flex-direction: column;
@@ -1463,6 +1357,10 @@ html[data-show-portfolio="1"] [data-mask="portfolio"]::after,
 html[data-show-salary="1"] [data-mask="salary"]::after {
   content: none;
 }
+/* Signed amounts are left-to-right islands, so a minus stays before the digits («−۸۸۸»). The hero net
+   needs it here because .total-num is an RTL box; the other signed values sit in <bdi dir="ltr">.
+   The placeholder is empty until amounts are shown. */
+.total-num > [data-amt] { unicode-bidi: isolate; direction: ltr; }
 .section-logo {
   width: 18px;
   height: 18px;
@@ -1605,6 +1503,9 @@ html[data-show-salary="1"] [data-mask="salary"]::after {
 }
 .btn-icon:hover { background: var(--surface-hover); }
 
+.top-inner > .theme-btn { margin-inline-start: auto; }
+.theme-btn { width: 44px; height: 44px; flex-shrink: 0; }
+.settings-row[hidden] { display: none; }
 [data-theme="dark"] .theme-icon-light { display: none; }
 [data-theme="light"] .theme-icon-dark { display: none; }
 
@@ -1618,6 +1519,7 @@ html[data-show-salary="1"] [data-mask="salary"]::after {
 }
 .toast-ok { background: var(--success-bg); color: var(--success); }
 .toast-warn { background: var(--warn-bg); color: var(--warn); }
+.push-code { display: block; margin-top: 4px; font-size: 0.75em; opacity: 0.8; font-family: ui-monospace, monospace; unicode-bidi: isolate; overflow-wrap: anywhere; }
 
 .auth-card {
   width: min(440px, 100%);
@@ -1883,7 +1785,7 @@ input:focus {
 .advanced-body > h2 { margin-top: 4px; }
 
 /* ---------- Main navigation (Phase 1, from /mockups/phase1) ----------
-   Five sections. >=900px: rounded pill container centered in the top bar, avatar on the left.
+   Five sections. >=900px: rounded pill container centered in the top bar.
    <900px: fixed bottom bar, icon over label, active = filled pill + bold label.
    Not approved yet: restyle only through these custom properties; icons live in partials/nav_icons.html. */
 :root,
@@ -1907,10 +1809,7 @@ input:focus {
   --main-nav-active-icon-fill: none;
   --main-nav-desk-bg: rgba(255, 255, 255, 0.04);
   --main-nav-desk-border: var(--border-subtle);
-  --avatar-size: 36px;
-  --avatar-fg: #04120e;
-  --avatar-bg: #3ee0b8; /* logo B: flat teal, ink text 11.44:1; retired violet/cyan gradient */
-  --main-nav-desk-shift: -49px;
+  --main-nav-desk-shift: -73px;
   --page-extra-bottom: 0px; /* a future sticky bar (e.g. unsaved changes on assets) adds its height here */
 }
 [data-theme="light"] {
@@ -1918,7 +1817,6 @@ input:focus {
   --main-nav-fg: var(--text-muted);
   --main-nav-active-ring: rgba(13, 159, 122, 0.25);
   --main-nav-desk-bg: rgba(255, 255, 255, 0.7);
-  --avatar-fg: #04120e; /* dark text on the teal in both themes (>=4.5:1); white was ~2.6:1 */
 }
 
 /* Secondary text / placeholders use the muted token (#8b93a8 in dark). */
@@ -1957,21 +1855,6 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 .main-nav-label-rest { display: none; }
 #account-settings { scroll-margin-top: calc(env(safe-area-inset-top) + 84px); }
 
-.menu-toggle .avatar { display: none; }
-.avatar-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.avatar {
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--avatar-fg);
-  background: var(--avatar-bg);
-}
-
 /* Settings rows (admin / logout) */
 .settings-rows { padding: 4px 0; overflow: hidden; }
 .settings-row-form { margin: 0; }
@@ -2005,7 +1888,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 
 @media (min-width: 900px) {
   /* The nav comes after <main> in the HTML (keyboard order); it is placed in the top bar here, centered
-     between the logo and the avatar like before: (avatar 36 + gap 12 − logo 134 − gap 12) / 2 = −49px. */
+     in the space beside the logo: (0 − logo 134 − gap 12) / 2 = −73px. */
   .has-main-nav .top-inner { min-height: 74px; } /* same height as when the nav sat inside it */
   .main-nav {
     position: fixed;
@@ -2034,9 +1917,6 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
   }
   .main-nav-icon { width: var(--main-nav-icon-desk); height: var(--main-nav-icon-desk); }
   .main-nav-label-rest { display: inline; }
-  .has-main-nav .menu-toggle { padding: 0; border: 0; background: transparent; min-height: 0; border-radius: 50%; }
-  .has-main-nav .menu-toggle .menu-toggle-text { display: none; }
-  .has-main-nav .menu-toggle .avatar { display: grid; }
 }
 @media (min-width: 900px) and (max-width: 1099px) {
   .main-nav-item { padding: 0 12px; }
@@ -2130,7 +2010,7 @@ textarea::placeholder { color: var(--text-muted); opacity: 1; }
 }
 /* phones: the column wrappers vanish so the cards are grid items in the areas above */
 .dash-main, .dash-side { display: contents; }
-.dash-hero { grid-area: hero; }
+.dash-hero { grid-area: hero; container-type: inline-size; }
 .dash-tiles { grid-area: tiles; }
 .dash-chart { grid-area: chart; }
 .dash-assets { grid-area: assets; min-width: 0; }
@@ -2199,9 +2079,10 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 .stat { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--border-subtle); min-width: 0; }
 [data-theme="light"] .stat { background: rgba(255, 255, 255, 0.6); }
 .stat dt { font-size: 12px; color: var(--text-muted); margin: 0 0 2px; }
-.stat dd { margin: 0; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat dd { margin: 0; font-size: 15px; font-weight: 700; white-space: nowrap; } /* money is never truncated */
 .stat dd small { display: block; margin-top: 1px; font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
 .stat [data-mask]::after { font-size: 15px; }
+html:not([data-show-portfolio="1"]) .stat dd[data-mask] > small { display: none; } /* own font-size escapes the mask: unit (تومان / میلیون تومان) hinted the size */
 @media (min-width: 900px) { .stat dd small { display: inline; margin: 0; } }
 .dash-hero .fresh {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
@@ -2230,7 +2111,7 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 }
 .tile:hover { color: var(--text); border-color: var(--border); }
 .tile .t { font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-.tile .v { font-size: 17px; font-weight: 700; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v { font-size: clamp(15px, 4.4vw, 17px); font-weight: 700; margin-top: 4px; white-space: nowrap; } /* money is never truncated; the masked bdi inherits this when revealed */
 .tile .v-empty { font-size: 14.5px; }
 .tile .s { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .tile .row { display: flex; align-items: center; margin-top: auto; padding-top: 8px; }
@@ -2239,6 +2120,16 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 .badge-due.is-soon { background: var(--danger-bg); color: var(--danger); }
 .badge-acc { background: var(--accent-muted); color: var(--accent); white-space: nowrap; }
 .btn-text { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 14px; min-height: 44px; }
+/* Phones: a stat or tile that can't fit its whole amount takes its own row instead of cutting it (desktop unchanged). */
+@media (max-width: 899px) {
+  .stats, .dash-tiles { display: flex; flex-wrap: wrap; }
+  .stat { flex: 1 1 0; min-width: min-content; }
+  .tile { flex: 1 1 calc(50% - 5px); min-width: min-content; }
+  html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { font-size: clamp(22px, 10.5cqi, 40px) !important; } /* sized to the card so the number stays on one line */
+  /* 12+ digits: data-digits is set by amounts.js only while amounts are shown */
+  html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num:is([data-digits="12"], [data-digits="13"], [data-digits="14"], [data-digits="15"], [data-digits="16"], [data-digits="17"], [data-digits="18"], [data-digits="19"], [data-digits="20"]) { font-size: clamp(22px, 8cqi, 40px) !important; }
+  .dash-hero .total-num { white-space: normal; overflow-wrap: anywhere; } /* last resort, only once the size is at its 22px floor: wrap, never clip in .summary */
+}
 
 /* asset cards (phones) */
 .assets-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 2px 10px; }
@@ -2250,14 +2141,33 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 .acard .r1 { display: flex; align-items: center; gap: 12px; }
 .acard .nm { flex: 1; min-width: 0; }
 .acard .nm b { display: block; font-size: 15px; font-weight: 700; line-height: 1.35; }
-/* Quantity line wraps instead of «…» (name and quantity never truncated); each number stays whole. */
+/* Quantity line wraps instead of «…» (Arabi spec: name and quantity never truncated); each number stays whole. */
 .acard .nm > span { display: block; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
 .acard .nm > span bdi { white-space: nowrap; }
+/* mobile base amount (quantity + unit): muted, never split; masked by hide-amounts like other amounts */
+.acard .nm .acard-qty { white-space: nowrap; }
+.acard .nm .acard-qty[data-mask]::after { font-size: 12.5px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; }
+/* row toman values (mobile cards + desktop table) masked like other amounts; mask sized to the row text */
+.row-val[data-mask]::after { font-size: 15px; letter-spacing: 0.06em; }
+.usd-equiv.row-val[data-mask]::after { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.usd-equiv.row-val[data-mask] { display: block; }
+/* children with their own font-size (.acard .vl b/small) would escape the font-size:0 mask */
+html:not([data-show-portfolio="1"]) .row-val[data-mask="portfolio"] > * { display: none; }
+/* share % masked with the other row amounts */
+.share-val[data-mask]::after { font-size: 12px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.06em; }
+/* hide-amounts: no proportions either. CSS-only, so the existing toggle restores everything without a reload.
+   Share bars become empty tracks; the donut canvas is hidden behind a plain neutral ring (no slices, no tooltip). */
+html:not([data-show-portfolio="1"]) .share-bar i,
+html:not([data-show-portfolio="1"]) .acard .line i { visibility: hidden; }
+html:not([data-show-portfolio="1"]) .donut-wrap canvas { visibility: hidden; }
+html:not([data-show-portfolio="1"]) .donut-wrap::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 25px solid var(--track-masked); }
+html:not([data-show-portfolio="1"]) .share-bar,
+html:not([data-show-portfolio="1"]) .acard .line { background: var(--track-masked); }
 .acard .vl { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: left; white-space: nowrap; }
 .acard .vl b { font-size: 15.5px; font-weight: 700; }
 .acard .vl small { font-size: 12px; color: var(--text-muted); }
 .acard .sub2 { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-.acard .line { height: 3px; margin: 12px -12px 0; background: rgba(255, 255, 255, 0.05); }
+.acard .line { height: 3px; margin: 12px -12px 0; background: var(--track); }
 .acard .line i, .share-bar i { display: block; height: 100%; }
 .logo { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.06); flex: none; }
 .logo img { width: 24px; height: 24px; }
@@ -2281,7 +2191,7 @@ html[data-show-portfolio="1"] .dash-hero [data-mask="portfolio"].total-num { fon
 .usd-equiv { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .share-cell { min-width: 150px; }
 .share-pct { display: inline-block; min-width: 46px; font-size: 13px; color: var(--text-muted); }
-.share-bar { display: inline-block; vertical-align: middle; width: calc(100% - 56px); max-width: 110px; height: 6px; border-radius: 9px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.share-bar { display: inline-block; vertical-align: middle; width: calc(100% - 56px); max-width: 110px; height: 6px; border-radius: 9px; background: var(--track); overflow: hidden; }
 
 /* donut */
 .donut-wrap { position: relative; width: 190px; height: 190px; margin: 0 auto; }
@@ -2360,6 +2270,8 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 /* Phase 2: keep amount + «تومان» on one line (360px) */
 .dash-hero .total { white-space: nowrap; }
 .net-line dd.num, .stat dd, .tile .v, .badge-acc { white-space: nowrap; }
+.net-line dd.num { min-width: min-content; margin-inline-start: auto; } /* an amount that doesn't fit drops under its label, at the end of the row */
+html[data-show-portfolio="1"] .net-line div { flex-wrap: wrap; } /* only when shown, so the hidden layout stays the same */
 @media (max-width: 380px) {
   .dash-hero .total-num { font-size: clamp(26px, 8vw, 40px); }
   .net-line dd.num { font-size: 14px; }
@@ -2532,7 +2444,7 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
   box-shadow: var(--card-shadow);
 }
 
-/* «دانلود اپلیکیشن اندروید» rows (settings + avatar/side menu); never shown inside the Android app. */
+/* «دانلود اپلیکیشن اندروید» rows (settings); never shown inside the Android app. */
 .in-android-app [data-apk-download] { display: none !important; }
 .apk-download { align-items: center; }
 .apk-download-text { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; }
@@ -2545,9 +2457,8 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 .nav-link.apk-download { display: flex; gap: 10px; }
 .nav-link.apk-download .main-nav-icon { width: 20px; height: 20px; flex: none; }
 
-/* Every tap target at least 44×44 (box size, not font size). */
+/* Batch 1 (Arabi review): every tap target at least 44×44 (box size, not font size). */
 .brand { min-height: 44px; display: inline-flex; align-items: center; }
-.menu-toggle, .has-main-nav .menu-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
 #chart-range [data-range] { min-height: 44px; min-width: 44px; }
 .privacy-btn { min-height: 44px; min-width: 44px; }
 .dash a.btn-sm, .dash a.btn-text { min-height: 44px; display: inline-flex; align-items: center; }
@@ -2566,15 +2477,16 @@ html.chart-fs-open, html.chart-fs-open body { overflow: hidden; }
 
 /* SMS offer card (Android v7, shown only when AndroidBridge.getSmsAutoState() is "off") */
 /* Phase 3: SMS offer card (spending page, Android app only) and «از پیامک» tag on spends. */
-.sms-offer { position: relative; }
+/* One-line banner: never pushes the add-spend form down. */
+.sms-offer { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px 0 0; padding-inline-start: 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--accent-muted, transparent); font-size: 13.5px; }
 .sms-offer[hidden] { display: none; }
-.sms-offer h2 { margin: 0 0 6px; font-size: 16px; padding-inline-end: 48px; }
-.sms-offer-close {
-  position: absolute; top: 8px; inset-inline-end: 8px; min-width: 44px; min-height: 44px;
-  border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer;
-}
-.sms-offer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.sms-offer-actions .btn { min-height: 44px; }
+.sms-offer-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sms-offer-enable, .sms-offer-close { flex: none; min-width: 44px; min-height: 44px; border: 0; background: transparent; cursor: pointer; font: inherit; }
+.sms-offer-enable { color: var(--accent); font-weight: 700; padding: 0 8px; }
+.sms-offer-close { color: var(--text-muted); font-size: 15px; border-radius: 50%; }
+/* Small inline amounts: the mask must match the text size, not the 22px default. */
+.mask-sm[data-mask]::after { font-size: 13px; letter-spacing: 0.06em; }
 /* «از پیامک»: spends saved automatically from a bank SMS (category sms_bank + idempotency key in the note) */
 .tag-sms {
   display: inline-block; padding: 0 8px; line-height: 22px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
@@ -2719,7 +2631,7 @@ body.sp-locked{overflow:hidden}
   .sp-addbar{display:none}
 }
 @media (max-width:899px){
-  .sp-page{padding-bottom:84px}
+  .sp-page{padding-bottom:140px}
   [data-sp-js] .sp-form:not(.open){display:none}
   .sp-form.open{position:fixed;z-index:91;inset-inline:0;bottom:0;max-height:90vh;overflow:auto;scroll-padding-bottom:96px;margin:0;border-radius:22px 22px 0 0;padding:16px 18px 16px;background:var(--surface-solid,#11131a)}
   [data-theme=light] .sp-form.open{background:#fff}
@@ -2844,7 +2756,7 @@ html.dv-locked .dv-wrap{backdrop-filter:none;-webkit-backdrop-filter:none}
 html.dv-locked{overflow:hidden}
 .dv-sub{color:var(--text-muted);margin:0 0 16px;line-height:1.8;font-size:14px}
 .dv-grid{display:grid;gap:16px;padding-bottom:24px}
-@media (min-width:900px){.dv-grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}.dv-sum{grid-column:1/-1}}
+@media (min-width:900px){.dv-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch}.dv-sum{grid-column:1/-1}.dv-card:not(.dv-sum){display:flex;flex-direction:column}.dv-card:not(.dv-sum) > [data-dv-swap]{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}.dv-card:not(.dv-sum) .dv-sumrow{margin-top:auto}.dv-card:not(.dv-sum) .dv-empty{flex:1 1 auto;justify-content:center}}
 .dv-card{border:1px solid var(--border-subtle,var(--border));border-radius:18px;padding:16px;background:color-mix(in srgb,var(--text) 2%,transparent);min-width:0}
 .dv-card h2{font-size:17px;margin:0;display:flex;align-items:center;gap:8px}
 .dv-chead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}.dv-chead h2{flex:1}
@@ -2854,12 +2766,14 @@ html.dv-locked{overflow:hidden}
 @media (min-width:900px){.dv-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .dv-tile{padding:12px 14px;border-radius:14px;border:1px solid var(--border-subtle,var(--border));background:color-mix(in srgb,var(--text) 3%,transparent);min-width:0}
 .dv-tile>span{display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:13px;min-height:24px}
-.dv-tile b{display:block;font-size:19px;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-tile b{display:block;font-size:clamp(15px,4.4vw,19px);line-height:1.6;white-space:nowrap;overflow:visible;text-overflow:clip} /* money is never truncated */
+html[data-show-portfolio="1"] .dv-tile b[data-mask="portfolio"]{font-size:clamp(15px,4.4vw,19px)!important} /* the privacy reveal rule otherwise resets it to inherit (15px) */
 .dv-tile small{color:var(--text-muted);font-size:12.5px}
 .dv-tile.dv-left{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:12px}
 .dv-tile.dv-left>*{grid-column:1}
 .dv-tile.dv-left .privacy-btn{grid-column:2;grid-row:1/4;min-height:44px;min-width:44px;margin:0;padding:0 14px;border:1px solid var(--border);border-radius:12px}
 @media (min-width:900px){.dv-tile.dv-left{grid-column:auto}}
+@media (max-width:899px){.dv-tiles{display:flex;flex-wrap:wrap}.dv-tile{flex:1 1 calc(50% - 6px);min-width:min-content}.dv-tiles>.dv-tile:not(.dv-left):nth-child(odd):nth-last-child(2),.dv-tile.dv-left{flex-basis:100%}}
 .dv-next{display:flex;align-items:center;gap:12px;margin:12px 0 0;padding:12px 14px;border-radius:14px;background:var(--accent-muted);line-height:1.7;font-size:14px}
 .dv-next b{color:var(--text)}.dv-next .d{margin-inline-start:auto;color:var(--accent-text);font-weight:700;white-space:nowrap}
 [data-theme=light] .dv-next{background:#dff5ee}
@@ -2878,7 +2792,10 @@ html.dv-locked{overflow:hidden}
 .dv-badge{display:inline-flex;align-items:center;padding:0 8px;border-radius:8px;font-size:12px;font-weight:700;min-height:22px}
 .dv-badge.end{background:#12302a;color:var(--accent-text)}[data-theme=light] .dv-badge.end{background:#dff5ee}
 .dv-badge.soon{background:#33270d;color:var(--warn-text)}[data-theme=light] .dv-badge.soon{background:#fff3db}
+.dv-badge.late{background:var(--danger-bg);color:var(--danger)}.dv-next .d.late{color:var(--danger)}
+.dv-badge.paid{background:#12302a;color:var(--accent-text)}[data-theme=light] .dv-badge.paid{background:#dff5ee}
 .dv-sumrow{display:flex;justify-content:space-between;gap:12px;padding:12px 0 0;margin:4px 0 0;border-top:1px solid var(--border);font-size:14px}
+.dv-sumrow.lead{padding:0 0 12px;margin:0 0 4px;border-top:0;border-bottom:1px solid var(--border)}
 .dv-sumrow b{white-space:nowrap}
 .dv-menu{position:absolute;z-index:40;top:52px;inset-inline-end:0;min-width:220px;padding:6px;border-radius:14px;border:1px solid var(--border);background:var(--surface-solid,#11131a);box-shadow:0 12px 30px rgba(0,0,0,.35)}
 [data-theme=light] .dv-menu{background:#fff}
@@ -2919,7 +2836,7 @@ html.dv-locked{overflow:hidden}
 .dv-preview[hidden],.dv-fail[hidden],.dv-summary[hidden]{display:none}
 .dv-err{display:block;color:var(--danger-text);font-size:12.5px;line-height:1.6;margin-top:4px}
 .dv-err:empty{display:none}
-.dv-sheet input[aria-invalid=true]{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
+.dv-sheet :is(input,select)[aria-invalid=true]{border-color:var(--danger-text)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger-text) 18%,transparent)}
 .dv-fail{margin:0;padding:10px 14px;border-radius:12px;border:1px solid var(--danger-text);line-height:1.7;font-size:14px}
 .dv-summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 10px;padding:8px 14px;border-radius:12px;border:1px solid var(--danger-text);line-height:1.7}
 .dv-summary strong{flex-basis:100%}
@@ -2933,7 +2850,7 @@ html.dv-locked{overflow:hidden}
 }
 @media (max-width:599px){
   .dv-sheet .grid-form{grid-template-columns:1fr!important}.dv-sheet .grid-form>*{grid-column:1/-1}
-  .dv-tile{padding:10px 12px}.dv-tile b{font-size:17px}
+  .dv-tile{padding:10px 12px}
   .dv-row{grid-template-columns:minmax(0,1fr) 44px;grid-template-areas:"t dots" "a dots" "meta meta"}
   .dv-row .t{grid-area:t}.dv-row .a{grid-area:a;text-align:start;display:flex;gap:6px;align-items:baseline}.dv-row .a small{display:inline}
   .dv-dots{grid-area:dots;grid-row:auto;grid-column:auto;align-self:start}.dv-meta{grid-area:meta}
@@ -3083,7 +3000,6 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 @media (min-width:600px){.v2-dlg{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;box-sizing:border-box}}
 .v2-dlg h2{margin:0;font-size:18px}.v2-dlg p{margin:0;line-height:1.8;font-size:14.5px}
 .v2-dlg .v2-actions{justify-content:flex-end}.v2-dlg .btn{min-height:44px}
-.side-nav .theme-toggle.theme-toggle-labelled{border:1px solid var(--border);border-radius:12px;color:var(--text)}
 @media (max-width:599px){.v2-grid{grid-template-columns:minmax(0,1fr)}.v2-card{padding:16px}#settings-v2 .v2-actions .btn{flex:1}.v2-dlg .v2-actions .btn{flex:1}}
 
 /* One-time «آدرس عوض می‌شود» notice (old host only; move-notice.js un-hides it). Never in the Android app. */
@@ -3100,3 +3016,4 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 .move-notice h2 { margin: 0 0 4px; font-size: 16px; }
 .move-notice p { margin: 0 0 10px; color: var(--text-muted); }
 .move-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+html .stat.stat-usd .mc[hidden],.mc[hidden]{display:none}

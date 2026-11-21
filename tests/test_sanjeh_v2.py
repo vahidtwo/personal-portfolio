@@ -181,7 +181,8 @@ def test_dashboard_does_not_retry_rejected_token(client, no_network, fake_sanjeh
 def test_card_markup_contract(client, no_network, fake_sanjeh):
     _register(client)
     _connect(client, headers=JSON)
-    html = client.get("/assets").text
+    from tests.amounts_helper import with_amounts
+    html = with_amounts(client, "/assets")
     card = html.split("data-car-card")[1].split("</section>")[0]
     assert "<input" not in card  # nothing of the car ends up in the holdings form
     assert 'aria-label="گزینه‌های سنجه"' in card and "تعویض توکن" in card and "قطع اتصال" in card

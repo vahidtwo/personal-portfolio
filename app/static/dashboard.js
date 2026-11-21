@@ -368,7 +368,9 @@
         callbacks: {
           title: function (items) {
             if (!items.length) return "";
-            return labels[items[0].dataIndex] ?? "";
+            const title = labels[items[0].dataIndex] ?? "";
+            // LRI keeps the date before the time when the tooltip is rtl.
+            return title ? isolateLtr(title) : "";
           },
           label: function (ctx) {
             const v = ctx.parsed.y;

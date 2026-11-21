@@ -46,6 +46,16 @@ def test_tooltip_isolates_the_signed_change_in_an_ltr_run():
     assert "attachSignedChangeDraw" not in JS
 
 
+def test_tooltip_title_keeps_the_date_before_the_time():
+    # textDirection rtl would otherwise paint the time first («۱۴:۲۱ ۱۴۰۵/۰۸/۳۰»).
+    # The title is wrapped in LRI…PDI so the pixels stay date then time, like main.
+    m = re.search(r"title: function \(items\) \{.*?\n          \},", JS, re.S)
+    assert m, "title callback"
+    body = m.group(0)
+    assert "isolateLtr(" in body
+    assert "labels[items[0].dataIndex]" in body
+
+
 def test_change_prefix_is_the_fixed_label():
     assert 'const CHANGE_LABEL_PREFIX = "تغییر نسبت به قبل: "' in JS
 

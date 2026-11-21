@@ -21,7 +21,7 @@ def test_download_row_renders_for_logged_in_user_in_settings(client, no_network,
     assert sorted(links) == ["settings-row v2-row"]
     assert html.count('<span class="settings-row-label">دریافت اپ اندروید</span>') == 1
     assert html.count('id="apk-download"') == 1
-    assert "ثبت خودکار خرج از پیامک بانک فقط در اپ اندروید ممکن است." in html
+    assert "ثبت خودکار خرج از پیامک بانک فقط در اپ اندروید کار می‌کند." in html
     # version and size in their own isolated spans, so the digits can never run together («نسخهٔ ۴۰۳٫۰ مگابایت»)
     metas = re.findall(r'<span class="apk-meta">(.*?)</span>\s*<span class="apk-note apk-why">', html)
     assert len(metas) == 1

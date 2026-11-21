@@ -160,10 +160,18 @@
     return sign + body + "٪";
   }
 
+  const CHANGE_LABEL_PREFIX = "تغییر نسبت به قبل: ";
+  const LTR_ISOLATE = "\u2066";
+  const POP_ISOLATE = "\u2069";
+
+  function isolateLtr(value) {
+    return LTR_ISOLATE + value + POP_ISOLATE;
+  }
+
   function changeLabelForPoint(ctx) {
     const idx = ctx.dataIndex;
     if (idx <= 0) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + isolateLtr("—");
     }
     const series = ctx.dataset.data;
     const current = ctx.parsed.y;
@@ -171,9 +179,11 @@
     const previous = Number(prevPoint && typeof prevPoint === "object" ? prevPoint.y : prevPoint);
     const change = formatChangeFromPrevious(current, previous);
     if (change == null) {
-      return "تغییر نسبت به قبل: —";
+      return CHANGE_LABEL_PREFIX + isolateLtr("—");
     }
-    return "تغییر نسبت به قبل: " + change;
+    // LRI…PDI keeps «−۲۰٪» as an LTR run inside the RTL tooltip, so the minus
+    // sits before the digits and the colon stays after «قبل».
+    return CHANGE_LABEL_PREFIX + isolateLtr(change);
   }
 
   let pieChartInited = false;
@@ -343,6 +353,7 @@
         enabled: !rangeSelect && !hideValues,
         position: "nearest",
         rtl: true,
+        textDirection: "rtl",
         backgroundColor: surface,
         titleColor: text,
         bodyColor: text,
@@ -357,7 +368,9 @@
         callbacks: {
           title: function (items) {
             if (!items.length) return "";
-            return labels[items[0].dataIndex] ?? "";
+            const title = labels[items[0].dataIndex] ?? "";
+            // LRI keeps the date before the time when the tooltip is rtl.
+            return title ? isolateLtr(title) : "";
           },
           label: function (ctx) {
             const v = ctx.parsed.y;

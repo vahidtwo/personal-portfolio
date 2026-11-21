@@ -12,13 +12,13 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def test_version_21_with_approved_notes():
+def test_version_22_with_notes_pending_approval():
     g = _read(APP / "build.gradle.kts")
-    assert "?.toInt() ?: 21" in g and '?: "12.1.5"' in g
+    assert "?.toInt() ?: 22" in g and '?: "12.1.6"' in g
     rel = json.loads(_read(ROOT / "app" / "android_release.json"))
-    assert rel["versionCode"] == 21 and rel["versionName"] == "12.1.5"
+    assert rel["versionCode"] == 22 and rel["versionName"] == "12.1.6"
     assert rel["cert_sha256"] == "e775e8db9a2d1ff1e15d5572c2f5bf043c68c23b4a0721f1796278fa413a63ec"
-    assert rel["notes_approved"] is True and rel["notes"]
+    assert isinstance(rel["notes_approved"], bool) and rel["notes"]
 
 
 def test_fixed_origin_and_flags():

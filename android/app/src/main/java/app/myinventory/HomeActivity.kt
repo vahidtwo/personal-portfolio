@@ -769,7 +769,7 @@ class HomeActivity : AppCompatActivity() {
                 minimumHeight = dp(44); isClickable = true; isFocusable = true
                 contentDescription = item.full; isSelected = active
                 if (active) ViewCompat.setStateDescription(this, "صفحهٔ فعلی")
-                setOnClickListener { if (active) scroll.smoothScrollTo(0, 0) else openWeb(item.href) }
+                setOnClickListener { if (active) scroll.smoothScrollTo(0, 0) else openTab(item) }
                 foreground = android.graphics.drawable.StateListDrawable().apply {
                     addState(intArrayOf(android.R.attr.state_focused),
                         android.graphics.drawable.InsetDrawable(bg(0, 12).apply { setStroke(dp(2), nc.activeIcon) }, dp(2)))
@@ -805,6 +805,12 @@ class HomeActivity : AppCompatActivity() {
         }
         val fm = p.fontMetrics
         return dp(WebNav.GAP_DP) + ((labelLinePx() - (fm.descent - fm.ascent)) / 2).toInt()
+    }
+
+    /** The settings tab is native when NATIVE_SETTINGS is on; every other tab is still the web page. */
+    private fun openTab(item: WebNav.Item) {
+        if (item.key == "settings" && BuildConfig.NATIVE_SETTINGS) startActivity(Intent(this, SettingsActivity::class.java))
+        else openWeb(item.href)
     }
 
     private fun openWeb(path: String) {

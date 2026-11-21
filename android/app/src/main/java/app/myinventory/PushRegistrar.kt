@@ -30,6 +30,12 @@ object PushRegistrar {
     private fun base(context: Context): String =
         (prefs(context).getString(MainActivity.KEY_URL, "") ?: "").trimEnd('/')
 
+    /** The token this phone last registered with the server, if any. */
+    fun registeredToken(context: Context): String? = prefs(context).getString(KEY_TOKEN, null)?.takeIf { it.isNotEmpty() }
+
+    /** After logout: forget the registration so the next sign-in registers again. */
+    fun forgetRegistration(context: Context) = prefs(context).edit { remove(KEY_TOKEN); remove(KEY_AT) }
+
     fun state(context: Context): String = prefs(context).getString(KEY_STATE, PushState.IDLE) ?: PushState.IDLE
     fun detail(context: Context): String = prefs(context).getString(KEY_DETAIL, "") ?: ""
 

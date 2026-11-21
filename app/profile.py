@@ -352,21 +352,21 @@ async def profile_account(
 async def profile_save(
     request: Request,
     background_tasks: BackgroundTasks,
-    gold_grams: str = Form("0"),
-    coin_emami: str = Form("0"),
-    coin_bahar: str = Form("0"),
-    coin_half: str = Form("0"),
-    coin_quarter: str = Form("0"),
-    coin_gram: str = Form("0"),
-    silver_grams: str = Form("0"),
-    btc: str = Form("0"),
-    ada: str = Form("0"),
-    eth: str = Form("0"),
-    sol: str = Form("0"),
-    doge: str = Form("0"),
-    matic: str = Form("0"),
-    usd: str = Form("0"),
-    cash_toman: str = Form("0"),
+    gold_grams: str | None = Form(None),
+    coin_emami: str | None = Form(None),
+    coin_bahar: str | None = Form(None),
+    coin_half: str | None = Form(None),
+    coin_quarter: str | None = Form(None),
+    coin_gram: str | None = Form(None),
+    silver_grams: str | None = Form(None),
+    btc: str | None = Form(None),
+    ada: str | None = Form(None),
+    eth: str | None = Form(None),
+    sol: str | None = Form(None),
+    doge: str | None = Form(None),
+    matic: str | None = Form(None),
+    usd: str | None = Form(None),
+    cash_toman: str | None = Form(None),
     cash_toman_keep: str = Form(""),
     next_url: str = Form("", alias="next"),
     csrf: str = Form(""),
@@ -376,10 +376,11 @@ async def profile_save(
     user = get_authenticated_user(request, db)
     if user is None:
         return redirect_to_login(request)
-    if cash_toman_keep == "1" and cash_toman.strip() in ("", "0"):
+    cash_kept = cash_toman_keep == "1" and (cash_toman or "").strip() in ("", "0")
+    if cash_kept:
         # the page sends cash empty until amounts.js fills it in: empty plus this marker means unchanged
-        cash_toman = format(Decimal(user.cash_toman or 0), "f")
-    form = {
+        cash_toman = None
+    posted = {
         "gold_grams": gold_grams,
         "coin_emami": coin_emami,
         "coin_bahar": coin_bahar,
@@ -396,12 +397,21 @@ async def profile_save(
         "usd": usd,
         "cash_toman": cash_toman,
     }
+    # A field that is not in the post keeps its stored value; only the fields sent are validated and saved.
+    # An empty value that is sent still means zero, as before.
+    sent = [name for name in HOLDING_FORM_FIELDS if posted[name] is not None]
+    stored = _stored_holdings(user)
+    form = {name: (posted[name] if posted[name] is not None else stored[name]) for name in HOLDING_FORM_FIELDS}
+    # the error page shows the same values as before this rule: what was typed, or «0» for a field not sent
+    shown = {name: (posted[name] if posted[name] is not None else "0") for name in HOLDING_FORM_FIELDS}
+    if cash_kept:
+        shown["cash_toman"] = stored["cash_toman"] or "0"
     # Assets v2: validate every field first and collect {field: message}; nothing is assigned or committed
     # unless all of them are valid. A form post still gets the HTML page (now with inline errors);
     # a fetch() with Accept: application/json gets 422 {"ok": false, "error", "fields", "reasons"}.
     wants_json = "application/json" in (request.headers.get("accept") or "")
     reasons: dict[str, str] = {}
-    for name in HOLDING_FORM_FIELDS:
+    for name in sent:
         reason = quantity_error(form[name], 2 if name == "cash_toman" else 8)
         if reason:
             reasons[name] = reason
@@ -412,9 +422,9 @@ async def profile_save(
         fields = {k: field_error_message(r, 2 if k == "cash_toman" else 8) for k, r in reasons.items()}
         if wants_json:
             return JSONResponse({"ok": False, "error": summary, "fields": fields, "reasons": reasons}, status_code=422)
-        return render_assets(request, db, user, form=form, error=summary, field_errors=fields,
+        return render_assets(request, db, user, form=shown, error=summary, field_errors=fields,
                              field_short={k: FIELD_ERROR_SHORT_FA[r] for k, r in reasons.items()})
-    for name in HOLDING_FORM_FIELDS:
+    for name in sent:
         setattr(user, name, parse_decimal(form[name], field=name))
     # the Sanjeh token is no longer part of this form: car card v2 uses /assets/car/* (app/car_routes.py)
     sanjeh_warning = None
@@ -436,6 +446,18 @@ HOLDING_FORM_FIELDS = (
     "gold_grams", "coin_emami", "coin_bahar", "coin_half", "coin_quarter", "coin_gram", "silver_grams",
     "btc", "ada", "eth", "sol", "doge", "matic", "usd", "cash_toman",
 )
+
+
+def _stored_holdings(user: User) -> dict[str, str]:
+    """Stored quantities as plain Latin text, exactly as saved ('' for zero)."""
+    out = {}
+    for name in HOLDING_FORM_FIELDS:
+        value = Decimal(getattr(user, name) or 0)
+        text = format(value, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        out[name] = "" if value == 0 else text
+    return out
 
 
 def holdings_form(user: User) -> dict[str, str]:

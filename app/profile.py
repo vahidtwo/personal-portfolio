@@ -273,6 +273,49 @@ def parse_salary(raw: str, existing: Decimal | None = None) -> tuple[Decimal | N
     return value, None
 
 
+def settings_section_changes(
+    db: Session, user: User, section: str, *, full_name: str = "", username: str = "", mobile: str = "",
+    salary_toman: str = "", current_password: str = "", new_password: str = "",
+) -> tuple[dict[str, str], dict]:
+    """Validate one settings section and return ({field: error}, {column: new value}). Writes nothing.
+    full_name must already be stripped and cut to 80 characters."""
+    errors: dict[str, str] = {}
+    changes: dict = {}
+    if section == "account":
+        name = normalize_username(username)
+        admin_error = admin_name_change_error(user.username, name)
+        if validate_username(name):
+            errors["username"] = USERNAME_ERROR
+        elif admin_error:
+            errors["username"] = admin_error
+        elif db.query(User).filter(User.username == name, User.id != user.id).first() is not None:
+            errors["username"] = "این نام کاربری قبلاً ثبت شده"
+        phone, phone_error = _parse_mobile(mobile)
+        if phone_error:
+            errors["mobile"] = phone_error
+        if name != user.username and "username" not in errors:
+            if current_password == "":
+                errors["current_password"] = CURRENT_PW_MISSING_USER
+            elif not verify_password(current_password, user.password_hash):
+                errors["current_password"] = CURRENT_PW_WRONG
+        changes = {"full_name": full_name, "username": name, "mobile": phone or ""}
+    elif section == "salary":
+        salary, salary_error = parse_salary(salary_toman, Decimal(user.salary_toman or 0))
+        if salary_error:
+            errors["salary_toman"] = salary_error
+        changes = {"salary_toman": salary} if salary is not None else {}
+    else:  # password
+        if validate_password(new_password):
+            errors["new_password"] = PASSWORD_ERROR
+        if current_password == "":
+            errors["current_password"] = CURRENT_PW_MISSING_PW
+        elif not verify_password(current_password, user.password_hash):
+            errors["current_password"] = CURRENT_PW_WRONG
+        if not errors:
+            changes = {"password_hash": hash_password(new_password)}
+    return errors, changes
+
+
 @router.post("/profile/account")
 async def profile_account(
     request: Request,
@@ -300,40 +343,10 @@ async def profile_account(
         "mobile": mobile if section == "account" else (user.mobile or ""),
         "salary_toman": "",  # never echoed back into the page
     }
-    errors: dict[str, str] = {}
-    changes: dict = {}
-    if section == "account":
-        name = normalize_username(username)
-        admin_error = admin_name_change_error(user.username, name)
-        if validate_username(name):
-            errors["username"] = USERNAME_ERROR
-        elif admin_error:
-            errors["username"] = admin_error
-        elif db.query(User).filter(User.username == name, User.id != user.id).first() is not None:
-            errors["username"] = "این نام کاربری قبلاً ثبت شده"
-        phone, phone_error = _parse_mobile(mobile)
-        if phone_error:
-            errors["mobile"] = phone_error
-        if name != user.username and "username" not in errors:
-            if current_password == "":
-                errors["current_password"] = CURRENT_PW_MISSING_USER
-            elif not verify_password(current_password, user.password_hash):
-                errors["current_password"] = CURRENT_PW_WRONG
-        changes = {"full_name": account["full_name"], "username": name, "mobile": phone or ""}
-    elif section == "salary":
-        salary, salary_error = parse_salary(salary_toman, Decimal(user.salary_toman or 0))
-        if salary_error:
-            errors["salary_toman"] = salary_error
-        changes = {"salary_toman": salary} if salary is not None else {}
-    else:  # password
-        if validate_password(new_password):
-            errors["new_password"] = PASSWORD_ERROR
-        if current_password == "":
-            errors["current_password"] = CURRENT_PW_MISSING_PW
-        elif not verify_password(current_password, user.password_hash):
-            errors["current_password"] = CURRENT_PW_WRONG
-        if not errors:
-            changes = {"password_hash": hash_password(new_password)}
+    errors, changes = settings_section_changes(
+        db, user, section, full_name=account["full_name"], username=username, mobile=mobile,
+        salary_toman=salary_toman, current_password=current_password, new_password=new_password,
+    )
     if errors:
         if _wants_json(request):
             return JSONResponse({"errors": errors}, status_code=422)

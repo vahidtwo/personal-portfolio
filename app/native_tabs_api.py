@@ -1,8 +1,9 @@
-"""Read-only JSON mirrors of the signed-in tabs for the native Android screens.
+"""JSON mirrors of the signed-in tabs for the native Android screens.
 
-Each endpoint reads the same functions the HTML pages use, so web and app show the same numbers.
-No endpoint here writes user data, and none carries the salary or the salary-derived «مانده»:
-those stay behind GET /api/salary, fetched on tap.
+Each endpoint calls the same functions the HTML pages and forms use, so web and app show and save the
+same thing. The GET endpoints write no user data. The settings writes need the session CSRF token in
+X-CSRF-Token. No response carries the salary or the salary-derived «مانده»: those stay behind
+GET /api/salary, fetched on tap.
 """
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ from app.firebase_push import device_counts, firebase_admin_ready
 from app.formatting import format_toman, format_when
 from app.models import Debt, MonthlyExpense
 from app.number_input import to_latin_digits
-from app.security import get_authenticated_user
+from app.security import get_authenticated_user, is_admin, require_csrf
 
 router = APIRouter(prefix="/api")
 
@@ -304,7 +305,70 @@ async def api_settings(request: Request, db: Session = Depends(get_db)):
         "account": {"full_name": user.full_name or "", "username": user.username, "mobile": user.mobile or ""},
         "has_salary": Decimal(user.salary_toman or 0) > 0,
         "has_mcp_token": bool(user.mcp_token_hash),
+        "is_admin": is_admin(user),
         "car_connected": bool(user.sanjeh_token),
         "car_fetched_label": format_when(user.car_fetched_at) if user.sanjeh_token else None,
         "push": {"server": firebase_admin_ready(), "devices": device_counts(db, user.id)},
     })
+
+
+async def _json_body(request: Request) -> dict:
+    try:
+        data = await request.json()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _text(data: dict, key: str) -> str:
+    value = data.get(key)
+    return value if isinstance(value, str) else ("" if value is None else str(value))
+
+
+async def _settings_write(request: Request, db: Session, section: str) -> JSONResponse:
+    """Same validation, error copy and saved columns as POST /profile/account for that section.
+    The request body is never logged and the response never echoes a password or the salary."""
+    from app.profile import SAVED_FA, settings_section_changes
+
+    require_csrf(request, request.headers.get("x-csrf-token"))
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return _login_required()
+    data = await _json_body(request)
+    full_name = _text(data, "full_name").strip()[:80] if section == "account" else ""
+    errors, changes = settings_section_changes(
+        db, user, section,
+        full_name=full_name,
+        username=_text(data, "username"),
+        mobile=_text(data, "mobile"),
+        salary_toman=_text(data, "salary_toman"),
+        current_password=_text(data, "current_password"),
+        new_password=_text(data, "new_password"),
+    )
+    if errors:
+        return _json({"ok": False, "errors": errors}, status_code=422)
+    for key, value in changes.items():
+        setattr(user, key, value)
+    db.commit()
+    title, detail = SAVED_FA[section]
+    body = {"ok": True, "title": title, "detail": detail}
+    if section == "account":
+        body["account"] = {"full_name": user.full_name or "", "username": user.username, "mobile": user.mobile or ""}
+    if section == "salary":
+        body["has_salary"] = Decimal(user.salary_toman or 0) > 0
+    return _json(body)
+
+
+@router.api_route("/settings/account", methods=["PATCH", "POST"])
+async def api_settings_account(request: Request, db: Session = Depends(get_db)):
+    return await _settings_write(request, db, "account")
+
+
+@router.post("/settings/password")
+async def api_settings_password(request: Request, db: Session = Depends(get_db)):
+    return await _settings_write(request, db, "password")
+
+
+@router.api_route("/settings/salary", methods=["PATCH", "POST"])
+async def api_settings_salary(request: Request, db: Session = Depends(get_db)):
+    return await _settings_write(request, db, "salary")

@@ -12,9 +12,10 @@ from app import debt_schedule as ds
 from tests.amounts_helper import with_amounts
 
 
-def D(months, y, m, d, monthly=1000, created=None):
+def D(months, y, m, d, monthly=1000, created=None, last_paid=None):
     return SimpleNamespace(id=1, title="t", monthly_toman=monthly, months_left=months,
-                           due_year=y, due_month=m, due_day=d, created_at=created)
+                           due_year=y, due_month=m, due_day=d, created_at=created,
+                           last_paid_on=last_paid)
 
 
 TODAY = jdatetime.date(1405, 8, 13)
@@ -189,3 +190,65 @@ def test_overdue_unit_is_not_glued_to_toman(client, no_network, clock):  # noqa:
     assert "تومانشامل" not in html
     assert 'data-installment-overdue' in html
     assert "تومان</small> <small class=\"dv-unit\" data-installment-overdue>" in html
+
+
+def test_mid_loan_paid_this_month_still_counts():
+    """After «پرداخت شد» the due date is next month, but last_paid_on is this month, so it still counts."""
+    paid = D(4, 1405, 9, 20, 2_000_000, last_paid=TODAY.togregorian())
+    assert ds.this_month_installments([paid], TODAY) == Decimal("2000000")
+    assert ds.this_month_installments([paid], LAST) == Decimal("2000000")
+    # Jalali last_paid_on is accepted the same way as the stored Gregorian date.
+    assert ds.this_month_installments([D(4, 1405, 9, 20, 2_000_000, last_paid=TODAY)], TODAY) == Decimal("2000000")
+    # 5M salary, 2M mid-loan pay, no other costs → 3M left.
+    assert ds.salary_left(5_000_000, [paid], 0, TODAY) == Decimal("3000000")
+    unpaid = D(5, 1405, 8, 20, 2_000_000)
+    assert ds.this_month_installments([unpaid], TODAY) == ds.this_month_installments([paid], TODAY)
+
+
+def test_mid_loan_undo_stops_using_the_cleared_date():
+    paid = D(4, 1405, 9, 20, 2_000_000, last_paid=TODAY.togregorian())
+    undone = D(5, 1405, 8, 20, 2_000_000, last_paid=None)
+    assert ds.this_month_installments([paid], TODAY) == Decimal("2000000")
+    assert ds.this_month_installments([undone], TODAY) == Decimal("2000000")
+    # A previous month's payment is restored on undo: next-month due must not count.
+    restored_old = D(4, 1405, 9, 20, 2_000_000, last_paid=jdatetime.date(1405, 7, 20).togregorian())
+    assert ds.this_month_installments([restored_old], TODAY) == Decimal("0")
+
+
+def test_loan_starting_next_month_is_not_counted_even_after_due_day():
+    early = datetime(2026, 10, 1, 8, tzinfo=timezone.utc)
+    starts = D(6, 1405, 9, 30, 10_000_000, early)
+    assert ds.this_month_installments([starts], LAST) == Decimal("0")
+    assert ds.this_month_installments([starts], TODAY) == Decimal("0")
+    # Mid-loan pay and a next-month loan together: only the paid one counts.
+    paid = D(4, 1405, 9, 20, 2_000_000, last_paid=TODAY.togregorian())
+    assert ds.this_month_installments([paid, starts], TODAY) == Decimal("2000000")
+
+
+def test_last_instalment_paid_this_month_still_counts():
+    finished = D(0, 1405, 9, 25, 700, last_paid=TODAY.togregorian())
+    assert ds.this_month_installments([finished], TODAY) == Decimal("700")
+    # Pre-deploy final payment (no last_paid_on) still counts via the stored next month.
+    assert ds.this_month_installments([D(0, 1405, 9, 25, 700)], TODAY) == Decimal("700")
+
+
+def test_overdue_plus_mid_loan_pay():
+    late = D(5, 1405, 6, 10, 1_000_000)
+    paid = D(4, 1405, 9, 30, 2_000_000, last_paid=LAST.togregorian())
+    starts = D(4, 1405, 9, 30, 10_000_000)
+    assert ds.this_month_installments([late, paid, starts], LAST) == Decimal("3000000")
+    assert ds.month_due([late, paid, starts], LAST)[0] == Decimal("3000000")
+
+
+def test_year_boundary_paid_this_month_and_next_year_start():
+    esf = jdatetime.date(1405, 12, 29)
+    far = jdatetime.date(1406, 1, 1)
+    paid = D(4, 1406, 1, 10, 400, last_paid=esf.togregorian())
+    starts = D(6, 1406, 1, 10, 500)
+    assert ds.this_month_installments([paid], esf) == Decimal("400")
+    assert ds.this_month_installments([starts], esf) == Decimal("0")
+    # On 1 Farvardin the Esfand payment is no longer this month; the Farvardin instalment is now due.
+    assert ds.this_month_installments([paid], far) == Decimal("400")
+    assert ds.this_month_installments([starts], far) == Decimal("500")
+    # Unpaid Esfand loan still counts on the last day of the year.
+    assert ds.this_month_installments([D(2, 1405, 12, 29, 400)], esf) == Decimal("400")

@@ -12,6 +12,7 @@ triple like 1405/08/31 is therefore allowed and every reader goes through `clamp
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal
 
 import jdatetime
@@ -158,10 +159,11 @@ def month_due(debts, today: jdatetime.date | None = None) -> tuple[Decimal, Deci
 
 
 def this_month_installments(debts, today: jdatetime.date | None = None) -> Decimal:
-    """Unpaid instalments dated in today's Jalali month; later months and older overdue months are left out.
+    """All of this month's instalments, paid or unpaid. Later months and older overdue months are left out.
 
-    A loan whose next due is already next month is not counted, even when its due day has already
-    passed in this month: that row is either paid or first due later, and is not still owed now.
+    A loan whose next due is already next month counts only when last_paid_on falls in today's Jalali
+    month: that instalment was paid this month, so its due date has already moved on. A loan that
+    simply starts next month, or was last paid in another month, is not counted.
     A finished loan still counts when its final instalment was this month's.
     """
     today = today or tehran_today()
@@ -177,10 +179,38 @@ def this_month_installments(debts, today: jdatetime.date | None = None) -> Decim
         if stored <= (today.year, today.month):
             due_now = int(debt.months_left) > _months_between(stored, today)
         else:
-            due_now = False
+            due_now = stored == following and _paid_this_month(debt, today)
         if due_now:
             total += Decimal(debt.monthly_toman)
     return total
+
+
+def _paid_this_month(debt, today: jdatetime.date) -> bool:
+    """True when last_paid_on is a calendar date in today's Jalali month."""
+    jalali = _as_jalali(getattr(debt, "last_paid_on", None))
+    return jalali is not None and (jalali.year, jalali.month) == (today.year, today.month)
+
+
+def _as_jalali(value) -> jdatetime.date | None:
+    if value is None:
+        return None
+    if isinstance(value, jdatetime.datetime):
+        value = value.date()
+    if isinstance(value, jdatetime.date):
+        return value
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value[:10])
+        except ValueError:
+            return None
+    elif isinstance(value, datetime):
+        value = value.date()
+    if not isinstance(value, date):
+        return None
+    try:
+        return jdatetime.date.fromgregorian(date=value)
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 def _final_paid_this_month(debt, following: tuple[int, int]) -> bool:

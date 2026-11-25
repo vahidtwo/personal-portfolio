@@ -79,12 +79,65 @@
       });
     }
   }
+  // Field errors while typing (the server still validates on submit; the copy matches unified_auth.py).
+  var USERNAME_RE = /^[a-zA-Z][a-zA-Z0-9_]{2,31}$/;
+  var USERNAME_PARTIAL = /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/;
+  var USERNAME_ERROR = "نام کاربری باید با حرف انگلیسی شروع شود و ۳ تا ۳۲ حرف باشد.";
+  var PASSWORD_ERROR = "دست‌کم ۸ حرف";
+  var IDLE = { "username-hint": "۳ تا ۳۲ حرف انگلیسی یا عدد، بدون فاصله", "password-hint": PASSWORD_ERROR };
+  function fieldState(input, hint, text, kind) {
+    var box = input.closest(".inp");
+    if (kind) {
+      hint.textContent = text;
+      hint.className = "hint " + kind;
+    } else {
+      hint.textContent = IDLE[hint.id] || hint.textContent;
+      hint.className = "hint";
+    }
+    if (box) box.classList.toggle("err", kind === "bad");
+    if (kind === "bad") input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+  }
+  var userIn = document.getElementById("username"), userHint = document.getElementById("username-hint");
+  var passIn = document.getElementById("password"), passHint = document.getElementById("password-hint");
+  if (userHint) userHint.setAttribute("aria-live", "polite");
+  function checkUser(final) {
+    if (!userIn || !userHint || userIn.readOnly) return true;
+    var v = userIn.value.trim();
+    var ok = final ? USERNAME_RE.test(v) : (v === "" || USERNAME_PARTIAL.test(v));
+    if (!ok) fieldState(userIn, userHint, USERNAME_ERROR, "bad");
+    else if (userIn.getAttribute("aria-invalid") === "true" && (USERNAME_RE.test(v) || !final)) fieldState(userIn, userHint, "", null);
+    return ok;
+  }
+  function checkPass(final) {
+    if (!passIn || !passHint || FA.test(passIn.value)) return true;
+    var n = passIn.value.length;
+    if (n === 0 && final) { fieldState(passIn, passHint, PASSWORD_ERROR, "bad"); return false; }
+    if (n > 0 && n < 8) fieldState(passIn, passHint, PASSWORD_ERROR, final ? "bad" : "warn");
+    else fieldState(passIn, passHint, "", null);
+    return true;
+  }
+  if (userIn && userHint) {
+    userIn.addEventListener("input", function () { checkUser(false); });
+    userIn.addEventListener("blur", function () { if (userIn.value.trim()) checkUser(true); });
+  }
+  if (passIn && passHint) {
+    passIn.addEventListener("input", function () { checkPass(false); });
+    passIn.addEventListener("blur", function () { if (passIn.value) checkPass(true); });
+  }
   var first = document.querySelector("[data-autofocus]");
   if (first) first.focus({ preventScroll: true });
   var form = document.querySelector("[data-auth-form]");
   if (!form) return;
   form.addEventListener("submit", function (event) {
     if (form.dataset.busy === "1") { event.preventDefault(); return; }
+    if (userIn && passIn && !userIn.readOnly) {
+      var userOk = checkUser(true), passOk = checkPass(true);
+      if (!userOk || !passOk) {
+        event.preventDefault();
+        (userOk ? passIn : userIn).focus();
+        return;
+      }
+    }
     form.dataset.busy = "1";
     form.setAttribute("aria-busy", "true");
     form.querySelectorAll("input:not([type=hidden])").forEach(function (i) { i.readOnly = true; });

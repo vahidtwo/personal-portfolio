@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import jdatetime
 
-from app.formatting import persian_digits
+from app.formatting import persian_digits, tehran_today
 from app.number_input import normalize_number_text
 
 AMOUNT_FORMAT = "مبلغ را بدون ممیز بنویسید؛ مثلاً ۱۲۰٬۰۰۰"
@@ -14,6 +14,7 @@ AMOUNT_POSITIVE = "مبلغ باید بیشتر از صفر باشد"
 YEAR_MSG = "سال را چهاررقمی بنویسید"
 MONTH_MSG = "ماه بین ۱ تا ۱۲ است"
 CATEGORY_MSG = "زیردسته را انتخاب کنید"
+FUTURE_MSG = "خرج آینده ثبت نمی‌شود"
 FIELD_ORDER = ("amount_toman", "category_id", "year", "month", "day")
 FIELD_SHORT = {"amount_toman": "مبلغ", "category_id": "زیردسته", "year": "سال", "month": "ماه", "day": "روز"}
 
@@ -72,6 +73,9 @@ def validate_spend(amount: str, year: str, month: str, day: str, existing: Decim
             errors["day"] = day_msg(n)
         else:
             spent = jdatetime.date(y, m, d)
+            if spent > tehran_today():
+                errors["day"] = FUTURE_MSG
+                spent = None
     elif d is None or not 1 <= d <= 31:
         errors["day"] = day_msg(31)
     return errors, value, spent

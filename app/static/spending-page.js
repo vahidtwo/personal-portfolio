@@ -43,6 +43,10 @@
       var n = monthLength(y, m);
       if (d === null || d < 1 || d > n) e.day = MSG.day(n);
     } else if (d === null || d < 1 || d > 31) e.day = MSG.day(31);
+    if (!e.year && !e.month && !e.day && v.today && v.today.length === 3) {
+      var ty = Number(v.today[0]), tm = Number(v.today[1]), td = Number(v.today[2]);
+      if (y > ty || (y === ty && (m > tm || (m === tm && d > td)))) e.day = "خرج آینده ثبت نمی‌شود";
+    }
     return e;
   }
   W.SpendValidate = { validate: validate, monthLength: monthLength };
@@ -153,11 +157,14 @@
       openDialog(card, { back: back, focus: amt, onClose: function () { card.classList.remove("open"); card.removeAttribute("role"); card.removeAttribute("aria-modal"); } });
     }
     $("[data-sp-close]", card).addEventListener("click", closeDialog);
+    function monthKind() { return page.getAttribute("data-sp-month-kind") || ""; }
+    function lastDayParts() { return (page.getAttribute("data-sp-last-day") || "").split("-"); }
     function bindOpen(root) { $$("[data-sp-open-form]", root).forEach(function (b) {
       b.addEventListener("click", function (e) {
         e.preventDefault();
-        if (b.hasAttribute("data-sp-month-start")) {
-          setDate([form.elements.jy.value, form.elements.jm.value, 1]); pickDay("other");
+        if (monthKind() === "future") return;
+        if (b.hasAttribute("data-sp-month-start") || monthKind() === "past") {
+          setDate(lastDayParts()); pickDay("other");
         }
         openForm(b);
       });
@@ -229,7 +236,7 @@
 
     /* ---------- validation ---------- */
     var FIELDS = { amount_toman: amt, year: form.elements.year, month: form.elements.month, day: form.elements.day };
-    function values() { return { amount: amt.value, orig: amt.getAttribute("data-sp-orig") || "", year: FIELDS.year.value, month: FIELDS.month.value, day: FIELDS.day.value }; }
+    function values() { return { amount: amt.value, orig: amt.getAttribute("data-sp-orig") || "", year: FIELDS.year.value, month: FIELDS.month.value, day: FIELDS.day.value, today: parts("data-today").map(Number) }; }
     function setErr(name, msg) {
       var input = FIELDS[name];
       var err = name === "category_id" ? $("#sp-category_id") : $("#err-" + name);
@@ -325,8 +332,32 @@
           var nl = $("[data-sp-list]", doc); if (!nl) throw new Error("no list");
           list.replaceWith(nl); bindRows(nl); bindMore(nl); bindOpen(nl);
           if (withSummary) { var ns = $("[data-sp-sum]", doc); sum.replaceWith(ns); bindMonth(ns);
-            var nf = $("[data-sp-page]", doc); // hidden jy/jm for the form follow the month
-            form.elements.jy.value = $("[name=jy]", nf).value; form.elements.jm.value = $("[name=jm]", nf).value; }
+            var np = $("[data-sp-page]", doc);
+            if (np) {
+              ["data-sp-month-kind", "data-sp-last-day"].forEach(function (a) {
+                if (np.hasAttribute(a)) page.setAttribute(a, np.getAttribute(a)); else page.removeAttribute(a);
+              });
+              if (np.hasAttribute("data-sp-open")) page.setAttribute("data-sp-open", "");
+              else page.removeAttribute("data-sp-open");
+            }
+            var nf = $("[data-sp-form]", np || doc);
+            if (nf && !/\/spends\/\d+/.test(form.getAttribute("action") || "")) {
+              ["jy", "jm", "year", "month", "day"].forEach(function (n) {
+                if (form.elements[n] && nf.elements[n]) form.elements[n].value = nf.elements[n].value;
+              });
+              var cur = current();
+              pickDay(cur === parts("data-today").join("-") ? "today" : cur === parts("data-yesterday").join("-") ? "yesterday" : "other");
+            } else if (np) {
+              form.elements.jy.value = $("[name=jy]", np).value; form.elements.jm.value = $("[name=jm]", np).value;
+            }
+            var na = $("[data-sp-addbar]", doc);
+            var ca = $("[data-sp-addbar]");
+            if (na) { if (ca) ca.replaceWith(na); else page.appendChild(na); bindOpen(na); }
+            else if (ca) ca.remove();
+            if (submitBtn && !/\/spends\/\d+/.test(form.getAttribute("action") || "")) {
+              submitBtn.disabled = monthKind() === "future";
+            }
+          }
           if (history.replaceState) history.replaceState(null, "", url);
           if (window.Amounts) window.Amounts.refresh(url);
         })

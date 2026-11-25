@@ -2644,7 +2644,10 @@ body.sp-locked{overflow:hidden}
   .sp-form.open .form-actions .btn{flex:1;justify-content:center;min-height:48px}
   .sp-addbar{position:fixed;inset-inline:0;bottom:calc(var(--main-nav-h,56px) + env(safe-area-inset-bottom));padding:10px 16px;background:linear-gradient(to top,var(--bg) 62%,transparent);z-index:45}
   .sp-addbar .btn{width:100%;justify-content:center;min-height:48px;gap:8px}
+  .sp-addbar .sp-future-hint{margin:0 0 8px;text-align:center}
 }
+.sp-future-hint{margin:0 0 8px;color:var(--text-muted);font-size:14px;line-height:1.5}
+.sp-empty .btn:disabled,.sp-addbar .btn:disabled,.form-actions .btn:disabled{opacity:.55;cursor:not-allowed;pointer-events:none}
 /* ---- Assets v2 (mockups/app-v2/assets) ---- */
 /* --danger-bg stays the soft tint from the dashboard block: a solid value here hid the text of
    .badge-due.is-soon («۲ روز دیگر»), .delta-down and .chg.down (text color == background). */

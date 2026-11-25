@@ -62,6 +62,7 @@ def _form(cat):
     ("۵۰۰", "۱۴۰۴", "۱۲", "۳۰", {"day": "این ماه ۲۹ روز دارد"}),
     ("۵۰۰", "۱۴۰۳", "۱۲", "۳۰", {}),  # 1403 is a leap year
     ("۵۰۰", "۰۵", "۷", "۲۸", {"year": "سال را چهاررقمی بنویسید"}),
+    ("۵۰۰", "۱۴۰۵", "۱۰", "۱", {"day": "خرج آینده ثبت نمی‌شود"}),
 ])
 def test_validate_spend_reports_every_field(amount, year, month, day, want):
     from app.spend_validation import validate_spend
@@ -76,15 +77,18 @@ def test_js_validation_matches_server():
     node = shutil.which("node")
     if not node:
         pytest.skip("node not installed")
+    from app.formatting import tehran_today
     from app.spend_validation import validate_spend
 
+    today = tehran_today()
     cases = [("۱۲۰٫۰۰۰٫۵", "۱۴۰۵", "۱۳", "۲۸"), ("۱۲۰٬۰۰۰", "۱۴۰۵", "۷", "۲۸"), ("۰", "۱۴۰۵", "۷", "۳۱"),
              ("-۵", "1404", "12", "30"), ("۵۰۰", "۱۴۰۳", "۱۲", "۳۰"), ("1.5", "99", "0", "40"), ("", "۱۴۰۵", "۱", "۳۱"),
-             ("۱٬۲۰۰", "۱۴۰۵", "۶", "۳۱"), ("x", "", "", "")]
+             ("۱٬۲۰۰", "۱۴۰۵", "۶", "۳۱"), ("x", "", "", ""), ("۵۰۰", "۱۴۰۵", "۱۰", "۱")]
     static = Path(__file__).resolve().parents[1] / "app" / "static"
     script = (f"const v=require({str(static / 'spending-page.js')!r});"
+              f"const today={list((today.year, today.month, today.day))};"
               f"const cases={json.dumps(cases, ensure_ascii=False)};"
-              "console.log(JSON.stringify(cases.map(c=>v.validate({amount:c[0],year:c[1],month:c[2],day:c[3]}))));")
+              "console.log(JSON.stringify(cases.map(c=>v.validate({amount:c[0],year:c[1],month:c[2],day:c[3],today:today}))));")
     out = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20, cwd=static)
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == [validate_spend(*c)[0] for c in cases]

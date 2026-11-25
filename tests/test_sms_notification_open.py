@@ -49,8 +49,10 @@ def test_add_param_opens_the_spend_form(client, no_network):
     _register(client)
     plain = client.get("/dashboard?tab=daily").text
     opened = client.get("/dashboard?tab=daily&add=1&src=notification").text
-    assert re.search(r'<div class="sp-page" data-sp-page>', plain)
-    assert re.search(r'<div class="sp-page" data-sp-page data-sp-open>', opened)
+    plain_tag = re.search(r'<div class="sp-page"[^>]*>', plain).group(0)
+    opened_tag = re.search(r'<div class="sp-page"[^>]*>', opened).group(0)
+    assert 'data-sp-page' in plain_tag and 'data-sp-open' not in plain_tag
+    assert 'data-sp-page' in opened_tag and 'data-sp-open' in opened_tag
 
 
 def _cached_daily_then_new():

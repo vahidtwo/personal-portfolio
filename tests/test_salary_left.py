@@ -192,6 +192,26 @@ def test_overdue_unit_is_not_glued_to_toman(client, no_network, clock):  # noqa:
     assert "تومان</small> <small class=\"dv-unit\" data-installment-overdue>" in html
 
 
+def test_dashboard_overdue_is_not_glued_to_toman(client, no_network, clock):  # noqa: F811
+    import re
+
+    from tests.test_debts_v2 import _seed
+    from tests.test_holdings import _register
+    from tests.amounts_helper import with_amounts
+
+    _register(client)
+    _seed([("عقب", 1000000, 5, 1405, 6, 1)])
+    html = with_amounts(client, "/dashboard")
+    assert "تومانشامل" not in html
+    assert "data-installment-overdue" in html
+    assert '</bdi>&nbsp;تومان <small class="muted" data-installment-overdue>شامل عقب‌افتاده:' in html
+    assert html.count("&nbsp;تومان") >= 2
+    dd = re.search(r"<dt>اقساط باقی‌مانده</dt><dd[^>]*>(.*?)</dd>", html, re.S).group(1)
+    visible = re.sub(r"<[^>]+>", "", dd).replace("&nbsp;", " ")
+    assert "تومانشامل" not in visible.replace(" ", "")
+    assert "تومان شامل عقب‌افتاده" in visible.replace(" ", " ")
+
+
 def test_mid_loan_paid_this_month_still_counts():
     """After «پرداخت شد» the due date is next month, but last_paid_on is this month, so it still counts."""
     paid = D(4, 1405, 9, 20, 2_000_000, last_paid=TODAY.togregorian())

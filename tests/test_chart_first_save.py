@@ -61,6 +61,9 @@ def test_first_save_keeps_changes_as_dash(client, no_network):
     db.close()
     assert changes["24h"]["delta"] is None and changes["7d"]["delta"] is None
     assert changes["has_history"] is False
+    chart, _html = _chart(client)
+    assert chart["has_prior_point"] is False
+    assert chart["weekly"]["has_prior_point"] is False
 
 
 def test_zero_history_keeps_earliest_of_today():
@@ -91,7 +94,7 @@ def test_existing_history_still_drops_today():
 
 
 def test_no_prices_no_500_and_specific_empty_line(client, no_network):
-    from app.dashboard import CHART_NO_PRICES_PLACEHOLDER_FA
+    from app.dashboard import CHART_NO_PRICES_FA
 
     _register(client)
     r = _save(client, gold_grams="1")
@@ -99,7 +102,8 @@ def test_no_prices_no_500_and_specific_empty_line(client, no_network):
     assert _snapshots() == []
     page = client.get("/dashboard")
     assert page.status_code == 200
-    assert 'data-empty="no-prices"' in page.text and CHART_NO_PRICES_PLACEHOLDER_FA in page.text
+    assert CHART_NO_PRICES_FA == "قیمت بازار هنوز دریافت نشده. نمودار با رسیدن اولین قیمت‌ها پر می‌شود."
+    assert 'data-empty="no-prices"' in page.text and CHART_NO_PRICES_FA in page.text
 
 
 def test_no_row_for_user_without_assets(client, no_network):
@@ -118,3 +122,32 @@ def test_form_post_redirect_also_stores_snapshot(client, no_network):
     r = client.post("/profile", data={"csrf": _csrf(client, "/assets"), "gold_grams": "1"}, follow_redirects=False)
     assert r.status_code == 303
     assert len(_snapshots()) == 1
+
+
+def test_first_save_chart_foot_uses_dash_like_chips():
+    """With only today's start point, the «این ماه» stat is «—», not «۰٪» or a bare «٪»."""
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "app/static/dashboard.js").read_text(encoding="utf-8")
+    assert "if (!src().has_prior_point || first === 0)" in js
+    block = js.split("function updateFoot(view) {", 1)[1].split("function renderChart()", 1)[0]
+    assert 'changeEl.textContent = "—"' in block
+    # The zero-change «۰٪» label is only reached when a prior day exists.
+    assert block.index("!src().has_prior_point") < block.index('changeEl.textContent = "۰٪"')
+
+
+def test_prior_day_snapshot_sets_has_prior_point(client, no_network):
+    from app.db import SessionLocal
+    from app.models import PortfolioSnapshot, User
+
+    _set_price("gold", "7400000")
+    _register(client)
+    _save(client, gold_grams="1")
+    db = SessionLocal()
+    snap = db.query(PortfolioSnapshot).join(User).filter(User.username == "alice").one()
+    snap.taken_at = (datetime.now(timezone.utc) - timedelta(days=1)).replace(tzinfo=None)
+    db.commit()
+    db.close()
+    chart, _html = _chart(client)
+    assert chart["has_prior_point"] is True
+    assert chart["weekly"]["has_prior_point"] is True

@@ -44,8 +44,7 @@ def _format_usd(value: Decimal) -> str:
     return format_usd(value, fixed=True)
 
 
-# Placeholder until design supplies the final wording for the chart's no-prices state.
-CHART_NO_PRICES_PLACEHOLDER_FA = "هنوز قیمت بازار دریافت نشده است. نمودار بعد از دریافت قیمت‌ها پر می‌شود."
+CHART_NO_PRICES_FA = "قیمت بازار هنوز دریافت نشده. نمودار با رسیدن اولین قیمت‌ها پر می‌شود."
 
 # Chart points: last snapshot per Tehran day for the week/month/3-month ranges (sent for the last
 # 92 days only), last snapshot per week for year/all. Stored values are never changed.
@@ -135,7 +134,9 @@ def _chart_points(db: Session, picked: list, view, now: datetime) -> dict:
                 "data": [_chart_number(bd.get(key, 0)) for bd in breakdowns] + [_chart_number(current.get(key, 0))],
             }
         )
-    return {"labels": labels, "times": times, "series": series}
+    now_day = now.astimezone(TEHRAN).date()
+    has_prior_point = any(_as_utc(s.taken_at).astimezone(TEHRAN).date() < now_day for s in snaps)
+    return {"labels": labels, "times": times, "series": series, "has_prior_point": has_prior_point}
 
 
 def build_chart_data(db: Session, user_id: int, view, now: datetime | None = None) -> dict:
@@ -646,7 +647,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         missing_fa=missing_fa,
         chart_data=chart_data,
         chart_no_prices=not prices,
-        chart_no_prices_fa=CHART_NO_PRICES_PLACEHOLDER_FA,
+        chart_no_prices_fa=CHART_NO_PRICES_FA,
         chart_asset_options=chart_asset_options,
         default_chart_asset_key=default_chart_asset_key,
         pie_data=pie_data,

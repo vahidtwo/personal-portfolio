@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/unit_price.html" import unit_price_line %}
 {% block title %}دارایی‌ها، دارایی‌تو{% endblock %}
 {% block content %}
 {#- Phase 1 piece 2: dedicated Assets page (layout from /mockups/phase1/assets.html).
@@ -56,6 +57,7 @@
       <div class="arow-info">
         <label class="arow-name" for="asset-{{ r.field }}">{{ r.name }}{% if r.symbol %} <span class="arow-symbol" dir="ltr">{{ r.symbol }}</span>{% endif %}</label>
         <span class="arow-worth" id="worth-{{ r.field }}">{% if r.manual %}بدون تبدیل{% elif r.value_label is none %}قیمت در دسترس نیست{% else %}<bdi class="num" data-row-value>{{ amt("row-" ~ r.key, r.value_label) }}</bdi> تومان{% endif %}</span>
+        {%- if r.unit_price %}{{ unit_price_line(r.unit_price, "arow-price") }}{% endif %}
       </div>
       <div class="v2-field">
       <div class="arow-input">

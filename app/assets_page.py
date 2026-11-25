@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.formatting import format_toman, format_when
-from app.portfolio import ASSET_META, build_portfolio, load_prices
+from app.portfolio import ASSET_META, build_portfolio, load_prices, unit_price_parts
 from app.security import get_authenticated_user, redirect_to_login
 from app.car_routes import ERR_EMPTY, ERR_FAILED, ERR_REJECTED, car_context
 from app.web import pop_flash, render
@@ -77,6 +77,7 @@ def assets_context(user, db: Session, form: dict[str, str], saved: dict[str, str
                     "manual": manual,
                     "thousands": manual,
                     "price_plain": _plain(price),
+                    "unit_price": unit_price_parts(key, row.unit_price),
                     "value_plain": _plain(row.value_toman),
                     "value_label": format_toman(row.value_toman) if price is not None else None,
                 }

@@ -42,7 +42,7 @@ class SmsSettingsActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Arabi's tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
+    // Design tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
     private val light by lazy {
         (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_NO
@@ -102,8 +102,8 @@ class SmsSettingsActivity : Activity() {
         box.addView(row)
         val explainer = when {
             denied -> "خاموش است، چون اجازهٔ پیامک داده نشده."
-            on -> "روشن است. پیامک‌های تازه‌ای که یکی از کلمه‌های زیر و یک مبلغ را دارند، خرج ثبت می‌شوند."
-            else -> "پیامک‌های تازه‌ای که «${firstKeyword()}» و یک مبلغ دارند، خودکار به‌عنوان خرج ثبت می‌شوند."
+            on -> "پیامکِ دارای مبلغ منفی (−) و خط «مانده» خودکار ثبت می‌شود. اگر یکی از کلمه‌های شما در پیامک باشد، مبلغ منفی بدون «مانده» یا «برداشت» کنار مبلغ هم ثبت می‌شود. بقیهٔ پیامک‌ها نادیده گرفته می‌شوند."
+            else -> "پیامکِ دارای مبلغ منفی (−) و خط «مانده» خودکار ثبت می‌شود. اگر یکی از کلمه‌های شما در پیامک باشد، مبلغ منفی بدون «مانده» یا «برداشت» کنار مبلغ هم ثبت می‌شود. بقیهٔ پیامک‌ها نادیده گرفته می‌شوند."
         }
         box.addView(tv(explainer, 14f, muted))
         if (deniedOnce && !on && !denied) box.addView(tv("اجازه داده نشد.", 14f, danger))
@@ -226,11 +226,10 @@ class SmsSettingsActivity : Activity() {
 
     private fun showPrePermissionSheet() {
         val v = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(8)); layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        val kw = firstKeyword()
-        v.addView(tv("اگر اجازه دهید، وقتی پیامکی با «$kw» و یک مبلغ می‌رسد، اپ خودش آن را خرج ثبت می‌کند.", 15f, cText))
+        v.addView(tv("پیامکِ دارای مبلغ منفی (−) و خط «مانده» خودکار ثبت می‌شود. اگر یکی از کلمه‌های شما در پیامک باشد، مبلغ منفی بدون «مانده» یا «برداشت» کنار مبلغ هم ثبت می‌شود. بقیهٔ پیامک‌ها نادیده گرفته می‌شوند.", 15f, cText))
         v.addView(tv("چه چیزی خوانده می‌شود", 15f, cText, bold = true).apply { accessibilityHeading() })
         v.addView(bullet("فقط پیامک‌های تازه، از همین حالا به بعد. پیامک‌های قبلی صندوق خوانده نمی‌شوند."))
-        v.addView(bullet("فقط پیامک‌هایی که «$kw» (یا کلمه‌هایی که خودتان اضافه می‌کنید) و یک مبلغ دارند. بقیه نادیده گرفته می‌شوند. کلمه‌ها فقط روی گوشی می‌مانند."))
+        v.addView(bullet("کلمه‌ها فقط روی گوشی می‌مانند و به سایت فرستاده نمی‌شوند."))
         v.addView(tv("چه چیزی به سایت فرستاده می‌شود", 15f, cText, bold = true).apply { accessibilityHeading() })
         v.addView(bullet("مبلغ به تومان"))
         v.addView(bullet("یادداشتی کوتاه: ۱۰۰ حرف اول پیامک، با شمارهٔ کارت یا حساب به شکل **** و بدون مانده"))
@@ -276,7 +275,7 @@ class SmsSettingsActivity : Activity() {
 
     private fun upgradeCard(): View = section(accent).apply {
         contentDescription = null
-        addView(tv("از این نسخه فقط پیامک‌هایی ثبت می‌شوند که یکی از کلمه‌های شما و یک مبلغ را دارند. «برداشت» را برایتان اضافه کردیم؛ همین پایین می‌توانید عوضش کنید.", 14f, cText))
+        addView(tv("پیامکِ دارای مبلغ منفی (−) و خط «مانده» خودکار ثبت می‌شود. اگر یکی از کلمه‌های شما در پیامک باشد، مبلغ منفی بدون «مانده» یا «برداشت» کنار مبلغ هم ثبت می‌شود. بقیهٔ پیامک‌ها نادیده گرفته می‌شوند. «برداشت» را برایتان اضافه کردیم؛ همین پایین می‌توانید عوضش کنید.", 14f, cText))
         addView(button("باشه") { SmsPrefs.dismissUpgradeNote(this@SmsSettingsActivity); render() })
     }
 
@@ -309,7 +308,7 @@ class SmsSettingsActivity : Activity() {
         addRow.addView(input); addRow.addView(add)
         s.addView(addRow)
         if (errorText != null && errorOnInput) s.addView(alert(errorText!!))
-        s.addView(tv("پیامکی ثبت می‌شود که یکی از این کلمه‌ها و یک مبلغ را داشته باشد.", 13f, muted))
+        s.addView(tv("پیامکِ دارای مبلغ منفی (−) و خط «مانده» خودکار ثبت می‌شود. اگر یکی از کلمه‌های شما در پیامک باشد، مبلغ منفی بدون «مانده» یا «برداشت» کنار مبلغ هم ثبت می‌شود. بقیهٔ پیامک‌ها نادیده گرفته می‌شوند.", 13f, muted))
         s.addView(tv("این کلمه‌ها فقط روی همین گوشی ذخیره می‌شوند و به سایت فرستاده نمی‌شوند.", 13f, muted))
         s.addView(tv("اجازهٔ پیامک داده شده", 13f, accent))
         return s

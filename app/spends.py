@@ -27,7 +27,7 @@ from app.db import get_db
 from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
 from app.models import DailySpend, SpendCategory, User
 from app.number_input import parse_int_required
-from app.spend_validation import CATEGORY_MSG, FIELD_ORDER, FIELD_SHORT, summary_fa, validate_spend
+from app.spend_validation import CATEGORY_MSG, FIELD_ORDER, FIELD_SHORT, month_length, summary_fa, validate_spend
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
 from app.web import flash, render
 
@@ -327,11 +327,15 @@ def daily_view(
         today = tehran_today()
         first_parent = picker_parents[0].id if picker_parents else ""
         first_child = next((child.id for child in picker_children if child.parent_id == first_parent), "")
+        if (year, month) < (today.year, today.month):
+            fy, fm, fd = year, month, month_length(year, month)
+        else:
+            fy, fm, fd = today.year, today.month, today.day
         spend_form = {
             "amount_toman": "",
-            "year": str(today.year),
-            "month": str(today.month),
-            "day": str(today.day),
+            "year": str(fy),
+            "month": str(fm),
+            "day": str(fd),
             "parent_id": str(first_parent),
             "category_id": str(first_child),
             "note": "",
@@ -365,6 +369,13 @@ def daily_view(
         "daily_has_more": len(visible) < len(rows),
         "daily_month_name": month_name,
         "daily_is_current_month": (year, month) == (today_j.year, today_j.month),
+        "daily_is_future_month": (year, month) > (today_j.year, today_j.month),
+        "daily_month_kind": (
+            "current" if (year, month) == (today_j.year, today_j.month)
+            else "future" if (year, month) > (today_j.year, today_j.month)
+            else "past"
+        ),
+        "daily_last_day_parts": [year, month, month_length(year, month)],
         "daily_today_chip": f"امروز، {persian_digits(str(today_j.day))} {JALALI_MONTHS[today_j.month - 1]}",
         "daily_today_parts": [today_j.year, today_j.month, today_j.day],
         "daily_yesterday_parts": [yesterday_j.year, yesterday_j.month, yesterday_j.day],

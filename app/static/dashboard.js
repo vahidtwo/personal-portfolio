@@ -506,7 +506,7 @@
     const weekly = payload.weekly && (payload.weekly.times || []).length >= 2 ? payload.weekly : null;
     function src() {
       if (weekly && (range === "365" || range === "all")) return weekly;
-      return { labels, times, series };
+      return { labels, times, series, has_prior_point: payload.has_prior_point };
     }
     const assetOptions = payload.assetOptions || [];
     // A single point is not a trend: show the empty state until there are 2+ points.
@@ -583,7 +583,7 @@
       const label = document.getElementById("chart-change-label");
       if (label) label.textContent = RANGE_CHANGE_LABEL[range] || "";
       changeEl.classList.remove("is-up", "is-down");
-      if (first === 0) {
+      if (!src().has_prior_point || first === 0) {
         changeEl.textContent = "—";
       } else {
         const pct = ((last - first) / Math.abs(first)) * 100;

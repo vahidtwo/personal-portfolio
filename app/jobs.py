@@ -170,6 +170,27 @@ async def refresh_market_prices_for_user(user_id: int) -> None:
         db.close()
 
 
+def snapshot_user_with_stored_prices(db, user: User):
+    """Store one snapshot for this user from the prices already in the database, right now.
+
+    Returns the snapshot time, or None when nothing was stored (no stored prices, no assets, or an
+    error). Never raises: a failed snapshot must not fail the save that triggered it.
+    """
+    try:
+        prices = load_prices(db)
+        if not prices:
+            return None
+        taken_at = utcnow()
+        if not snapshot_user(db, user, prices, taken_at):
+            return None
+        db.commit()
+        return taken_at
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to store snapshot for user %s after save", user.id)
+        return None
+
+
 async def refresh_prices_and_snapshot_user(user_id: int) -> None:
     """Refresh market prices when possible, then store one snapshot for this user."""
     try:

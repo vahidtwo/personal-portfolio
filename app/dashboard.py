@@ -537,7 +537,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     view = build_portfolio(user, prices)
     now = utcnow()
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     _debt_list, debt_total, next_debt_label = debt_rows(debts)
     recent_snaps = (
         db.query(PortfolioSnapshot)

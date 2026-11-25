@@ -7,7 +7,7 @@ moves a month on; last_paid_on is set to today's Tehran date and restored on und
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import jdatetime
@@ -16,15 +16,19 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import debt_schedule as ds
+from app.daily_spend import JALALI_MONTHS
 from app.db import get_db
 from app.debt_validation import FIELD_SHORT, reminder_error, summary_fa, validate_debt, validate_expense
 from app.formatting import format_amount_input, format_jalali_date, format_toman, format_when, persian_digits, tehran_today
-from app.models import Debt, DueReminder, MonthlyExpense, User
+from app.models import Debt, DebtPayment, DueReminder, MonthlyExpense, User, utcnow
 from app.security import get_authenticated_user, redirect_to_login, require_csrf
 from app.web import flash, pop_flash, render
 
 router = APIRouter()
 DEBTS_URL = "/profile?tab=debts"
+NO_STORE = {"Cache-Control": "no-store, private", "Pragma": "no-cache", "Vary": "Cookie"}
+DEBT_HISTORY_RELEASE_AT = datetime(2026, 11, 25, 0, 0, tzinfo=timezone.utc)
+DEBT_HISTORY_NOTE_BEFORE = "پرداخت‌های قبل از ۴ آذر ۱۴۰۵ ثبت نشده‌اند."
 EMPTY_DEBT_FORM = {"title": "", "monthly_toman": "", "months_left": "", "due_year": "", "due_month": "", "due_day": "",
                    "reminder_days_before": "1"}
 # «یادآوری قسط» options (value, label); NULL in the database shows as the default «۱ روز قبل».
@@ -171,7 +175,7 @@ def debts_page(
 ) -> dict:
     """Context for the v2 debts partial (passed as `dv`)."""
     today = tehran_today()
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     items = db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
     rows, total, _ = debt_rows(debts, today)
     exp_rows = expense_rows(items, today)
@@ -247,7 +251,7 @@ def page_context_for_get(db: Session, user: User, request: Request) -> dict:
 
 def render_debts(request: Request, db: Session, user: User, *, status_code: int = 200, **kwargs):
     """Server-rendered debts page with errors at their fields (the no-JS path)."""
-    debts_rows, debt_total, next_debt_label = debt_rows(db.query(Debt).filter(Debt.user_id == user.id).all())
+    debts_rows, debt_total, next_debt_label = debt_rows(db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all())
     dv = debts_page(db, user, request, **kwargs)
     response = render(
         request,
@@ -308,7 +312,7 @@ def _with_reminder(errors: dict, raw: str | None) -> tuple[dict, int | None]:
 
 def _owned_debt(db, user, debt_id) -> Debt | None:
     debt = db.get(Debt, debt_id)
-    return debt if debt is not None and debt.user_id == user.id else None
+    return debt if debt is not None and debt.user_id == user.id and debt.deleted_at is None else None
 
 
 def _not_found(request, message="بدهی پیدا نشد."):
@@ -404,6 +408,42 @@ def _parse_iso_date(value) -> date | None:
     return date.fromisoformat(str(value)[:10])
 
 
+def _conflict(request: Request, message: str):
+    if wants_json(request):
+        return JSONResponse({"ok": False, "error": message, "fields": {}}, status_code=409)
+    flash(request, message, error=True)
+    return RedirectResponse(DEBTS_URL, status_code=303)
+
+
+def _same_jalali_month(paid_on: date, today: jdatetime.date) -> bool:
+    paid_j = jdatetime.date.fromgregorian(date=paid_on)
+    return (paid_j.year, paid_j.month) == (today.year, today.month)
+
+
+def _payment_matches_debt_after(debt: Debt, payment: DebtPayment) -> bool:
+    after_y, after_m = ds.add_months(int(payment.period_jy), int(payment.period_jm), 1)
+    return _state(debt) == [
+        int(payment.before_months_left) - 1,
+        after_y,
+        after_m,
+        int(payment.before_due_day),
+    ]
+
+
+def _format_paid_on_jalali(paid_on: date) -> str:
+    j = jdatetime.date.fromgregorian(date=paid_on)
+    return f"{persian_digits(str(j.day))} {JALALI_MONTHS[j.month - 1]} {persian_digits(str(j.year))}"
+
+
+def _note_before_for(debt: Debt) -> str | None:
+    created = getattr(debt, "created_at", None)
+    if created is None:
+        return None
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return DEBT_HISTORY_NOTE_BEFORE if created < DEBT_HISTORY_RELEASE_AT else None
+
+
 @router.post("/profile/debts/{debt_id}/paid")
 async def profile_debt_paid(
     debt_id: int,
@@ -412,31 +452,48 @@ async def profile_debt_paid(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """«پرداخت شد، یک قسط کم کن»: months_left − 1 and the next due a month on.
+    """«پرداخت شد، یک قسط کم کن»: months_left − 1, next due a month on, and record a DebtPayment row.
 
     Idempotent-safe: `expect` is the count the user saw; a repeated or stale POST (double tap,
     back button, second tab) no longer matches and changes nothing.
     """
-    require_csrf(request, csrf)
+    require_csrf(request, csrf or request.headers.get("x-csrf-token"))
     user = get_authenticated_user(request, db)
     if user is None:
+        if wants_json(request):
+            return JSONResponse({"ok": False, "error": "login required"}, status_code=401, headers=NO_STORE)
         return redirect_to_login(request)
     debt = _owned_debt(db, user, debt_id)
     if debt is None:
         return _not_found(request)
     months = int(debt.months_left or 0)
     if not expect.strip().isdigit() or int(expect) != months or months <= 0:
-        message = "این پرداخت قبلاً ثبت شده بود؛ چیزی تغییر نکرد."
-        if wants_json(request):
-            return JSONResponse({"ok": False, "error": message, "fields": {}}, status_code=409)
-        flash(request, message, error=True)
-        return RedirectResponse(DEBTS_URL, status_code=303)
+        return _conflict(request, "این پرداخت قبلاً ثبت شده بود؛ چیزی تغییر نکرد.")
+    today = tehran_today()
+    paid_date = today.togregorian()
+    nxt = ds.next_due(debt, today)
     before = _state(debt)
-    previous_paid = _iso_date(debt.last_paid_on)
-    y, m = ds.after_payment(debt)  # the oldest unpaid one is paid: exactly one month on, never skipped
+    previous_paid_date = debt.last_paid_on
+    previous_paid = _iso_date(previous_paid_date)
+    payment = DebtPayment(
+        debt_id=debt.id,
+        user_id=user.id,
+        paid_on=paid_date,
+        amount_toman=Decimal(debt.monthly_toman),
+        kind="full",
+        period_jy=nxt.year,
+        period_jm=nxt.month,
+        before_months_left=months,
+        before_due_year=int(debt.due_year),
+        before_due_month=int(debt.due_month),
+        before_due_day=int(debt.due_day),
+        before_last_paid_on=previous_paid_date,
+    )
+    y, m = ds.after_payment(debt, today)  # the oldest unpaid one is paid: exactly one month on, never skipped
     debt.months_left = months - 1
     debt.due_year, debt.due_month = y, m  # due_day kept: a day-31 loan stays day 31 (readers clamp)
-    debt.last_paid_on = tehran_today().togregorian()
+    debt.last_paid_on = paid_date
+    db.add(payment)
     db.commit()
     title = (debt.title or "").strip() or "قسط"
     request.session["debt_undo"] = {
@@ -444,7 +501,7 @@ async def profile_debt_paid(
         "last_paid_on": previous_paid, "show": True,
     }
     if wants_json(request):
-        return JSONResponse({"ok": True, "redirect": DEBTS_URL})
+        return JSONResponse({"ok": True, "redirect": DEBTS_URL, "payment_id": payment.id})
     return RedirectResponse(DEBTS_URL, status_code=303)
 
 
@@ -452,31 +509,63 @@ async def profile_debt_paid(
 async def profile_debt_unpaid(
     debt_id: int,
     request: Request,
+    payment_id: str = Form(""),
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """«برگردان»: restores exactly the count and date from before the last «پرداخت شد».
+    """«بازگرداندن» / «برگردان»: undo the newest payment on this loan (same Jalali month only).
 
-    Only when the debt is still in the state that «پرداخت شد» left; otherwise nothing changes.
+    Works across any device/session via `debt_payments`. Refuses (409) when:
+    - no payment exists,
+    - `payment_id` was given and is not the newest payment row,
+    - the newest payment was not made in the current Tehran Jalali month, or
+    - the loan was edited afterwards and no longer matches what that payment left.
     """
-    require_csrf(request, csrf)
+    require_csrf(request, csrf or request.headers.get("x-csrf-token"))
     user = get_authenticated_user(request, db)
     if user is None:
+        if wants_json(request):
+            return JSONResponse({"ok": False, "error": "login required"}, status_code=401, headers=NO_STORE)
         return redirect_to_login(request)
     debt = _owned_debt(db, user, debt_id)
-    undo = request.session.get("debt_undo") or {}
-    if debt is None or undo.get("id") != debt_id or _state(debt) != list(undo.get("after") or []):
-        message = "چیزی برای برگرداندن نیست."
-        if wants_json(request):
-            return JSONResponse({"ok": False, "error": message, "fields": {}}, status_code=409)
-        flash(request, message, error=True)
-        return RedirectResponse(DEBTS_URL, status_code=303)
-    debt.months_left, debt.due_year, debt.due_month, debt.due_day = undo["before"]
-    if "last_paid_on" in undo:
-        debt.last_paid_on = _parse_iso_date(undo["last_paid_on"])
+    if debt is None:
+        return _not_found(request)
+    newest = (
+        db.query(DebtPayment)
+        .filter(DebtPayment.debt_id == debt.id, DebtPayment.user_id == user.id)
+        .order_by(DebtPayment.id.desc())
+        .first()
+    )
+    if payment_id.strip():
+        if not payment_id.strip().isdigit() or newest is None or int(payment_id.strip()) != newest.id:
+            return _conflict(request, "فقط آخرین پرداخت این ماه قابل برگرداندن است.")
+    if newest is None:
+        return _conflict(request, "چیزی برای برگرداندن نیست.")
+    today = tehran_today()
+    if not _same_jalali_month(newest.paid_on, today):
+        return _conflict(request, "برگرداندن فقط برای پرداخت‌های همین ماه ممکن است.")
+    if not _payment_matches_debt_after(debt, newest):
+        return _conflict(request, "چیزی برای برگرداندن نیست.")
+    debt.months_left = int(newest.before_months_left)
+    debt.due_year = int(newest.before_due_year)
+    debt.due_month = int(newest.before_due_month)
+    debt.due_day = int(newest.before_due_day)
+    before_last_paid = newest.before_last_paid_on
+    db.delete(newest)
+    db.flush()
+    remaining_latest = (
+        db.query(DebtPayment)
+        .filter(DebtPayment.debt_id == debt.id, DebtPayment.user_id == user.id)
+        .order_by(DebtPayment.id.desc())
+        .first()
+    )
+    debt.last_paid_on = remaining_latest.paid_on if remaining_latest is not None else before_last_paid
     db.commit()
-    request.session.pop("debt_undo", None)
-    return saved_response(request, f"پرداخت «{undo.get('title') or 'قسط'}» برگردانده شد.")
+    undo = request.session.get("debt_undo") or {}
+    if undo.get("id") == debt_id:
+        request.session.pop("debt_undo", None)
+    title = (debt.title or "").strip() or "قسط"
+    return saved_response(request, f"پرداخت «{title}» برگردانده شد.")
 
 
 @router.post("/profile/debts/{debt_id}/delete")
@@ -486,17 +575,67 @@ async def profile_delete_debt(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    require_csrf(request, csrf)
+    """Soft-delete the loan (`deleted_at`) and clear its reminders; `debt_payments` rows stay for export."""
+    require_csrf(request, csrf or request.headers.get("x-csrf-token"))
     user = get_authenticated_user(request, db)
     if user is None:
+        if wants_json(request):
+            return JSONResponse({"ok": False, "error": "login required"}, status_code=401, headers=NO_STORE)
         return redirect_to_login(request)
     debt = _owned_debt(db, user, debt_id)
     if debt is None:
         return _not_found(request)
     db.query(DueReminder).filter(DueReminder.debt_id == debt.id).delete(synchronize_session=False)
-    db.delete(debt)
+    debt.deleted_at = utcnow()
     db.commit()
     undo = request.session.get("debt_undo") or {}
     if undo.get("id") == debt_id:
         request.session.pop("debt_undo", None)
     return saved_response(request, "قسط حذف شد")
+
+
+@router.get("/api/debts/{debt_id}/payments")
+async def api_debt_payments(debt_id: int, request: Request, db: Session = Depends(get_db)):
+    """Authenticated JSON payment history for one loan, newest first."""
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login required"}, status_code=401, headers=NO_STORE)
+    debt = _owned_debt(db, user, debt_id)
+    if debt is None:
+        return JSONResponse({"ok": False, "error": "بدهی پیدا نشد.", "fields": {}}, status_code=404, headers=NO_STORE)
+    today = tehran_today()
+    rows = (
+        db.query(DebtPayment)
+        .filter(DebtPayment.debt_id == debt.id, DebtPayment.user_id == user.id)
+        .order_by(DebtPayment.id.desc())
+        .all()
+    )
+    payments = []
+    for idx, row in enumerate(rows):
+        can_undo = (
+            idx == 0
+            and _same_jalali_month(row.paid_on, today)
+            and _payment_matches_debt_after(debt, row)
+        )
+        payments.append({
+            "id": row.id,
+            "period_jy": int(row.period_jy),
+            "period_jm": int(row.period_jm),
+            "period_label": f"قسط {JALALI_MONTHS[int(row.period_jm) - 1]}",
+            "amount_toman": format(Decimal(row.amount_toman), "f"),
+            "amount_label": format_toman(Decimal(row.amount_toman)),
+            "paid_on": row.paid_on.isoformat(),
+            "paid_on_jalali": _format_paid_on_jalali(row.paid_on),
+            "kind": row.kind,
+            "can_undo": can_undo,
+        })
+    return JSONResponse(
+        {
+            "ok": True,
+            "debt_id": debt.id,
+            "count": len(payments),
+            "note_before": _note_before_for(debt),
+            "payments": payments,
+        },
+        headers=NO_STORE,
+    )

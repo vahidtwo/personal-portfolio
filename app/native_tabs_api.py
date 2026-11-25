@@ -266,7 +266,7 @@ async def api_debts(request: Request, db: Session = Depends(get_db)):
     if user is None:
         return _login_required()
     today = tehran_today()
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     items = db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
     rows, total, _ = debt_rows(debts, today)
     installment, installment_overdue = ds.month_due(debts, today)

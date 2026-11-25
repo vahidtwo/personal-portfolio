@@ -17,11 +17,13 @@ def test_download_row_renders_for_logged_in_user_in_settings(client, no_network,
     _fake_info(monkeypatch)
     _register(client)
     html = client.get("/profile").text
-    links = re.findall(r'<a class="([^"]+) apk-download" href="/download/my-inventory\.apk" data-apk-download>', html)
+    links = re.findall(r'<a class="([^"]+) apk-download" href="/download/my-inventory\.apk" data-apk-download id="apk-download">', html)
     assert sorted(links) == ["settings-row v2-row"]
     assert html.count('<span class="settings-row-label">دریافت اپ اندروید</span>') == 1
+    assert html.count('id="apk-download"') == 1
+    assert "ثبت خودکار خرج از پیامک بانک فقط در اپ اندروید کار می‌کند." in html
     # version and size in their own isolated spans, so the digits can never run together («نسخهٔ ۴۰۳٫۰ مگابایت»)
-    metas = re.findall(r'<span class="apk-meta">(.*?)</span>\s*<span class="apk-note">', html)
+    metas = re.findall(r'<span class="apk-meta">(.*?)</span>\s*<span class="apk-note apk-why">', html)
     assert len(metas) == 1
     for meta in metas:
         assert '<span class="apk-version">نسخهٔ <bdi>۳٫۰</bdi></span>' in meta

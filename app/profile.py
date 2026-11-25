@@ -15,7 +15,7 @@ from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows, page_context_for_get
 from app.expenses import expense_form_for_request
-from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
+from app.formatting import format_amount_input, format_qty_input, format_toman, format_when, persian_digits
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
 from app import rate_limit
 from app.firebase_push import firebase_admin_ready, send_push_to_user
@@ -34,6 +34,7 @@ from app.security import (
     normalize_username,
     parse_decimal,
     require_csrf,
+    rotate_session,
     validate_password,
     validate_username,
     verify_password,
@@ -273,12 +274,46 @@ def parse_salary(raw: str, existing: Decimal | None = None) -> tuple[Decimal | N
     return value, None
 
 
+CURRENT_PW_LOCKED = "چند بار پشت سر هم اشتباه شد. برای امنیت، تا حدود {n} دقیقهٔ دیگر دوباره امتحان کنید."
+
+
+class CurrentPasswordLocked(Exception):
+    """Too many wrong current passwords for this account; nothing was checked or saved."""
+
+    def __init__(self, retry_after: int):
+        super().__init__("current password locked")
+        self.retry_after = retry_after
+
+    @property
+    def message(self) -> str:
+        return CURRENT_PW_LOCKED.format(n=persian_digits(str(max(1, -(-self.retry_after // 60)))))
+
+
+def _current_pw_key(user: User) -> str:
+    return f"settings-pw:user:{user.id}"
+
+
+def _current_password_ok(user: User, password: str) -> bool:
+    """The settings forms' current-password check, with the login limit (shared by web and app, per account).
+    A wrong password counts; a right one resets the count; while locked nothing is checked."""
+    key, window = _current_pw_key(user), rate_limit.LOGIN_WINDOW_SECONDS
+    wait = rate_limit.retry_after(key, rate_limit.LOGIN_FAILS_PER_USER, window)
+    if wait:
+        raise CurrentPasswordLocked(wait)
+    if verify_password(password, user.password_hash):
+        rate_limit.clear(key)
+        return True
+    rate_limit.record(key, window, rate_limit.LOGIN_FAILS_PER_USER)
+    return False
+
+
 def settings_section_changes(
     db: Session, user: User, section: str, *, full_name: str = "", username: str = "", mobile: str = "",
     salary_toman: str = "", current_password: str = "", new_password: str = "",
 ) -> tuple[dict[str, str], dict]:
-    """Validate one settings section and return ({field: error}, {column: new value}). Writes nothing.
-    full_name must already be stripped and cut to 80 characters."""
+    """Validate one settings section and return ({field: error}, {column: new value}). Writes no user columns.
+    full_name must already be stripped and cut to 80 characters. Raises CurrentPasswordLocked when the
+    current-password check is over its attempt limit."""
     errors: dict[str, str] = {}
     changes: dict = {}
     if section == "account":
@@ -296,7 +331,7 @@ def settings_section_changes(
         if name != user.username and "username" not in errors:
             if current_password == "":
                 errors["current_password"] = CURRENT_PW_MISSING_USER
-            elif not verify_password(current_password, user.password_hash):
+            elif not _current_password_ok(user, current_password):
                 errors["current_password"] = CURRENT_PW_WRONG
         changes = {"full_name": full_name, "username": name, "mobile": phone or ""}
     elif section == "salary":
@@ -309,7 +344,7 @@ def settings_section_changes(
             errors["new_password"] = PASSWORD_ERROR
         if current_password == "":
             errors["current_password"] = CURRENT_PW_MISSING_PW
-        elif not verify_password(current_password, user.password_hash):
+        elif not _current_password_ok(user, current_password):
             errors["current_password"] = CURRENT_PW_WRONG
         if not errors:
             changes = {"password_hash": hash_password(new_password)}
@@ -343,10 +378,20 @@ async def profile_account(
         "mobile": mobile if section == "account" else (user.mobile or ""),
         "salary_toman": "",  # never echoed back into the page
     }
-    errors, changes = settings_section_changes(
-        db, user, section, full_name=account["full_name"], username=username, mobile=mobile,
-        salary_toman=salary_toman, current_password=current_password, new_password=new_password,
-    )
+    try:
+        errors, changes = settings_section_changes(
+            db, user, section, full_name=account["full_name"], username=username, mobile=mobile,
+            salary_toman=salary_toman, current_password=current_password, new_password=new_password,
+        )
+    except CurrentPasswordLocked as locked:
+        retry = {"Retry-After": str(locked.retry_after)}
+        errors = {"current_password": locked.message}
+        if _wants_json(request):
+            return JSONResponse({"errors": errors, "retry_after": locked.retry_after}, status_code=429, headers=retry)
+        page = _render_account_error(request, db, user, errors, account, section)
+        page.status_code = 429
+        page.headers.update(retry)
+        return page
     if errors:
         if _wants_json(request):
             return JSONResponse({"errors": errors}, status_code=422)
@@ -354,6 +399,8 @@ async def profile_account(
     for key, value in changes.items():
         setattr(user, key, value)
     db.commit()
+    if "password_hash" in changes:
+        rotate_session(request, user)
     title, detail = SAVED_FA[section]
     flash(request, f"{title}. {detail}")
     if _wants_json(request):

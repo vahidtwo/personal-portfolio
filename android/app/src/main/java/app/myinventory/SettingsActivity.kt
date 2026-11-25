@@ -1,6 +1,7 @@
 package app.myinventory
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -29,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,6 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.myinventory.settings.SettingsData
@@ -52,6 +57,7 @@ import app.myinventory.ui.components.AlertKind
 import app.myinventory.ui.components.AmountField
 import app.myinventory.ui.components.AmountText
 import app.myinventory.ui.components.AppCard
+import app.myinventory.ui.components.ButtonPair
 import app.myinventory.ui.components.AppIcons
 import app.myinventory.ui.components.BottomNav
 import app.myinventory.ui.components.DangerButton
@@ -69,6 +75,7 @@ import app.myinventory.ui.components.TopBar
 import app.myinventory.ui.format.MASK
 import app.myinventory.ui.format.faDigits
 import app.myinventory.ui.theme.DaraiitoTheme
+import app.myinventory.ui.theme.SheetScrim
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -93,7 +100,7 @@ class SettingsActivity : AppCompatActivity() {
         data class Ready(val data: SettingsData) : Load
     }
 
-    private enum class Page { MAIN, ACCOUNT, SALARY }
+    private enum class Page { MAIN, ACCOUNT, PASSWORD, SALARY }
 
     @Composable
     private fun SettingsRoot() {
@@ -121,13 +128,11 @@ class SettingsActivity : AppCompatActivity() {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             when (page) {
                 Page.MAIN -> MainPage(load, showSkeleton, onRetry = { attempt++ }, onOpen = { page = it })
-                Page.ACCOUNT -> (load as? Load.Ready)?.let { ready ->
-                    AccountPage(ready.data, onSaved = { load = Load.Ready(it) }, onBack = { page = Page.MAIN })
-                }
-                Page.SALARY -> (load as? Load.Ready)?.let { ready ->
-                    SalaryPage(ready.data.hasSalary, onSaved = { has -> load = Load.Ready(ready.data.copy(hasSalary = has)) },
+                Page.ACCOUNT, Page.PASSWORD -> (load as? Load.Ready)?.let { ready ->
+                    AccountPage(ready.data, toPassword = page == Page.PASSWORD, onSaved = { load = Load.Ready(it) },
                         onBack = { page = Page.MAIN })
                 }
+                Page.SALARY -> SalaryPage(onBack = { page = Page.MAIN })
             }
         }
     }
@@ -152,9 +157,9 @@ class SettingsActivity : AppCompatActivity() {
                 when (load) {
                     Load.Loading -> if (showSkeleton) SkeletonList()
                     Load.Error -> {
-                        AlertBox(AlertKind.Error, "تنظیمات باز نشد", "اتصال را بررسی کنید و دوباره بزنید.")
+                        AlertBox(AlertKind.Error, "تنظیمات باز نشد.", "اتصال را بررسی کنید و دوباره امتحان کنید.")
                         Spacer(Modifier.height(12.dp))
-                        PrimaryButton("دوباره", onRetry, Modifier.fillMaxWidth())
+                        PrimaryButton("دوباره", onRetry, Modifier.fillMaxWidth(), icon = AppIcons.Refresh)
                     }
                     is Load.Ready -> {
                         val d = load.data
@@ -192,7 +197,7 @@ class SettingsActivity : AppCompatActivity() {
                         ListCard(listOf(
                             {
                                 SettingsListItem(AppIcons.Assets, "حقوق ماهانه", "همیشه پنهان؛ برای «مانده»",
-                                    trailing = if (d.hasSalary) MASK else "ثبت نشده") { onOpen(Page.SALARY) }
+                                    trailing = MASK) { onOpen(Page.SALARY) }
                             },
                             {
                                 SettingsListItem(AppIcons.Bell, "اعلان‌ها", "در صفحهٔ وب باز می‌شود") { openWeb(WEB_PUSH) }
@@ -205,10 +210,10 @@ class SettingsActivity : AppCompatActivity() {
                             },
                         ))
                         SectionLabel("امنیت")
-                        ListCard(listOf({ SettingsListItem(AppIcons.Lock, "رمز عبور") { onOpen(Page.ACCOUNT) } }))
+                        ListCard(listOf({ SettingsListItem(AppIcons.Lock, "رمز عبور") { onOpen(Page.PASSWORD) } }))
                         SectionLabel("اپ")
                         val appRows = mutableListOf<@Composable () -> Unit>(
-                            { SettingsListItem(AppIcons.Phone, "نسخهٔ اپ", faDigits(BuildConfig.VERSION_NAME), showChevron = false) },
+                            { SettingsListItem(AppIcons.Phone, "نسخهٔ اپ", SettingsModel.versionLabel(BuildConfig.VERSION_NAME, ::faDigits), showChevron = false) },
                             { SettingsListItem(AppIcons.Server, "پیشرفته: توکن MCP", "در صفحهٔ وب باز می‌شود") { openWeb(WEB_MCP) } },
                         )
                         if (d.isAdmin) appRows += { SettingsListItem(AppIcons.Shield, "مدیریت", "در صفحهٔ وب باز می‌شود") { openWeb("/admin") } }
@@ -227,7 +232,7 @@ class SettingsActivity : AppCompatActivity() {
         if (confirmLogout) {
             val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
-                onDismissRequest = { if (!loggingOut) confirmLogout = false }, sheetState = sheet,
+                onDismissRequest = { if (!loggingOut) confirmLogout = false }, sheetState = sheet, scrimColor = SheetScrim,
                 containerColor = MaterialTheme.colorScheme.surface,
             ) {
                 Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
@@ -236,15 +241,15 @@ class SettingsActivity : AppCompatActivity() {
                     Text("برای ورود دوباره، نام کاربری و رمز لازم است. اعلان‌های این گوشی هم قطع می‌شود.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // «انصراف» first (right), «خروج» on the left; stacked with large text.
+                    ButtonPair({ m -> SecondaryButton("انصراف", { confirmLogout = false }, m, enabled = !loggingOut) }) { m ->
                         DangerButton("خروج", {
                             loggingOut = true
                             scope.launch {
                                 withContext(Dispatchers.IO) { logoutRemote() }
                                 finishLogout()
                             }
-                        }, Modifier.weight(1f), busy = loggingOut)
-                        SecondaryButton("انصراف", { confirmLogout = false }, Modifier.weight(1f), enabled = !loggingOut)
+                        }, m, busy = loggingOut)
                     }
                 }
             }
@@ -263,7 +268,7 @@ class SettingsActivity : AppCompatActivity() {
     // ---------- account and password ----------
 
     @Composable
-    private fun AccountPage(data: SettingsData, onSaved: (SettingsData) -> Unit, onBack: () -> Unit) {
+    private fun AccountPage(data: SettingsData, toPassword: Boolean, onSaved: (SettingsData) -> Unit, onBack: () -> Unit) {
         var name by rememberSaveable { mutableStateOf(data.fullName) }
         var username by rememberSaveable { mutableStateOf(data.username) }
         var mobile by rememberSaveable { mutableStateOf(data.mobile) }
@@ -278,15 +283,21 @@ class SettingsActivity : AppCompatActivity() {
         var pwOffline by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val needPw = SettingsModel.needsCurrentPassword(data.username, username)
+        val scroll = rememberScrollState()
+        LaunchedEffect(toPassword) { if (toPassword) { delay(50); scroll.animateScrollTo(scroll.maxValue) } }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             TopBar("حساب", onBack)
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 16.dp)) {
                 AppCard {
                     Text("حساب", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(14.dp))
                     val e = accResult?.errors.orEmpty()
                     if (accResult?.ok == true) { AlertBox(AlertKind.Success, accResult!!.title, accResult!!.detail); Spacer(Modifier.height(12.dp)) }
+                    if (accResult?.ok == false) {
+                        AlertBox(AlertKind.Error, if (e.size == 1) e.values.first() else "ذخیره نشد", if (e.size > 1) e.values.first() else null)
+                        Spacer(Modifier.height(12.dp))
+                    }
                     if (accOffline) { AlertBox(AlertKind.Error, "ذخیره نشد", "اتصال را بررسی کنید و دوباره بزنید."); Spacer(Modifier.height(12.dp)) }
                     LabeledField("نام", name, { name = it.take(80) })
                     Spacer(Modifier.height(14.dp))
@@ -325,6 +336,10 @@ class SettingsActivity : AppCompatActivity() {
                     Spacer(Modifier.height(14.dp))
                     val e = pwResult?.errors.orEmpty()
                     if (pwResult?.ok == true) { AlertBox(AlertKind.Success, pwResult!!.title, pwResult!!.detail); Spacer(Modifier.height(12.dp)) }
+                    if (pwResult?.ok == false) {
+                        AlertBox(AlertKind.Error, if (e.size == 1) e.values.first() else "تغییر نکرد", if (e.size > 1) e.values.first() else null)
+                        Spacer(Modifier.height(12.dp))
+                    }
                     if (pwOffline) { AlertBox(AlertKind.Error, "تغییر نکرد", "اتصال را بررسی کنید و دوباره بزنید."); Spacer(Modifier.height(12.dp)) }
                     LabeledField("رمز فعلی", current, { current = it }, error = e["current_password"], ltr = true, password = true)
                     Spacer(Modifier.height(14.dp))
@@ -350,12 +365,14 @@ class SettingsActivity : AppCompatActivity() {
     // ---------- salary ----------
 
     @Composable
-    private fun SalaryPage(hasSalary: Boolean, onSaved: (Boolean) -> Unit, onBack: () -> Unit) {
-        // Plain remember only: never saved state, never preferences, never the home cache.
+    private fun SalaryPage(onBack: () -> Unit) {
+        // Plain remember only: never saved state, never preferences, never the home cache. The list and the
+        // settings API never say whether a salary exists; only a tap on «نمایش» asks the server.
         var shown by remember { mutableStateOf<Pair<String, String>?>(null) }
+        var none by remember { mutableStateOf(false) }
         var revealBusy by remember { mutableStateOf(false) }
         var revealFailed by remember { mutableStateOf(false) }
-        var editing by remember { mutableStateOf(!hasSalary) }
+        var editing by remember { mutableStateOf(false) }
         var input by remember { mutableStateOf("") }
         var saveBusy by remember { mutableStateOf(false) }
         var saveError by remember { mutableStateOf<String?>(null) }
@@ -363,7 +380,27 @@ class SettingsActivity : AppCompatActivity() {
         val scope = rememberCoroutineScope()
 
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-            shown = null; revealBusy = false; input = ""
+            shown = null; none = false; revealBusy = false; input = ""
+        }
+        // Keep a revealed salary out of the recents thumbnail while screenshots stay allowed.
+        DisposableEffect(shown != null) {
+            if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(shown == null)
+            onDispose { if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(true) }
+        }
+
+        fun reveal() {
+            revealBusy = true; revealFailed = false
+            scope.launch {
+                val r = withContext(Dispatchers.IO) { runCatching { NativeSession.request("GET", "/api/salary") }.getOrNull() }
+                revealBusy = false
+                if (r?.status == 401) { goToLogin(); return@launch }
+                val parts = if (r?.status == 200) SettingsModel.salaryParts(r.json.optString("salary")) else null
+                when {
+                    parts == null -> revealFailed = true
+                    SettingsModel.salaryIsNone(parts.first) -> { none = true; editing = true }
+                    else -> shown = parts
+                }
+            }
         }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
@@ -375,15 +412,18 @@ class SettingsActivity : AppCompatActivity() {
                     Spacer(Modifier.height(16.dp))
                     saved?.let { AlertBox(AlertKind.Success, it.title, it.detail); Spacer(Modifier.height(12.dp)) }
                     if (editing) {
-                        if (!hasSalary) {
+                        if (none) {
                             Text("هنوز حقوقی ثبت نکرده‌اید.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             Spacer(Modifier.height(12.dp))
                         }
-                        AmountField(if (hasSalary) "حقوق جدید" else "حقوق ماهانه", input, { input = it; saveError = null },
-                            hint = if (hasSalary) "مبلغ فعلی اینجا نمایش داده نمی‌شود." else null, error = saveError)
+                        AmountField(if (none) "حقوق ماهانه" else "حقوق جدید", input, { input = it; saveError = null },
+                            hint = if (none) null else "مبلغ فعلی اینجا نمایش داده نمی‌شود.", error = saveError)
                         Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ButtonPair(
+                            if (none) null else { m -> SecondaryButton("انصراف", { editing = false; input = ""; saveError = null }, m) },
+                        ) { m ->
                             PrimaryButton("ذخیرهٔ حقوق", {
+                                if (input.isEmpty()) { saveError = SALARY_EMPTY; return@PrimaryButton }
                                 saveBusy = true; saveError = null
                                 scope.launch {
                                     val r = withContext(Dispatchers.IO) {
@@ -392,44 +432,34 @@ class SettingsActivity : AppCompatActivity() {
                                     saveBusy = false
                                     when {
                                         r == null -> saveError = "ذخیره نشد. اتصال را بررسی کنید و دوباره بزنید."
-                                        r.ok -> {
-                                            input = ""; shown = null; editing = false; saved = r
-                                            onSaved(r.json.optBoolean("has_salary"))
-                                        }
+                                        r.ok -> { input = ""; shown = null; none = false; editing = false; saved = r }
                                         else -> saveError = r.errors["salary_toman"] ?: "ذخیره نشد."
                                     }
                                 }
-                            }, Modifier.weight(1f), enabled = input.isNotEmpty(), busy = saveBusy)
-                            if (hasSalary) SecondaryButton("انصراف", { editing = false; input = ""; saveError = null }, Modifier.weight(1f))
+                            }, m, busy = saveBusy)
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("حقوق فعلی", style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted)
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    AmountText(shown?.first ?: MASK, DaraiitoTheme.amount.large, Modifier.weight(1f, fill = false),
+                                Row(Modifier.semantics(mergeDescendants = true) {
+                                    if (shown == null) contentDescription = "حقوق فعلی پنهان"
+                                }) {
+                                    AmountText(shown?.first ?: MASK, DaraiitoTheme.amount.large,
+                                        Modifier.weight(1f, fill = false).alignByBaseline(),
                                         maxSize = 24.sp, minSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                                     Spacer(Modifier.width(6.dp))
-                                    Text(shown?.second ?: "تومان", style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted)
+                                    Text(shown?.second ?: "تومان", style = MaterialTheme.typography.bodyMedium,
+                                        color = DaraiitoTheme.extended.textMuted, modifier = Modifier.alignByBaseline())
                                 }
                             }
                             Spacer(Modifier.width(12.dp))
                             SecondaryButton(
-                                if (shown != null) "پنهان کردن" else "نمایش",
-                                {
-                                    if (shown != null) { shown = null; return@SecondaryButton }
-                                    revealBusy = true; revealFailed = false
-                                    scope.launch {
-                                        val r = withContext(Dispatchers.IO) {
-                                            runCatching { NativeSession.request("GET", "/api/salary") }.getOrNull()
-                                        }
-                                        revealBusy = false
-                                        val parts = if (r?.status == 200) SettingsModel.salaryParts(r.json.optString("salary")) else null
-                                        if (r?.status == 401) goToLogin()
-                                        if (parts == null) revealFailed = true else shown = parts
-                                    }
-                                },
-                                icon = if (shown != null) AppIcons.EyeOff else AppIcons.Eye, busy = revealBusy, accent = shown != null,
+                                when { revealBusy -> "در حال دریافت…"; shown != null -> "پنهان کردن"; else -> "نمایش" },
+                                { if (shown != null) shown = null else reveal() },
+                                modifier = Modifier.semantics { stateDescription = if (shown != null) "نمایان" else "پنهان" },
+                                icon = if (shown != null) AppIcons.EyeOff else AppIcons.Eye, busy = revealBusy,
+                                busyLabel = revealBusy, accent = shown != null,
                             )
                         }
                         if (shown != null) {
@@ -455,7 +485,8 @@ class SettingsActivity : AppCompatActivity() {
     private fun write(path: String, body: JSONObject): WriteResult? {
         val r = runCatching { NativeSession.post(path, body) }.getOrNull() ?: return null
         if (r.status == 401) { runOnUiThread { goToLogin() }; return null }
-        if (r.status != 200 && r.status != 422) return null
+        // 429: too many wrong current passwords; the body carries the message for that field.
+        if (r.status != 200 && r.status != 422 && r.status != 429) return null
         return SettingsModel.writeResult(r.status, r.json)
     }
 
@@ -498,6 +529,7 @@ class SettingsActivity : AppCompatActivity() {
 
     companion object {
         const val WEB_PUSH = "/profile#push-settings"
+        const val SALARY_EMPTY = "مبلغ را بدون ممیز بنویسید؛ مثلاً ۲٬۵۰۰٬۰۰۰"
         const val WEB_MCP = "/profile#advanced"
     }
 }

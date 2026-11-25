@@ -2,12 +2,11 @@ package app.myinventory.settings
 
 import org.json.JSONObject
 
-/** What GET /api/settings returns. Never holds the salary, only whether one is saved. */
+/** What GET /api/settings returns. Nothing about the salary, not even whether one is saved. */
 data class SettingsData(
     val fullName: String,
     val username: String,
     val mobile: String,
-    val hasSalary: Boolean,
     val isAdmin: Boolean,
 )
 
@@ -22,7 +21,6 @@ object SettingsModel {
             fullName = account.optString("full_name"),
             username = account.optString("username"),
             mobile = account.optString("mobile"),
-            hasSalary = json.optBoolean("has_salary"),
             isAdmin = json.optBoolean("is_admin"),
         )
     }
@@ -50,6 +48,12 @@ object SettingsModel {
         val unit = "تومان"
         return if (t.endsWith(unit)) t.removeSuffix(unit).trim() to unit else t to unit
     }
+
+    /** A revealed salary of zero means none is saved yet. */
+    fun salaryIsNone(number: String): Boolean = number.none { it.isDigit() && it != '0' && it != '۰' }
+
+    /** «12.1.7» → «۱۲٫۱٫۷». */
+    fun versionLabel(name: String, faDigits: (String) -> String): String = faDigits(name).replace('.', '٫')
 
     /** A username change needs the current password (same rule as the web form). */
     fun needsCurrentPassword(original: String, typed: String): Boolean =

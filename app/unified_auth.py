@@ -25,6 +25,8 @@ from app.db import get_db
 from app.formatting import persian_digits
 from app.models import User, utcnow
 from app.security import (
+    SESSION_PW_KEY,
+    password_stamp,
     hash_password,
     normalize_username,
     redirect_to_dashboard_if_authenticated,
@@ -162,6 +164,7 @@ async def auth_continue(
         user.last_login_at = utcnow()
         db.commit()
         request.session["user_id"] = user.id
+        request.session[SESSION_PW_KEY] = password_stamp(user)
         return RedirectResponse("/dashboard", status_code=303)
     # Unknown username: equal timing, then step b. Nothing is created yet.
     verify_password(password, _DUMMY_HASH)
@@ -212,5 +215,6 @@ async def auth_create(
     rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session.pop(PENDING_KEY, None)
     request.session["user_id"] = user.id
+    request.session[SESSION_PW_KEY] = password_stamp(user)
     flash(request, "حساب شما ساخته شد. دارایی‌هایتان را در صفحهٔ دارایی‌ها وارد کنید.")
     return RedirectResponse("/assets", status_code=303)

@@ -34,7 +34,6 @@ class NativeSettingsTest {
             """{"account":{"full_name":"سارا","username":"sara_demo","mobile":""},"has_salary":true,"is_admin":false}""",
         ))!!
         assertEquals("sara_demo", d.username)
-        assertTrue(d.hasSalary)
         assertFalse(d.isAdmin)
         assertNull(SettingsModel.parse(JSONObject("{}")))
     }
@@ -52,6 +51,21 @@ class NativeSettingsTest {
         assertEquals("۴۵٬۰۰۰٬۰۰۰" to "تومان", SettingsModel.salaryParts("۴۵٬۰۰۰٬۰۰۰ تومان"))
         assertNull(SettingsModel.salaryParts("—"))
         assertNull(SettingsModel.salaryParts(""))
+        assertTrue(SettingsModel.salaryIsNone("۰"))
+        assertFalse(SettingsModel.salaryIsNone("۴۵٬۰۰۰٬۰۰۰"))
+        assertFalse(SettingsModel.salaryIsNone("۱۰"))
+    }
+
+    @Test fun amountWordsGuardTypos() {
+        assertEquals("چهل و هشت میلیون تومان", app.myinventory.ui.format.amountWordsLine("48000000"))
+        assertEquals("هزار و پانصد تومان", app.myinventory.ui.format.amountWordsLine("1500"))
+        assertEquals("نه تریلیون و نهصد و نود و نه میلیارد و نهصد و نود و نه میلیون و نهصد و نود و نه هزار و نهصد و نود و نه تومان",
+            app.myinventory.ui.format.amountWordsLine("9999999999999"))
+        assertNull(app.myinventory.ui.format.amountWordsLine(""))
+    }
+
+    @Test fun versionUsesPersianDigitsAndSeparator() {
+        assertEquals("۱۲٫۱٫۷", SettingsModel.versionLabel("12.1.7", ::faDigits))
     }
 
     @Test fun smallRules() {

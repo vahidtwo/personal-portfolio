@@ -52,5 +52,6 @@ object AppIcons {
     val EyeOff = icon("eye-off", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z", circle(12f, 12f, 3f), "M4 4l16 16")
     val Edit = icon("edit", "M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4")
     val Alert = icon("alert", circle(12f, 12f, 9f), "M12 7.5v5.5", dots = listOf(circle(12f, 16.2f, 1f)))
+    val Refresh = icon("refresh", "M4 12a8 8 0 1 0 2.34-5.66", "M4 4v6h6")
     val Check = icon("check", circle(12f, 12f, 9f), "M8 12.2l2.7 2.7L16 9.6")
 }

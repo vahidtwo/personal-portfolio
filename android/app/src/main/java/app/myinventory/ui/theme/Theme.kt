@@ -40,3 +40,6 @@ object DaraiitoTheme {
     val spacing: Spacing @Composable @ReadOnlyComposable get() = LocalSpacing.current
     val amount: AmountTypography @Composable @ReadOnlyComposable get() = LocalAmountTypography.current
 }
+
+/** Bottom sheet scrim: black at 55%. */
+val SheetScrim: androidx.compose.ui.graphics.Color get() = Scrim

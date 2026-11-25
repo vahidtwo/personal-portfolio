@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -10,6 +12,7 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app import config as _config
 from app.config import ADMIN_USERNAMES, HTTPS_ONLY, SESSION_COOKIE_NAME
 from app.models import User
 
@@ -153,7 +156,33 @@ def get_authenticated_user(request: Request, db: Session) -> User | None:
     if user is None:
         invalidate_session(request)
         return None
+    stamp = request.session.get(SESSION_PW_KEY)
+    current = password_stamp(user)
+    if stamp is None:
+        # Sessions made before the stamp existed get it on their next request.
+        request.session[SESSION_PW_KEY] = current
+    elif not isinstance(stamp, str) or not hmac.compare_digest(stamp, current):
+        # The password changed since this session was made: it no longer signs anyone in.
+        invalidate_session(request)
+        return None
     return user
+
+
+SESSION_PW_KEY = "pw"
+
+
+def password_stamp(user: User) -> str:
+    """Short keyed fingerprint of the stored password hash. The session cookie is readable, so never the hash."""
+    digest = hmac.new((_config.SECRET_KEY or "").encode(), f"session-pw:{user.id}:{user.password_hash}".encode(), hashlib.sha256)
+    return digest.hexdigest()[:24]
+
+
+def rotate_session(request: Request, user: User) -> None:
+    """After a password change: a fresh session for this device (new CSRF token, new stamp); older sessions
+    of this user stop working because their stamp no longer matches."""
+    request.session.clear()
+    request.session["user_id"] = user.id
+    request.session[SESSION_PW_KEY] = password_stamp(user)
 
 
 def get_current_user(request: Request, db: Session) -> User | None:

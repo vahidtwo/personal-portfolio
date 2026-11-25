@@ -49,6 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -71,6 +74,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.myinventory.ui.format.AmountVisualTransformation
+import app.myinventory.ui.format.MASK
+import app.myinventory.ui.format.amountWordsLine
 import app.myinventory.ui.theme.DaraiitoTheme
 import app.myinventory.ui.theme.Motion
 import app.myinventory.ui.theme.PillShape
@@ -103,17 +108,28 @@ fun AmountText(
 
 /** 48dp pill, accent fill (web .btn-primary). Shows a spinner instead of the label while [busy]. */
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false) {
+fun PrimaryButton(
+    text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false,
+    icon: ImageVector? = null,
+) {
     val ext = DaraiitoTheme.extended
+    val cs = MaterialTheme.colorScheme
     Button(
         onClick = onClick, enabled = enabled && !busy, shape = PillShape,
         modifier = modifier.heightIn(min = DaraiitoTheme.spacing.buttonHeight),
         colors = ButtonDefaults.buttonColors(
             containerColor = ext.accentFill, contentColor = ext.onAccentFill,
-            disabledContainerColor = ext.accentFill.copy(alpha = .45f), disabledContentColor = ext.onAccentFill.copy(alpha = .7f),
+            disabledContainerColor = if (busy) ext.accentFill else cs.surfaceContainerHighest,
+            disabledContentColor = if (busy) ext.onAccentFill else ext.textMuted,
         ),
     ) {
-        if (busy) Spinner(color = ext.onAccentFill) else Text(text, style = MaterialTheme.typography.labelLarge)
+        if (busy) Spinner(color = ext.onAccentFill) else {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(text, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
@@ -121,7 +137,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 @Composable
 fun SecondaryButton(
     text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null,
-    enabled: Boolean = true, busy: Boolean = false, accent: Boolean = false,
+    enabled: Boolean = true, busy: Boolean = false, accent: Boolean = false, busyLabel: Boolean = false,
 ) {
     val cs = MaterialTheme.colorScheme
     val fg = if (accent) cs.primary else cs.onSurface
@@ -132,7 +148,10 @@ fun SecondaryButton(
         colors = ButtonDefaults.outlinedButtonColors(contentColor = fg),
         contentPadding = PaddingValues(horizontal = 18.dp),
     ) {
-        if (busy) Spinner(color = fg) else {
+        if (busy) {
+            Spinner(color = fg)
+            if (busyLabel) { Spacer(Modifier.width(8.dp)); Text(text, style = MaterialTheme.typography.labelLarge) }
+        } else {
             if (icon != null) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
@@ -165,18 +184,26 @@ fun LabeledField(
     hint: String? = null, error: String? = null, ltr: Boolean = false, keyboardType: KeyboardType = KeyboardType.Text,
     password: Boolean = false, enabled: Boolean = true, trailing: (@Composable () -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None, textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
-    height: Dp = DaraiitoTheme.spacing.fieldHeight,
+    height: Dp = DaraiitoTheme.spacing.fieldHeight, align: TextAlign? = null, placeholder: String? = null,
+    below: (@Composable () -> Unit)? = null,
 ) {
     val cs = MaterialTheme.colorScheme
     var shown by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = cs.onSurface)
         Spacer(Modifier.height(8.dp))
-        val style = if (ltr) textStyle.copy(textDirection = TextDirection.Ltr, textAlign = TextAlign.Left) else textStyle
+        val style = (if (ltr) textStyle.copy(textDirection = TextDirection.Ltr, textAlign = TextAlign.Left) else textStyle)
+            .let { if (align != null) it.copy(textAlign = align) else it }
         OutlinedTextField(
             value = value, onValueChange = onValueChange, singleLine = true, enabled = enabled,
             isError = error != null, textStyle = style,
-            modifier = Modifier.fillMaxWidth().heightIn(min = height).semantics { contentDescription = label },
+            modifier = Modifier.fillMaxWidth().heightIn(min = height)
+                .then(if (error != null) Modifier.border(2.dp, cs.error, MaterialTheme.shapes.medium) else Modifier)
+                .semantics {
+                    contentDescription = label
+                    if (error != null) error(error)
+                },
+            placeholder = placeholder?.let { p -> { Text(p, style = style, color = DaraiitoTheme.extended.textMuted, modifier = Modifier.fillMaxWidth()) } },
             shape = MaterialTheme.shapes.medium,
             keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboardType, autoCorrectEnabled = false),
             visualTransformation = if (password && !shown) PasswordVisualTransformation() else visualTransformation,
@@ -199,11 +226,16 @@ fun LabeledField(
                 else -> null
             },
         )
+        below?.invoke()
         when {
-            error != null -> Text(
-                error, style = MaterialTheme.typography.bodySmall, color = cs.error,
-                modifier = Modifier.padding(top = 6.dp).semantics { liveRegion = LiveRegionMode.Polite },
-            )
+            error != null -> Row(
+                Modifier.padding(top = 6.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AppIcons.Alert, contentDescription = null, tint = cs.error, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(error, style = MaterialTheme.typography.bodySmall, color = cs.error)
+            }
             hint != null -> Text(
                 hint, style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted,
                 modifier = Modifier.padding(top = 6.dp),
@@ -215,13 +247,23 @@ fun LabeledField(
 /** Amount input: Latin digits stored, «۴۸٬۰۰۰٬۰۰۰» shown, «تومان» at the end. Empty on open; never prefilled with money. */
 @Composable
 fun AmountField(label: String, value: String, onValueChange: (String) -> Unit, hint: String? = null, error: String? = null) {
+    val words = amountWordsLine(value)
     LabeledField(
         label = label, value = value,
         onValueChange = { raw -> onValueChange(amountDigits(raw)) },
-        hint = hint, error = error, ltr = true, keyboardType = KeyboardType.Number,
+        hint = hint ?: "به تومان؛ فقط عدد", error = error, ltr = true, keyboardType = KeyboardType.Number,
         visualTransformation = AmountVisualTransformation, textStyle = DaraiitoTheme.amount.input,
-        height = DaraiitoTheme.spacing.amountFieldHeight,
-        trailing = { Text("تومان", style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted, modifier = Modifier.padding(horizontal = 12.dp)) },
+        height = DaraiitoTheme.spacing.amountFieldHeight, align = TextAlign.Right, placeholder = "۰",
+        trailing = {
+            Text("تومان", style = MaterialTheme.typography.bodyMedium, color = DaraiitoTheme.extended.textMuted,
+                modifier = Modifier.padding(horizontal = 12.dp))
+        },
+        below = if (words != null && error == null) {
+            {
+                Text(words, style = MaterialTheme.typography.bodySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+            }
+        } else null,
     )
 }
 
@@ -272,8 +314,11 @@ fun SkeletonBlock(modifier: Modifier = Modifier, height: Dp = 16.dp, radius: Dp 
 @Composable
 fun AppCard(modifier: Modifier = Modifier, padding: Dp = DaraiitoTheme.spacing.cardPadding, content: @Composable ColumnScope.() -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val light = cs.background.luminance() > .5f
     Column(
-        modifier.fillMaxWidth().background(cs.surface, MaterialTheme.shapes.large)
+        modifier.fillMaxWidth()
+            .then(if (light) Modifier.shadow(2.dp, MaterialTheme.shapes.large) else Modifier)
+            .background(cs.surface, MaterialTheme.shapes.large)
             .border(1.dp, cs.outlineVariant, MaterialTheme.shapes.large).padding(padding),
         content = content,
     )
@@ -320,13 +365,13 @@ fun SettingsListItem(
             Text(headline, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                 color = if (danger) cs.error else cs.onSurface)
             if (supporting != null) {
-                Text(supporting, style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(supporting, style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted, maxLines = 2)
             }
         }
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
-            Text(trailing, style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted)
+            Text(trailing, style = MaterialTheme.typography.bodySmall, color = DaraiitoTheme.extended.textMuted,
+                modifier = if (trailing == MASK) Modifier.semantics { contentDescription = "پنهان" } else Modifier)
         }
         if (showChevron && onClick != null) {
             Spacer(Modifier.width(6.dp))
@@ -434,3 +479,22 @@ fun LetterAvatar(letter: String) {
     }
 }
 
+
+/**
+ * Cancel then action. Side by side in a right-to-left row (cancel on the right, action on the left);
+ * stacked full width, action on top, when large text would wrap the labels.
+ */
+@Composable
+fun ButtonPair(cancel: (@Composable (Modifier) -> Unit)?, action: @Composable (Modifier) -> Unit) {
+    if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.15f) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            action(Modifier.fillMaxWidth())
+            cancel?.invoke(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            cancel?.invoke(Modifier.weight(1f))
+            action(Modifier.weight(1f))
+        }
+    }
+}

@@ -13,6 +13,8 @@ from app import rate_limit
 from app.formatting import persian_digits
 from app import security
 from app.security import (
+    SESSION_PW_KEY,
+    password_stamp,
     attach_session_cookie_deletion,
     get_authenticated_user,
     hash_password,
@@ -111,6 +113,7 @@ async def register(
     db.commit()
     rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session["user_id"] = user.id
+    request.session[SESSION_PW_KEY] = password_stamp(user)
     flash(request, "حساب شما ساخته شد. دارایی‌هایتان را در صفحهٔ دارایی‌ها وارد کنید.")
     return RedirectResponse("/assets", status_code=303)
 
@@ -170,6 +173,7 @@ async def login(
     user.last_login_at = utcnow()
     db.commit()
     request.session["user_id"] = user.id
+    request.session[SESSION_PW_KEY] = password_stamp(user)
     return RedirectResponse("/dashboard", status_code=303)
 
 

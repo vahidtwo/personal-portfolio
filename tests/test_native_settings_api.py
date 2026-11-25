@@ -103,11 +103,11 @@ def test_salary_save_never_echoes_the_value(client, caplog):
     caplog.set_level(logging.DEBUG)
     r = _send(client, "/api/settings/salary", {"salary_toman": "۹۳٬۴۱۰٬۰۰۰"}, method="PATCH")
     assert r.status_code == 200 and r.json() == {"ok": True, "title": "حقوق ذخیره شد",
-                                                  "detail": "مبلغ همچنان پنهان است.", "has_salary": True}
+                                                  "detail": "مبلغ همچنان پنهان است."}
     assert _user()["salary"] == Decimal(SALARY)
     for text in (r.text, json.dumps(client.get("/api/settings").json(), ensure_ascii=False), caplog.text):
         assert "93410000" not in text and "۹۳٬۴۱۰٬۰۰۰" not in text
-    assert client.get("/api/settings").json()["has_salary"] is True
+    assert "has_salary" not in client.get("/api/settings").json()
 
 
 def test_salary_rules_match_the_web(client):
@@ -123,7 +123,7 @@ def test_salary_rules_match_the_web(client):
     assert _send(client, "/api/settings/salary", {"salary_toman": ""}).status_code == 200
     assert _user()["salary"] == Decimal(45_000_000)
     _send(client, "/api/settings/salary", {"salary_toman": "0"})
-    assert _user()["salary"] == 0 and client.get("/api/settings").json()["has_salary"] is False
+    assert _user()["salary"] == 0 and "has_salary" not in client.get("/api/settings").json()
 
 
 def test_settings_writes_touch_no_holdings(client):

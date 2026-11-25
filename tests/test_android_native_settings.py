@@ -41,6 +41,12 @@ def test_logout_unregisters_push_before_ending_session():
     assert "HomeCache(this).clear()" in fin and "NativeSession.clearLocal()" in fin
 
 
+def test_salary_row_never_tells_if_one_is_saved():
+    src = _read(KT / "SettingsActivity.kt")
+    assert "ثبت نشده" not in src and "hasSalary" not in src
+    assert "hasSalary" not in _read(KT / "settings" / "SettingsModel.kt")
+
+
 def test_no_recovery_code_row():
     assert "کد بازیابی" not in _read(KT / "SettingsActivity.kt")
 

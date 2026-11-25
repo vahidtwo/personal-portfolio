@@ -205,6 +205,11 @@ def category_name_key(name: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
+def merchant_name_key(name: str | None) -> str:
+    """Normalized key for SMS merchant memory (same normalization as category_name_key, capped at 80 chars)."""
+    return category_name_key(name)[:80]
+
+
 class DailySpend(Base):
     """One-off daily spend in toman. Not part of portfolio value or مانده."""
 
@@ -216,9 +221,29 @@ class DailySpend(Base):
     amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     spent_on: Mapped[date] = mapped_column(Date, index=True)
     note: Mapped[str] = mapped_column(String(120), default="")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    category_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="daily_spends")
+    category: Mapped[SpendCategory] = relationship()
+
+
+class SpendMerchantCategory(Base):
+    """Per-user merchant-to-category memory for incoming SMS spends."""
+
+    __tablename__ = "spend_merchant_categories"
+    __table_args__ = (UniqueConstraint("user_id", "merchant_key", name="uq_spend_merchant_user_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    merchant_key: Mapped[str] = mapped_column(String(80))
+    merchant_label: Mapped[str] = mapped_column(String(80))
+    category_id: Mapped[int] = mapped_column(ForeignKey("spend_categories.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship()
     category: Mapped[SpendCategory] = relationship()
 
 

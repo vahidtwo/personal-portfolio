@@ -177,6 +177,8 @@ async def api_spends(request: Request, db: Session = Depends(get_db)):
                 "amount_label": row["amount_label"],
                 "note": row["note_display"],
                 "from_sms": bool(row["from_sms"]),
+                "is_sms_bank": bool(row["is_sms_bank"]),
+                "category_source": row["category_source"],
             } for row in group["rows"]],
         })
     top = [{"name": s["label"], "parent_id": s["parent_id"], "color": s.get("color"), "share": s["share"], "share_label": s["share_label"],

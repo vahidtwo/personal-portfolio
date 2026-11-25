@@ -79,6 +79,18 @@ object NativeSession {
         return r
     }
 
+    /** DELETE with the session-bound CSRF token; a stale token (400) is refreshed once. */
+    @Throws(IOException::class)
+    fun delete(path: String, timeoutMs: Int = TIMEOUT_MS): Response {
+        if (csrf == null) refreshCsrf()
+        var r = request("DELETE", path, null, withCsrf = true, timeoutMs = timeoutMs)
+        if (r.status == 400 && r.json.optString("result").isEmpty()) {
+            refreshCsrf()
+            r = request("DELETE", path, null, withCsrf = true, timeoutMs = timeoutMs)
+        }
+        return r
+    }
+
     /** Drop the session from the WebView cookie store too (server cookies may already be gone). */
     fun clearLocal() {
         csrf = null

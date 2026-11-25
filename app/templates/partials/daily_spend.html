@@ -6,7 +6,7 @@
 <script src="/static/sms-offer.js?v={{ static_v }}" defer></script>
 {% set qs = "/dashboard?tab=daily&jy=" ~ daily_year ~ "&jm=" ~ daily_month %}
 {% set e = spend_errors %}
-<div class="sp-page" data-sp-page{% if e or editing_spend_id or spend_open_add %} data-sp-open{% endif %}>
+<div class="sp-page" data-sp-page{% if e or editing_spend_id or spend_open_add %} data-sp-open{% endif %}{% if editing_spend_id %} data-sp-editing="1"{% endif %}>
 <section class="card sp-sum" aria-labelledby="sp-h" data-sp-sum>
   <h1 id="sp-h">خرج‌ها</h1>
   <div class="sp-mnav">
@@ -45,14 +45,14 @@
       <div class="sp-dayh"><b>{{ g.label }}</b><span><span class="num mask-sm" data-mask="portfolio" data-amount>{{ amt("day-" ~ g.label, g.total_label) }}</span> تومان</span></div>
       <ul class="sp-rows">
         {% for row in g.rows %}
-        <li class="sp-row" data-sp-row="{{ row.id }}" data-sp-name="{{ row.name }}" data-sp-note="{{ row.note_display }}" data-sp-rel="{{ row.rel_label }}">
+        <li class="sp-row{% if row.is_sms_bank %} p6-has-q{% endif %}" data-sp-row="{{ row.id }}" data-sp-name="{{ row.name }}" data-sp-note="{{ row.note_display }}" data-sp-rel="{{ row.rel_label }}" data-sp-parent-id="{{ row.parent_id }}" data-sp-category-id="{{ row.category_id }}" data-sp-from-sms="{{ '1' if row.from_sms else '0' }}" data-sp-sms-bank="{{ '1' if row.is_sms_bank else '0' }}" data-sp-merchant="{{ row.merchant_label }}" data-sp-source="{{ row.category_source or '' }}">
           <span class="sp-ic" style="background:{{ row.color }}" aria-hidden="true">{{ row.initial }}</span>
-          <span class="t"><b>{{ row.name }}</b><small>{% if row.from_sms %}<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>{% endif %}{{ row.parent_name }}{% if row.note_display %}، {{ row.note_display }}{% endif %}</small></span>
-          <span class="a"><span class="num mask-sm" data-mask="portfolio" data-amount>{{ amt("spend-" ~ row.id, row.amount_label) }}</span><small>تومان</small></span>
+          <span class="t"><b>{{ row.name }}</b><small>{% if row.from_sms %}<span class="tag tag-sms sp-tag" title="ثبت خودکار از پیامک">از پیامک</span>{% endif %}{% if row.category_source == "learned" %}<span class="p6-learned">دستهٔ یادگرفته</span>{% endif %}{{ row.parent_name }}{% if row.note_display %}، {{ row.note_display }}{% endif %}</small>{% if row.is_sms_bank %}<button type="button" class="p6-catq" aria-haspopup="dialog" aria-label="انتخاب دسته برای خرج {{ row.note_display or row.name }}" data-sp-catq>دسته؟</button>{% endif %}</span>
+          <span class="a"><span class="num mask-sm" dir="ltr" style="unicode-bidi:isolate" data-mask="portfolio" data-amount>{{ amt("spend-" ~ row.id, row.amount_label) }}</span><small>تومان</small></span>
           <button type="button" class="sp-dots" aria-haspopup="menu" aria-expanded="false" aria-label="گزینه‌های خرج {{ row.name }}، {{ row.rel_label }}" data-sp-dots><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button>
           <div class="sp-menu" role="menu" hidden>
             <a role="menuitem" href="{{ qs }}&page={{ daily_page }}&edit_spend={{ row.id }}" data-sp-edit>ویرایش</a>
-            <button type="button" role="menuitem" class="d" data-sp-del>حذف…</button>
+            <button type="button" role="menuitem" class="d" data-sp-del>حذف</button>
           </div>
           <noscript><a href="{{ qs }}&page={{ daily_page }}&edit_spend={{ row.id }}">ویرایش</a></noscript>
         </li>
@@ -95,11 +95,11 @@
       <span class="sp-amt"><input id="sp-amount_toman" name="amount_toman" value="{{ spend_form.amount_toman }}" inputmode="numeric" dir="ltr" data-thousands data-amount-suggest required{% if editing_spend_id and spend_orig_amount %} data-sp-orig="{{ spend_orig_amount }}"{% endif %} aria-describedby="err-amount_toman"{% if e.amount_toman %} aria-invalid="true"{% endif %}><span class="u" aria-hidden="true">تومان</span></span>
       <span class="sp-err" id="err-amount_toman" data-sp-err>{{ e.amount_toman or "" }}</span>
     </label>
-    <div class="span-2 sp-cats">
+    <div class="span-2 sp-cats{% if e.category_id %} sp-invalid{% endif %}">
       <span class="sp-flabel" id="sp-pl">دسته</span>
-      <div class="sp-chips" role="group" aria-labelledby="sp-pl" data-sp-pchips></div>
-      <span class="sp-flabel" id="sp-cl">زیردسته</span>
-      <div class="sp-chips" role="group" aria-labelledby="sp-cl" data-sp-cchips></div>
+      <div class="sp-chips{% if e.category_id and not spend_form.parent_id %} p6-err{% endif %}" role="group" aria-labelledby="sp-pl" data-sp-pchips></div>
+      <span class="sp-flabel" id="sp-cl"{% if not spend_form.parent_id %} hidden{% endif %}>زیردسته</span>
+      <div class="sp-chips{% if e.category_id and spend_form.parent_id %} p6-err{% endif %}" role="group" aria-labelledby="sp-cl" data-sp-cchips{% if not spend_form.parent_id %} hidden{% endif %}></div>
     </div>
     <label class="sp-sel">
       <span class="label-text">دسته</span>
@@ -107,6 +107,7 @@
         {% for parent in daily_parents %}
         <option value="{{ parent.id }}" data-color="{{ parent.color }}" data-slug="{{ parent.slug }}" {% if spend_form.parent_id|string == parent.id|string %}selected{% endif %}>{{ parent.name }}</option>
         {% endfor %}
+        <option value="" {% if not spend_form.parent_id %}selected{% endif %}>انتخاب دسته…</option>
       </select>
     </label>
     <label class="sp-sel{% if e.category_id %} sp-invalid{% endif %}">
@@ -115,6 +116,7 @@
         {% for child in daily_children %}
         <option value="{{ child.id }}" data-parent="{{ child.parent_id }}" {% if spend_form.category_id|string == child.id|string %}selected{% endif %}>{{ child.name }}</option>
         {% endfor %}
+        <option value="" {% if not spend_form.category_id %}selected{% endif %}>انتخاب زیردسته…</option>
       </select>
     </label>
     <span class="sp-err span-2" id="sp-category_id" data-sp-err>{{ e.category_id or "" }}</span>

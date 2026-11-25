@@ -184,6 +184,16 @@ async def nightly_worker() -> None:
             made = await asyncio.to_thread(run_backup_locked)
             if made is not None:
                 logger.info("Nightly backup done: %s", ", ".join(p.name for p in made))
+                try:
+                    from app.db import SessionLocal
+                    from app.spends import cleanup_deleted_spends
+
+                    with SessionLocal() as db:
+                        removed = cleanup_deleted_spends(db)
+                    if removed:
+                        logger.info("Nightly spend cleanup removed %s expired rows", removed)
+                except Exception:
+                    logger.exception("Nightly spend cleanup failed")
         except Exception:
             logger.exception("Nightly backup failed")
 

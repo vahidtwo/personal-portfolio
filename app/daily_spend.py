@@ -204,7 +204,7 @@ def month_chart(db: Session, user: User, year: int, month: int) -> tuple[list[di
     start, end = jalali_month_bounds(year, month)
     spends = (
         db.query(DailySpend)
-        .filter(DailySpend.user_id == user.id, DailySpend.spent_on >= start, DailySpend.spent_on < end)
+        .filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None), DailySpend.spent_on >= start, DailySpend.spent_on < end)
         .all()
     )
     parents, children = categories_for_user(db, user)

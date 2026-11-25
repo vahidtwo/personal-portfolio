@@ -133,6 +133,20 @@
     </form>
   </section>
 
+  <section class="v2-card" id="learned-merchants" aria-labelledby="v2-learned" data-csrf="{{ csrf }}">
+    <h2 id="v2-learned">فروشگاه‌های یادگرفته</h2>
+    <p class="v2-desc">خرج‌های پیامکی تازه از این فروشگاه‌ها خودکار در همین دسته ثبت می‌شوند. حذف، خرج‌های قبلی را عوض نمی‌کند.</p>
+    {% if learned_merchants %}
+    <ul class="p6-learnlist" data-learned-list>
+      {% for m in learned_merchants %}
+      <li data-learned-id="{{ m.id }}"><span><b>{{ m.merchant_label }}</b><small>{{ m.parent_name }} › {{ m.category_name }}</small></span><button type="button" class="btn btn-ghost" data-learned-del="{{ m.id }}" aria-label="حذف «{{ m.merchant_label }}» از فروشگاه‌های یادگرفته">حذف</button></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="v2-desc p6-learned-empty" data-learned-empty>هنوز فروشگاهی یاد گرفته نشده. با تیک «همیشه همین دسته» در برگهٔ دسته اضافه می‌شود.</p>
+    {% endif %}
+  </section>
+
   <section class="v2-card settings-rows" aria-labelledby="v2-app" id="settings-account-actions">
     <h2 id="v2-app">اپ و اتصال‌ها</h2>
     <div class="v2-rows">

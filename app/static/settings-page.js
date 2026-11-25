@@ -206,6 +206,54 @@
       send();
     });
   });
+  /* ---- learned merchants (remove only) ---- */
+  const learnedCard = $("#learned-merchants", page);
+  if (learnedCard) {
+    const csrf = learnedCard.getAttribute("data-csrf") || "";
+    function showLearnedWarn() {
+      $$(".p6-toast").forEach((n) => n.remove());
+      const t = document.createElement("div");
+      t.className = "p6-toast warn";
+      t.setAttribute("role", "alert");
+      t.setAttribute("aria-live", "polite");
+      const sp = document.createElement("span");
+      sp.textContent = "ذخیره نشد؛ دوباره بزنید";
+      t.append(sp);
+      document.body.append(t);
+      setTimeout(() => t.remove(), 5000);
+    }
+    learnedCard.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-learned-del]");
+      if (!btn || btn.disabled) return;
+      const id = btn.getAttribute("data-learned-del");
+      const li = btn.closest("[data-learned-id]");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/merchant-categories/" + id, {
+          method: "DELETE",
+          credentials: "same-origin",
+          headers: { Accept: "application/json", "X-CSRF-Token": csrf },
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        if (!data || !data.ok) throw new Error("fail");
+        const list = $("[data-learned-list]", learnedCard);
+        if (li) li.remove();
+        if (list && !list.children.length) {
+          list.remove();
+          const empty = document.createElement("p");
+          empty.className = "v2-desc p6-learned-empty";
+          empty.setAttribute("data-learned-empty", "");
+          empty.textContent = "هنوز فروشگاهی یاد گرفته نشده. با تیک «همیشه همین دسته» در برگهٔ دسته اضافه می‌شود.";
+          learnedCard.append(empty);
+        }
+      } catch (_e) {
+        btn.disabled = false;
+        showLearnedWarn();
+      }
+    });
+  }
+
   const summary = $("[data-v2-summary]", page);
   if (summary) summary.focus();
 })();

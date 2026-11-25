@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows, page_context_for_get
+from app.spends import learned_merchant_rows
 from app.expenses import expense_form_for_request
 from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
@@ -116,6 +117,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         account_error=None,
         account_errors={},
         has_salary=Decimal(user.salary_toman or 0) > 0,
+        learned_merchants=learned_merchant_rows(db, user),
         **expense_form_for_request(db, user, request),
     )
 

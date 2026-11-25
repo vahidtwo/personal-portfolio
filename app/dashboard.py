@@ -433,7 +433,7 @@ def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:
         (
             Decimal(row.amount_toman)
             for row in db.query(DailySpend)
-            .filter(DailySpend.user_id == user.id, DailySpend.spent_on == today_g)
+            .filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None), DailySpend.spent_on == today_g)
             .all()
         ),
         Decimal("0"),

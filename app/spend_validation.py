@@ -13,9 +13,9 @@ AMOUNT_FORMAT = "مبلغ را بدون ممیز بنویسید؛ مثلاً ۱�
 AMOUNT_POSITIVE = "مبلغ باید بیشتر از صفر باشد"
 YEAR_MSG = "سال را چهاررقمی بنویسید"
 MONTH_MSG = "ماه بین ۱ تا ۱۲ است"
-CATEGORY_MSG = "زیردسته را انتخاب کنید"
+CATEGORY_MSG = "دسته را انتخاب کنید"
 FIELD_ORDER = ("amount_toman", "category_id", "year", "month", "day")
-FIELD_SHORT = {"amount_toman": "مبلغ", "category_id": "زیردسته", "year": "سال", "month": "ماه", "day": "روز"}
+FIELD_SHORT = {"amount_toman": "مبلغ", "category_id": "دسته", "year": "سال", "month": "ماه", "day": "روز"}
 
 
 def day_msg(n: int) -> str:

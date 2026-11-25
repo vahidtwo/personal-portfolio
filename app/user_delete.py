@@ -34,6 +34,7 @@ KNOWN_LABELS: dict[str, str] = {
     "debts": "بدهی/قسط",
     "monthly_expenses": "هزینه ماهانه",
     "daily_spends": "خرج روزانه",
+    "spend_merchant_categories": "فروشگاه یادگرفته",
     "push_device_tokens": "توکن اعلان",
     "spend_categories_custom": "دسته‌بندی شخصی",
     "spend_categories_seed": "دسته‌بندی پیش‌فرض",

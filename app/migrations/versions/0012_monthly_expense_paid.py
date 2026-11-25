@@ -3,13 +3,13 @@
 No backfill: existing rows stay NULL and show as unpaid for the current Jalali month.
 Idempotent: skips any column that already exists.
 
-Revision ID: 0011_monthly_expense_paid
+Revision ID: 0012_monthly_expense_paid
 Revises: 0010_debt_last_paid_on
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
-revision = "0011_monthly_expense_paid"
+revision = "0012_monthly_expense_paid"
 down_revision = "0010_debt_last_paid_on"
 branch_labels = None
 depends_on = None

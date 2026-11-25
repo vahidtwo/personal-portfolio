@@ -231,7 +231,7 @@ def test_migration_0011_upgrade_and_downgrade(tmp_path):
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "app/migrations"))
 
     heads = ScriptDirectory.from_config(cfg).get_heads()
-    assert heads == ["0011_monthly_expense_paid"]
+    assert heads == ["0012_monthly_expense_paid"]
 
     engine = create_engine(url)
     with engine.begin() as conn:

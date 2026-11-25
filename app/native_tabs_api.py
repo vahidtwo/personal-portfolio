@@ -18,9 +18,9 @@ from app.assets_page import assets_context
 from app.category_style import group_badge
 from app.daily_spend import _color_for, categories_for_user, ensure_spend_categories, picker_categories
 from app.db import get_db
-from app.debts import debt_rows, expense_rows
+from app.debts import debt_rows, expense_rows, expense_unpaid_total
 from app.firebase_push import device_counts, firebase_admin_ready
-from app.formatting import format_toman, format_when
+from app.formatting import format_toman, format_when, tehran_today
 from app.models import Debt, MonthlyExpense
 from app.number_input import to_latin_digits
 from app.security import get_authenticated_user
@@ -254,6 +254,8 @@ def _expense_json(row: dict) -> dict:
         "due_day": int(row["due_day"]),
         "day_label": row["day_label"],
         "next_label": row["next_label"],
+        "paid_this_month": row["paid_this_month"],
+        "overdue": row["overdue"],
     }
 
 
@@ -291,9 +293,17 @@ async def api_expenses(request: Request, db: Session = Depends(get_db)):
     user = get_authenticated_user(request, db)
     if user is None:
         return _login_required()
+    today = tehran_today()
     items = db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
     total = sum((Decimal(i.amount_toman) for i in items), Decimal("0"))
-    return _json({"total_label": format_toman(total), "expenses": [_expense_json(r) for r in expense_rows(items)]})
+    unpaid = expense_unpaid_total(items, today)
+    rows = expense_rows(items, today)
+    return _json({
+        "total_label": format_toman(total),
+        "unpaid_this_month_label": format_toman(unpaid),
+        "all_paid": bool(rows) and all(r["paid_this_month"] for r in rows),
+        "expenses": [_expense_json(r) for r in rows],
+    })
 
 
 @router.get("/settings")

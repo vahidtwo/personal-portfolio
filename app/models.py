@@ -166,6 +166,9 @@ class MonthlyExpense(Base):
     title: Mapped[str] = mapped_column(String(64), default="")
     amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     due_day: Mapped[int] = mapped_column()
+    # Jalali (year, month) in Asia/Tehran when marked paid for that month; NULL = unpaid.
+    paid_jy: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    paid_jm: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="monthly_expenses")

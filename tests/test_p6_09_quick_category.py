@@ -73,9 +73,9 @@ def _api_spends_rows(client):
     return [r for g in res.json()["groups"] for r in g["rows"]]
 
 
-def test_0011_migration_upgrade_downgrade_on_copy(tmp_path):
+def test_0014_migration_upgrade_downgrade_on_copy(tmp_path):
     db_path = tmp_path / "copy.db"
-    _alembic(db_path, "upgrade", "0010_debt_last_paid_on")
+    _alembic(db_path, "upgrade", "0012_monthly_expense_paid")
 
     c = sqlite3.connect(db_path)
     _insert(c, "users", id=1, username="fake_u1")
@@ -87,7 +87,7 @@ def test_0011_migration_upgrade_downgrade_on_copy(tmp_path):
     copy_path = tmp_path / "copied.db"
     shutil.copy2(db_path, copy_path)
 
-    _alembic(copy_path, "upgrade", "0011_spend_category_memory")
+    _alembic(copy_path, "upgrade", "0014_spend_category_memory")
     c2 = sqlite3.connect(copy_path)
     tables = {r[0] for r in c2.execute("select name from sqlite_master where type='table'")}
     assert "spend_merchant_categories" in tables
@@ -96,21 +96,21 @@ def test_0011_migration_upgrade_downgrade_on_copy(tmp_path):
     assert c2.execute("select amount_toman, deleted_at, category_source from daily_spends where id=1").fetchone() == (150000, None, None)
 
     # Idempotent re-run
-    _alembic(copy_path, "stamp", "0010_debt_last_paid_on")
-    _alembic(copy_path, "upgrade", "0011_spend_category_memory")
+    _alembic(copy_path, "stamp", "0012_monthly_expense_paid")
+    _alembic(copy_path, "upgrade", "0014_spend_category_memory")
 
     # Downgrade refuses while soft-deleted rows remain
     c2.execute("update daily_spends set deleted_at = '2026-11-02 00:00:00' where id = 1")
     c2.commit()
     c2.close()
     with pytest.raises(subprocess.CalledProcessError):
-        _alembic(copy_path, "downgrade", "0010_debt_last_paid_on")
+        _alembic(copy_path, "downgrade", "0012_monthly_expense_paid")
 
     c3 = sqlite3.connect(copy_path)
     c3.execute("update daily_spends set deleted_at = NULL where id = 1")
     c3.commit()
     c3.close()
-    _alembic(copy_path, "downgrade", "0010_debt_last_paid_on")
+    _alembic(copy_path, "downgrade", "0012_monthly_expense_paid")
 
     c4 = sqlite3.connect(copy_path)
     tables_after = {r[0] for r in c4.execute("select name from sqlite_master where type='table'")}

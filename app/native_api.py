@@ -22,7 +22,7 @@ from app.config import PRICE_MANUAL_REFRESH_MINUTES
 from app.debts import debt_rows
 from app.formatting import format_toman, format_usd, format_share_label, format_qty, persian_digits, tehran_today
 from app.models import Debt, PortfolioSnapshot, User, utcnow
-from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices
+from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices, unit_price_parts
 from app.security import (
     attach_session_cookie_deletion,
     csrf_token,
@@ -243,6 +243,7 @@ async def api_home(request: Request, db: Session = Depends(get_db)):
             "quantity_label": qty, "unit_fa": "دلار" if row.key == "usd" else row.unit_fa,
             "value_label": format_toman(row.value_toman), "share_label": format_share_label(share),
             "share": float(share), "chip": chip, "has_price": row.unit_price is not None,
+            "unit_price": unit_price_parts(row.key, row.unit_price),
             "spark": {"points": trends.get(row.key, []), "kind": spark["kind"], "label": spark["label"]} if spark else None,
         })
     if usd_price is not None and usd_price > 0:

@@ -67,11 +67,9 @@
   }
   var inputs = $$("[data-asset-input]", form);
   inputs.forEach(function (input) {
-    // validate on blur and on submit, never per keystroke; clear as soon as the value is valid again
+    // validate while typing, on blur and on submit; clear as soon as the value is valid again
     input.addEventListener("blur", function () { check(input); });
-    input.addEventListener("input", function () {
-      if (rowOf(input).classList.contains("v2-invalid") && !reason(input.value, maxDec(input))) setError(input, null);
-    });
+    input.addEventListener("input", function () { check(input); });
   });
 
   var banners = $("[data-v2-banners]", form);
@@ -247,7 +245,7 @@
     q.addEventListener("input", function () {
       var t = NF.normalize(q.value);
       if (t !== null && price) worth.textContent = money(Number(t || 0) * price);
-      if (document.getElementById("v2-qe") && !reason(q.value, max)) showErr(null);
+      showErr(reason(q.value, max));
     });
     q.addEventListener("blur", function (e) {
       if (e.relatedTarget && e.relatedTarget.hasAttribute("data-v2-close")) return;

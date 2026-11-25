@@ -741,7 +741,12 @@
       var box = document.createElement("div"); box.className = "sp-skel-rows"; box.setAttribute("aria-hidden", "true");
       for (var i = 0; i < 5; i++) box.innerHTML += '<div class="sp-row"><i class="v2-skel" style="width:36px;height:36px;border-radius:50%"></i><span><i class="v2-skel" style="width:60%;height:14px"></i><i class="v2-skel" style="width:40%;height:12px;margin-top:8px"></i></span><i class="v2-skel" style="width:70px;height:16px"></i><span></span></div>';
       list.appendChild(box);
-      if (withSummary && sum) $$(".sp-tile b", sum).forEach(function (b) { b.innerHTML = '<i class="v2-skel" style="width:72px;height:18px;display:inline-block"></i>'; });
+      if (withSummary && sum) {
+        $$(".sp-tile b", sum).forEach(function (b) { b.innerHTML = '<i class="v2-skel" style="width:110px;height:22px;margin-top:6px"></i>'; });
+        $$(".sp-bars li", sum).forEach(function (li) { li.innerHTML = '<i class="v2-skel" style="width:40%;height:14px"></i><i></i><i class="v2-skel bar" style="height:8px"></i>'; li.setAttribute("aria-hidden", "true"); });
+        $$(".sp-tile small, [data-sp-rest-toggle]", sum).forEach(function (el) { el.hidden = true; });
+        sum.setAttribute("aria-busy", "true");
+      }
     }
     function bindMore(root) {
       var m = $("[data-sp-more]", root);
@@ -760,5 +765,6 @@
       });
     }
     bindMore(document); bindMonth(document);
+    window.__spLoad = loadInto;
   });
 })();

@@ -3017,7 +3017,6 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 .move-notice p { margin: 0 0 10px; color: var(--text-muted); }
 .move-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 html .stat.stat-usd .mc[hidden],.mc[hidden]{display:none}
-<<<<<<< HEAD
 
 /* ---- Phase 6 item 9: quick category, merchant memory, delete undo & narrow-screen money fixes ---- */
 .p6-toast{position:fixed;z-index:95;inset-inline:16px;bottom:calc(var(--main-nav-h,56px) + env(safe-area-inset-bottom) + 12px);
@@ -3082,10 +3081,8 @@ html .stat.stat-usd .mc[hidden],.mc[hidden]{display:none}
 .sp-tile b{display:inline-block}
 @media (max-width:340px){.sp-row{grid-template-columns:36px minmax(0,1fr) 44px;grid-template-areas:"ic t dots" "ic a dots";row-gap:2px}
   .sp-row .sp-ic{grid-area:ic;align-self:start;margin-top:4px}.sp-row .t{grid-area:t}.sp-row .a{grid-area:a;margin-top:0!important}.sp-row .sp-dots{grid-area:dots}}
-=======
 .arow-price { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .arow-price bdi { white-space: nowrap; }
 .acard-price .up-v, .arow-price .up-v { white-space: nowrap; }
 .acard-price { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
 .acard-price bdi { white-space: nowrap; }
->>>>>>> origin/main

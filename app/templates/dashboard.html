@@ -263,7 +263,7 @@
     <p class="card-desc">مانده = حقوق − جمع اقساط این ماه − هزینهٔ ماهانه. روی ارزش پرتفوی اثری ندارد.</p>
   </div>
   <dl class="net-line">
-    <div><dt>اقساط باقی‌مانده</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-left", installment_month_label) }}</bdi> تومان{% if installment_overdue_label %}<small class="muted" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", installment_overdue_label) }}</bdi> تومان</small>{% endif %}</dd></div>
+    <div><dt>اقساط باقی‌مانده</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-left", installment_month_label) }}</bdi>&nbsp;تومان{% if installment_overdue_label %} <small class="muted" data-installment-overdue>شامل عقب‌افتاده: <bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("installments-overdue", installment_overdue_label) }}</bdi>&nbsp;تومان</small>{% endif %}</dd></div>
     <div><dt>جمع اقساط این ماه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount data-month-total>{{ amt("installments-month", month_total_label) }}</bdi> تومان</dd></div>
     <div><dt>هزینهٔ ماهانه</dt><dd class="num"><bdi dir="ltr" class="mask-sm" data-mask="portfolio" data-amount>{{ amt("fixed-monthly", expense_month_label) }}</bdi> تومان</dd></div>
     <div><dt>مانده</dt><dd class="num salary-amount"><bdi dir="ltr" data-salary-field="left">••••••</bdi> تومان</dd></div>

@@ -181,7 +181,7 @@ def test_settings_json(client):
     _register(client)
     data = client.get("/api/settings").json()
     assert data["account"]["username"] == "alice"
-    assert data["has_salary"] is False and data["car_connected"] is False
+    assert "has_salary" not in data and data["car_connected"] is False
     assert set(data["push"]) == {"server", "devices"}
 
 

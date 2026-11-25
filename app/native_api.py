@@ -24,6 +24,8 @@ from app.formatting import format_toman, format_usd, format_share_label, format_
 from app.models import Debt, PortfolioSnapshot, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, build_portfolio, load_prices, unit_price_parts
 from app.security import (
+    SESSION_PW_KEY,
+    password_stamp,
     attach_session_cookie_deletion,
     csrf_token,
     get_authenticated_user,
@@ -118,6 +120,7 @@ async def api_continue(request: Request, db: Session = Depends(get_db)):
         user.last_login_at = utcnow()
         db.commit()
         request.session["user_id"] = user.id
+        request.session[SESSION_PW_KEY] = password_stamp(user)
         return _result("ok", username=user.username)
     verify_password(password, ua._DUMMY_HASH)
     if validate_password(password):
@@ -161,6 +164,7 @@ async def api_create(request: Request, db: Session = Depends(get_db)):
     rate_limit.record(ip_key, rate_limit.REGISTER_WINDOW_SECONDS)
     request.session.pop(ua.PENDING_KEY, None)
     request.session["user_id"] = user.id
+    request.session[SESSION_PW_KEY] = password_stamp(user)
     return _result("ok", username=user.username)
 
 

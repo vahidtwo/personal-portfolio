@@ -134,7 +134,11 @@
     <span><span id="chart-change-label">این ماه</span> <b id="chart-change" class="chg-text mask-sm" data-mask="portfolio" data-amount></b></span>
   </div>
   <p class="chart-fs-hint">برای بزرگ‌نمایی دو انگشت را باز کنید یا چرخ ماوس را بچرخانید، برای جابه‌جایی بکشید و برای دیدن مقدار هر نقطه، روی نمودار نگه دارید.</p>
+  {% if chart_no_prices %}
+  <p class="chart-empty" id="chart-empty" data-empty="no-prices" hidden>{{ chart_no_prices_fa }}</p>
+  {% else %}
   <p class="chart-empty" id="chart-empty" hidden>هنوز تاریخچه‌ای برای نمودار نیست. بعد از ثبت دارایی، هر ساعت یک نقطه به نمودار اضافه می‌شود. <a href="/assets">افزودن دارایی</a></p>
+  {% endif %}
 </section>
 
 <section class="dash-assets" aria-labelledby="table-heading">

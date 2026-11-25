@@ -151,9 +151,38 @@ class Debt(Base):
     reminder_days_before: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     # Tehran calendar date of the last «پرداخت شد». NULL until that action runs on this row.
     last_paid_on: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    # Soft delete timestamp (UTC); NULL = visible loan, non-NULL = hidden while preserving payment history.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="debts")
+    payments: Mapped[list["DebtPayment"]] = relationship(
+        back_populates="debt",
+        order_by="DebtPayment.id.desc()",
+    )
+
+
+class DebtPayment(Base):
+    """History row for one «پرداخت شد» tap on a loan. Preserved on loan soft-delete (no CASCADE)."""
+
+    __tablename__ = "debt_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    paid_on: Mapped[date] = mapped_column(Date)
+    amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    kind: Mapped[str] = mapped_column(String(16), default="full")
+    period_jy: Mapped[int] = mapped_column(Integer)
+    period_jm: Mapped[int] = mapped_column(Integer)
+    before_months_left: Mapped[int] = mapped_column(Integer)
+    before_due_year: Mapped[int] = mapped_column(Integer)
+    before_due_month: Mapped[int] = mapped_column(Integer)
+    before_due_day: Mapped[int] = mapped_column(Integer)
+    before_last_paid_on: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    debt: Mapped[Debt] = relationship(back_populates="payments")
 
 
 class MonthlyExpense(Base):
@@ -210,6 +239,11 @@ def category_name_key(name: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
+def merchant_name_key(name: str | None) -> str:
+    """Normalized key for SMS merchant memory (same normalization as category_name_key, capped at 80 chars)."""
+    return category_name_key(name)[:80]
+
+
 class DailySpend(Base):
     """One-off daily spend in toman. Not part of portfolio value or مانده."""
 
@@ -221,9 +255,29 @@ class DailySpend(Base):
     amount_toman: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     spent_on: Mapped[date] = mapped_column(Date, index=True)
     note: Mapped[str] = mapped_column(String(120), default="")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    category_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped[User] = relationship(back_populates="daily_spends")
+    category: Mapped[SpendCategory] = relationship()
+
+
+class SpendMerchantCategory(Base):
+    """Per-user merchant-to-category memory for incoming SMS spends."""
+
+    __tablename__ = "spend_merchant_categories"
+    __table_args__ = (UniqueConstraint("user_id", "merchant_key", name="uq_spend_merchant_user_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    merchant_key: Mapped[str] = mapped_column(String(80))
+    merchant_label: Mapped[str] = mapped_column(String(80))
+    category_id: Mapped[int] = mapped_column(ForeignKey("spend_categories.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship()
     category: Mapped[SpendCategory] = relationship()
 
 

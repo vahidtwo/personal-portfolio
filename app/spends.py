@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import jdatetime
@@ -25,7 +25,7 @@ from app.daily_spend import (
 from app.category_style import group_badge
 from app.db import get_db
 from app.formatting import tehran_today, format_amount_input, format_jalali_date, format_toman, parse_jalali_parts, persian_digits
-from app.models import DailySpend, SpendCategory, User
+from app.models import DailySpend, SpendCategory, SpendMerchantCategory, User, merchant_name_key, utcnow
 from app.number_input import parse_int_required
 from app.spend_validation import CATEGORY_MSG, FIELD_ORDER, FIELD_SHORT, summary_fa, validate_spend
 from app.security import get_authenticated_user, parse_decimal, redirect_to_login, require_csrf
@@ -155,11 +155,80 @@ def commission_category(db: Session, user: User | None = None) -> SpendCategory:
     return row
 
 
+def sms_spend_category_with_source(
+    db: Session, user: User | None, amount_toman, raw_note: str = ""
+) -> tuple[SpendCategory | None, str | None]:
+    """Category and category_source for a new SMS spend.
+
+    Commission (< 50,000 toman) always wins over merchant memory; otherwise use learned
+    merchant memory if present for this user, else fall back to «بانک» (sms_bank).
+    """
+    if is_sms_commission(amount_toman):
+        return commission_category(db, user), None
+    if user is not None and raw_note:
+        merchant = _sms_merchant(raw_note)
+        m_key = merchant_name_key(merchant)
+        if m_key:
+            mem = (
+                db.query(SpendMerchantCategory)
+                .filter(SpendMerchantCategory.user_id == user.id, SpendMerchantCategory.merchant_key == m_key)
+                .one_or_none()
+            )
+            if mem is not None:
+                cat = db.get(SpendCategory, mem.category_id)
+                if cat is not None and cat.parent_id is not None and not cat.archived:
+                    parent = db.get(SpendCategory, cat.parent_id)
+                    if parent is not None and not parent.archived:
+                        return cat, "learned"
+    return db.query(SpendCategory).filter(SpendCategory.slug == "sms_bank").one_or_none(), None
+
+
 def sms_spend_category(db: Session, user: User | None, amount_toman) -> SpendCategory | None:
     """Category for a new SMS spend: «کارمزد» below the limit, otherwise «بانک»."""
-    if is_sms_commission(amount_toman):
-        return commission_category(db, user)
-    return db.query(SpendCategory).filter(SpendCategory.slug == "sms_bank").one_or_none()
+    cat, _source = sms_spend_category_with_source(db, user, amount_toman)
+    return cat
+
+
+SOFT_DELETE_TTL_HOURS = 24
+_NO_STORE = {"Cache-Control": "no-store, private", "Pragma": "no-cache", "Vary": "Cookie"}
+
+
+def cleanup_deleted_spends(db: Session, now: datetime | None = None) -> int:
+    """Hard-delete spends whose soft-delete timestamp is older than 24 hours."""
+    cutoff = (now or utcnow()) - timedelta(hours=SOFT_DELETE_TTL_HOURS)
+    removed = (
+        db.query(DailySpend)
+        .filter(DailySpend.deleted_at.isnot(None), DailySpend.deleted_at <= cutoff)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return int(removed or 0)
+
+
+def learned_merchant_rows(db: Session, user: User) -> list[dict]:
+    """Return learned merchant -> category pairs for settings (newest updated first)."""
+    ensure_spend_categories(db, user)
+    rows = (
+        db.query(SpendMerchantCategory)
+        .filter(SpendMerchantCategory.user_id == user.id)
+        .order_by(SpendMerchantCategory.updated_at.desc(), SpendMerchantCategory.id.desc())
+        .all()
+    )
+    if not rows:
+        return []
+    cats = {c.id: c for c in db.query(SpendCategory).all()}
+    out: list[dict] = []
+    for row in rows:
+        child = cats.get(row.category_id)
+        parent = cats.get(child.parent_id) if child and child.parent_id else None
+        out.append({
+            "id": row.id,
+            "merchant_label": row.merchant_label,
+            "category_id": row.category_id,
+            "category_name": child.name if child else "سایر",
+            "parent_name": parent.name if parent else (child.name if child else "سایر"),
+        })
+    return out
 
 
 def sms_spend_parts(
@@ -224,7 +293,12 @@ def daily_view(
     spend_errors: dict | None = None,
 ) -> dict:
     ensure_spend_categories(db, user)
-    has_any = db.query(DailySpend.id).filter(DailySpend.user_id == user.id).first() is not None
+    has_any = (
+        db.query(DailySpend.id)
+        .filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None))
+        .first()
+        is not None
+    )
     year, month = _viewed_jalali_month(request, jy, jm)
     parents, children = categories_for_user(db, user)
     parent_by_id = {row.id: row for row in parents}
@@ -232,7 +306,12 @@ def daily_view(
     start, end = jalali_month_bounds(year, month)
     spends = (
         db.query(DailySpend)
-        .filter(DailySpend.user_id == user.id, DailySpend.spent_on >= start, DailySpend.spent_on < end)
+        .filter(
+            DailySpend.user_id == user.id,
+            DailySpend.deleted_at.is_(None),
+            DailySpend.spent_on >= start,
+            DailySpend.spent_on < end,
+        )
         .order_by(DailySpend.spent_on.desc(), DailySpend.id.desc())
         .all()
     )
@@ -241,7 +320,7 @@ def daily_view(
         (
             Decimal(row.amount_toman)
             for row in db.query(DailySpend)
-            .filter(DailySpend.user_id == user.id, DailySpend.spent_on == today_g)
+            .filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None), DailySpend.spent_on == today_g)
             .all()
         ),
         Decimal("0"),
@@ -262,6 +341,9 @@ def daily_view(
         spent = jdatetime.date.fromgregorian(date=row.spent_on)
         name = child.name if child else (parent.name if parent else "سایر")
         parent_name = parent.name if parent else name
+        from_sms, note_display = sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)
+        is_sms_bank = bool(from_sms and child is not None and child.slug == "sms_bank")
+        merchant_label = (note_display if from_sms else "")[:80].strip()
         rows.append(
             {
                 "id": row.id,
@@ -276,8 +358,11 @@ def daily_view(
                 "initial": group_badge(parent.icon if parent else None, parent_name),
                 "amount_label": format_toman(Decimal(row.amount_toman)),
                 "note": row.note or "",
-                "from_sms": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[0],
-                "note_display": sms_spend_parts(row.note, child.slug if child else None, child.name if child else None)[1],
+                "from_sms": from_sms,
+                "is_sms_bank": is_sms_bank,
+                "category_source": row.category_source,
+                "merchant_label": merchant_label,
+                "note_display": note_display,
                 "year": spent.year,
                 "month": spent.month,
                 "day": spent.day,
@@ -325,15 +410,13 @@ def daily_view(
     picker_parents, picker_children = picker_categories(parents, children, keep_id)
     if spend_form is None:
         today = tehran_today()
-        first_parent = picker_parents[0].id if picker_parents else ""
-        first_child = next((child.id for child in picker_children if child.parent_id == first_parent), "")
         spend_form = {
             "amount_toman": "",
             "year": str(today.year),
             "month": str(today.month),
             "day": str(today.day),
-            "parent_id": str(first_parent),
-            "category_id": str(first_child),
+            "parent_id": "",
+            "category_id": "",
             "note": "",
         }
     prev_year, prev_month = shift_jalali_month(year, month, -1)
@@ -390,7 +473,7 @@ def _orig_amount(db: Session, user: User, spend_id: int | None) -> str:
     if not spend_id:
         return ""
     row = db.get(DailySpend, spend_id)
-    if row is None or row.user_id != user.id:
+    if row is None or row.user_id != user.id or row.deleted_at is not None:
         return ""
     return format(Decimal(row.amount_toman).normalize(), "f")
 
@@ -429,7 +512,7 @@ def _save_daily_spend(
     current_category_id = None
     if spend_id is not None:
         current = db.get(DailySpend, spend_id)
-        if current is not None and current.user_id == user.id:
+        if current is not None and current.user_id == user.id and current.deleted_at is None:
             existing_amount = Decimal(current.amount_toman)
             current_category_id = current.category_id
     errors, amount, spent = validate_spend(amount_toman, year, month, day, existing_amount)
@@ -470,7 +553,7 @@ def _save_daily_spend(
         flash(request, "خرج روزانه ذخیره شد.")
     else:
         item = db.get(DailySpend, spend_id)
-        if item is None or item.user_id != user.id:
+        if item is None or item.user_id != user.id or item.deleted_at is not None:
             flash(request, "خرج پیدا نشد.", error=True)
             if wants_json:
                 return JSONResponse({"ok": False, "error": "خرج پیدا نشد.", "redirect": "/dashboard?tab=daily"}, status_code=404)
@@ -570,6 +653,22 @@ async def profile_edit_spend(
     )
 
 
+def _wants_json(request: Request) -> bool:
+    return "application/json" in request.headers.get("accept", "")
+
+
+async def _json_body(request: Request) -> dict:
+    try:
+        data = await request.json()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _submitted_csrf(request: Request, body: dict | None = None, form_csrf: str = "") -> str | None:
+    return request.headers.get("x-csrf-token") or (body.get("csrf") if body else None) or form_csrf
+
+
 @router.post("/profile/spends/{spend_id}/delete")
 async def profile_delete_spend(
     spend_id: int,
@@ -580,21 +679,177 @@ async def profile_delete_spend(
     csrf: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    require_csrf(request, csrf)
+    wants_json = _wants_json(request)
+    body = await _json_body(request) if "application/json" in request.headers.get("content-type", "") else {}
+    require_csrf(request, _submitted_csrf(request, body, csrf))
     user = get_authenticated_user(request, db)
     if user is None:
+        if wants_json:
+            return JSONResponse({"ok": False, "error": "login"}, status_code=401, headers=_NO_STORE)
         return redirect_to_login(request)
     item = db.get(DailySpend, spend_id)
-    if item is None or item.user_id != user.id:
+    if item is None or item.user_id != user.id or item.deleted_at is not None:
+        if wants_json:
+            return JSONResponse({"ok": False, "error": "not_found"}, status_code=404, headers=_NO_STORE)
         flash(request, "خرج پیدا نشد.", error=True)
     else:
-        db.delete(item)
+        item.deleted_at = utcnow()
         db.commit()
+        if wants_json:
+            return JSONResponse({"ok": True, "id": item.id}, headers=_NO_STORE)
         flash(request, "خرج روزانه حذف شد.")
     target = f"/dashboard?tab=daily&jy={jy}&jm={jm}"
     if page.isdigit() and int(page) > 1:
         target += f"&page={int(page)}"
     return RedirectResponse(target, status_code=303)
+
+
+@router.post("/profile/spends/{spend_id}/restore")
+async def profile_restore_spend(spend_id: int, request: Request, db: Session = Depends(get_db)):
+    body = await _json_body(request)
+    require_csrf(request, _submitted_csrf(request, body))
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login"}, status_code=401, headers=_NO_STORE)
+    item = db.get(DailySpend, spend_id)
+    if item is None or item.user_id != user.id or item.deleted_at is None:
+        return JSONResponse({"ok": False, "error": "gone"}, status_code=409, headers=_NO_STORE)
+    item.deleted_at = None
+    db.commit()
+    return JSONResponse({"ok": True, "id": item.id}, headers=_NO_STORE)
+
+
+@router.api_route("/profile/spends/{spend_id}/category", methods=["POST", "PATCH"])
+async def profile_spend_category(spend_id: int, request: Request, db: Session = Depends(get_db)):
+    body = await _json_body(request)
+    require_csrf(request, _submitted_csrf(request, body))
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login"}, status_code=401, headers=_NO_STORE)
+    item = db.get(DailySpend, spend_id)
+    if item is None or item.user_id != user.id or item.deleted_at is not None:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404, headers=_NO_STORE)
+
+    raw_cid = body.get("category_id")
+    if not (isinstance(raw_cid, int) or (isinstance(raw_cid, str) and raw_cid.isdigit())):
+        return JSONResponse({"ok": False, "error": "category"}, status_code=422, headers=_NO_STORE)
+    child = db.get(SpendCategory, int(raw_cid))
+    is_undo = bool(body.get("undo")) or ("category_source" in body)
+    if child is None or child.parent_id is None:
+        return JSONResponse({"ok": False, "error": "category"}, status_code=422, headers=_NO_STORE)
+    parent = db.get(SpendCategory, child.parent_id)
+    if parent is None:
+        return JSONResponse({"ok": False, "error": "category"}, status_code=422, headers=_NO_STORE)
+    if not is_undo and (child.archived or parent.archived or parent.slug == "sms"):
+        return JSONResponse({"ok": False, "error": "category"}, status_code=422, headers=_NO_STORE)
+
+    prev_category_id = item.category_id
+    prev_category_source = item.category_source
+
+    item.category_id = child.id
+    if "category_source" in body:
+        src = body.get("category_source")
+        item.category_source = "learned" if src == "learned" else None
+    else:
+        item.category_source = None
+
+    undo_memory_id = None
+    restore_memory_id = None
+    restore_memory_category_id = None
+
+    if bool(body.get("remember_merchant")) and not is_undo:
+        from_sms, note_display = sms_spend_parts(item.note, child.slug, child.name)
+        merchant_label = (note_display if from_sms else "")[:80].strip()
+        m_key = merchant_name_key(merchant_label)
+        if m_key:
+            existing_mem = (
+                db.query(SpendMerchantCategory)
+                .filter(SpendMerchantCategory.user_id == user.id, SpendMerchantCategory.merchant_key == m_key)
+                .one_or_none()
+            )
+            if existing_mem is not None:
+                restore_memory_id = existing_mem.id
+                restore_memory_category_id = existing_mem.category_id
+                existing_mem.category_id = child.id
+                existing_mem.merchant_label = merchant_label
+                existing_mem.updated_at = utcnow()
+            else:
+                mem = SpendMerchantCategory(
+                    user_id=user.id,
+                    merchant_key=m_key,
+                    merchant_label=merchant_label,
+                    category_id=child.id,
+                )
+                db.add(mem)
+                db.flush()
+                undo_memory_id = mem.id
+
+    if is_undo:
+        del_mem_id = body.get("undo_memory_id")
+        if isinstance(del_mem_id, int) or (isinstance(del_mem_id, str) and del_mem_id.isdigit()):
+            mem = db.get(SpendMerchantCategory, int(del_mem_id))
+            if mem is not None and mem.user_id == user.id:
+                db.delete(mem)
+        rest_mem_id = body.get("restore_memory_id")
+        rest_cat_id = body.get("restore_memory_category_id")
+        if (isinstance(rest_mem_id, int) or (isinstance(rest_mem_id, str) and rest_mem_id.isdigit())) and (
+            isinstance(rest_cat_id, int) or (isinstance(rest_cat_id, str) and rest_cat_id.isdigit())
+        ):
+            mem = db.get(SpendMerchantCategory, int(rest_mem_id))
+            old_cat = db.get(SpendCategory, int(rest_cat_id))
+            if mem is not None and mem.user_id == user.id and old_cat is not None and old_cat.parent_id is not None:
+                mem.category_id = old_cat.id
+                mem.updated_at = utcnow()
+
+    db.commit()
+    parents, _ = categories_for_user(db, user)
+    parent_index = {row.id: i for i, row in enumerate(parents)}
+    from_sms, note_display = sms_spend_parts(item.note, child.slug, child.name)
+    return JSONResponse(
+        {
+            "ok": True,
+            "id": item.id,
+            "category_id": child.id,
+            "parent_id": parent.id,
+            "child_name": child.name,
+            "parent_name": parent.name,
+            "color": _color_for(parent, parent_index.get(parent.id, 0)),
+            "initial": group_badge(parent.icon, parent.name),
+            "from_sms": from_sms,
+            "is_sms_bank": bool(from_sms and child.slug == "sms_bank"),
+            "category_source": item.category_source,
+            "note_display": note_display,
+            "prev_category_id": prev_category_id,
+            "prev_category_source": prev_category_source,
+            "undo_memory_id": undo_memory_id,
+            "restore_memory_id": restore_memory_id,
+            "restore_memory_category_id": restore_memory_category_id,
+        },
+        headers=_NO_STORE,
+    )
+
+
+@router.get("/api/merchant-categories")
+async def api_list_merchant_categories(request: Request, db: Session = Depends(get_db)):
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login"}, status_code=401, headers=_NO_STORE)
+    return JSONResponse({"items": learned_merchant_rows(db, user)}, headers=_NO_STORE)
+
+
+@router.delete("/api/merchant-categories/{mem_id}")
+async def api_delete_merchant_category(mem_id: int, request: Request, db: Session = Depends(get_db)):
+    body = await _json_body(request)
+    require_csrf(request, _submitted_csrf(request, body))
+    user = get_authenticated_user(request, db)
+    if user is None:
+        return JSONResponse({"ok": False, "error": "login"}, status_code=401, headers=_NO_STORE)
+    mem = db.get(SpendMerchantCategory, mem_id)
+    if mem is None or mem.user_id != user.id:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404, headers=_NO_STORE)
+    db.delete(mem)
+    db.commit()
+    return JSONResponse({"ok": True, "id": mem_id}, headers=_NO_STORE)
 
 
 SMS_QUEUE_MAX_AGE_DAYS = 7
@@ -640,11 +895,11 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
     idem = str(payload.get("idempotency_key") or "").strip()[:64]
     note = sms_note_for_storage(raw_note, idem)
     ensure_spend_categories(db, user)
-    child = sms_spend_category(db, user, amount)
+    child, category_source = sms_spend_category_with_source(db, user, amount, raw_note)
     if child is None:
         return JSONResponse({"ok": False, "error": "category"}, status_code=500)
     spent_on = sms_spent_on(payload.get("sms_at"), tehran_today().togregorian())
-    duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id)
+    duplicate_query = db.query(DailySpend).filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None))
     if idem:
         duplicate = duplicate_query.filter(func.instr(DailySpend.note, f"[{idem}]") > 0).first()
     else:
@@ -662,6 +917,7 @@ async def api_sms_spend(request: Request, db: Session = Depends(get_db)):
         amount_toman=amount,
         spent_on=spent_on,
         note=note,
+        category_source=category_source,
     )
     db.add(item)
     db.commit()

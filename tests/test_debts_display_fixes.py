@@ -158,7 +158,7 @@ def test_manual_note_digits_shown_as_typed():
 def test_note_is_outside_amount_mask():
     from pathlib import Path
     tpl = (Path(__file__).resolve().parents[1] / "app/templates/partials/daily_spend.html").read_text()
-    small = re.search(r'<span class="t">.*?</small></span>', tpl, re.S).group(0)
+    small = re.search(r'<span class="t">.*?</small>', tpl, re.S).group(0)
     assert "note_display" in small and "data-mask" not in small and "data-amount" not in small
 
 

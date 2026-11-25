@@ -447,7 +447,7 @@ def month_spend_tile(db: Session, user: User, today: jdatetime.date) -> dict:
         (
             Decimal(row.amount_toman)
             for row in db.query(DailySpend)
-            .filter(DailySpend.user_id == user.id, DailySpend.spent_on == today_g)
+            .filter(DailySpend.user_id == user.id, DailySpend.deleted_at.is_(None), DailySpend.spent_on == today_g)
             .all()
         ),
         Decimal("0"),
@@ -538,7 +538,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     view = build_portfolio(user, prices)
     now = utcnow()
     total = view.total_toman if view.total_toman > 0 else Decimal("1")
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     _debt_list, debt_total, next_debt_label = debt_rows(debts)
     recent_snaps = (
         db.query(PortfolioSnapshot)

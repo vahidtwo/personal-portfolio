@@ -83,7 +83,7 @@ def pending(debts, today: jdatetime.date, n_days: int):
     """
     out = []
     for debt in debts:
-        if not ds.is_active(debt):  # finished («تسویه شد») or paid off
+        if getattr(debt, "deleted_at", None) is not None or not ds.is_active(debt):  # finished («تسویه شد») or paid off
             continue
         due = ds.next_due(debt, today)
         if due is None:
@@ -115,7 +115,7 @@ def send_due_reminders(db: Session, *, now: datetime | None = None, push=None) -
     today = jdatetime.date.fromgregorian(date=local.date())
     sent_keys = {(r.debt_id, r.kind, r.due_date) for r in db.query(DueReminder).all()}
     count = 0
-    for debt, kind, due, days in pending(db.query(Debt).all(), today, days_before()):
+    for debt, kind, due, days in pending(db.query(Debt).filter(Debt.deleted_at.is_(None)).all(), today, days_before()):
         key = (debt.id, kind, due.strftime("%Y-%m-%d"))
         if key in sent_keys:
             continue

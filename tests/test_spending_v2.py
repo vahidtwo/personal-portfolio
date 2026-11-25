@@ -211,11 +211,12 @@ def test_page_contract(client, no_network, mehr28):
     html = full[full.index("data-sp-page"):full.index("</footer>") if "</footer>" in full else None]
     assert "confirm(" not in html and " · " not in html.split("<footer")[0]
     assert re.search(r'aria-label="گزینه‌های خرج [^"۰-۹]+، [^"]+"', html) and "data-sp-amount" not in html
-    assert 'role="menu"' in html and "حذف…" in html and 'id="sp-del-form"' in html
+    assert 'role="menu"' in html and ">حذف</button>" in html and 'id="sp-del-form"' in html
     assert 'id="daily-spend-form"' in html and 'name="parent_id" id="spend-parent"' in html  # same POST fields
     assert "<h1 id=\"sp-h\">خرج‌ها</h1>" in html and "فهرست خرج‌ها" in html
     js = (Path(__file__).resolve().parents[1] / "app" / "static" / "spending-page.js").read_text(encoding="utf-8")
-    for needle in ("alertdialog", "در حال ثبت…", "دوباره ثبت کن", "ثبت نشد", "فهرست خرج‌ها باز نشد",
+    assert "alertdialog" not in js and "confirmDelete" not in js
+    for needle in ("p6-toast", "بازگرداندن", "در حال ثبت…", "دوباره ثبت کن", "ثبت نشد", "فهرست خرج‌ها باز نشد",
                    "در حال بارگذاری خرج‌های ماه", "aria-pressed", "1000"):
         assert needle in js
     assert "confirm(" not in js

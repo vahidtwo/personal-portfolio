@@ -256,13 +256,12 @@ def test_category_share_percent_is_masked(client, no_network, clock):
     assert any(not m for t, m, skip in q.chunks if not skip and "٪" in t and DIGIT.search(t))
 
 
-def test_delete_confirm_prints_amount_only_when_shown():
+def test_delete_confirm_removed_and_cat_sheet_masks_amount():
     js = (STATIC / "spending-page.js").read_text(encoding="utf-8")
-    fn = js.split("function confirmDelete(row, back) {", 1)[1].split("document.body.appendChild(d);", 1)[0]
-    assert "data-sp-amount" not in js
+    assert "confirmDelete" not in js and "alertdialog" not in js and "data-sp-amount" not in js
+    fn = js.split("function openCatSheet(row, back) {", 1)[1].split("var sheet = document.createElement", 1)[0]
     assert 'var shown = document.documentElement.getAttribute("data-show-portfolio") === "1";' in fn
-    assert 'var amt = shown ? $(".a [data-amount]", row) : null;' in fn
-    assert 'var desc = (amt ? amt.textContent.trim() + " تومان، " : "") + row.getAttribute("data-sp-name")' in fn
+    assert 'var amtEl = shown ? $(".a [data-amount]", row) : null;' in fn
 
 
 def test_debt_delete_confirm_fills_amounts_only_when_shown():

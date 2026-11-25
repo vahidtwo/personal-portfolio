@@ -34,7 +34,7 @@ def monthly_view(
 
     # «اقساط این ماه»: unpaid instalments due this Jalali month plus overdue ones, each once.
     today = tehran_today()
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     installment, installment_overdue = month_due(debts, today)
     income_total = Decimal(user.salary_toman or 0)
     items = (

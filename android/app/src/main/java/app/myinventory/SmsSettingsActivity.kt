@@ -10,6 +10,9 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.Executors
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.Gravity
@@ -34,6 +37,10 @@ class SmsSettingsActivity : Activity() {
     private var errorText: String? = null
     private var errorOnInput = false
     private var draft = ""
+    private var learnedMerchants: List<LearnedMerchant>? = null
+    private var learnedError: String? = null
+    private val io = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // Design tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
     private val light by lazy {
@@ -66,7 +73,9 @@ class SmsSettingsActivity : Activity() {
         SmsPrefs.ensureMigrated(this)
     }
 
-    override fun onResume() { super.onResume(); render() } // re-check permission after app settings
+    override fun onResume() { super.onResume(); render(); loadLearnedMerchants() } // re-check permission after app settings
+
+    override fun onDestroy() { super.onDestroy(); io.shutdownNow() }
 
     private fun permanentlyDenied(): Boolean =
         SmsPrefs.askedBefore(this) && !SmsPrefs.permissionGranted(this) &&
@@ -101,6 +110,96 @@ class SmsSettingsActivity : Activity() {
         root.addView(box)
         if (denied) root.addView(deniedBox())
         if (on) root.addView(keywordSection())
+        if (NativeSession.signedIn()) root.addView(learnedMerchantsSection())
+    }
+
+    private fun loadLearnedMerchants() {
+        if (!NativeSession.signedIn()) return
+        io.execute {
+            val loaded = runCatching {
+                val res = NativeSession.request("GET", LearnedMerchants.PATH_LIST)
+                if (res.status in 200..299) LearnedMerchants.parseList(res.json) else null
+            }.getOrNull()
+            mainHandler.post {
+                if (isFinishing || isDestroyed) return@post
+                if (loaded != null) {
+                    learnedMerchants = loaded
+                    render()
+                }
+            }
+        }
+    }
+
+    private fun deleteLearnedMerchant(item: LearnedMerchant) {
+        learnedError = null
+        io.execute {
+            val ok = runCatching {
+                val res = NativeSession.delete(LearnedMerchants.deletePath(item.id))
+                res.status in 200..299 && res.json.optBoolean("ok", true)
+            }.getOrDefault(false)
+            mainHandler.post {
+                if (isFinishing || isDestroyed) return@post
+                if (ok) {
+                    learnedMerchants = learnedMerchants?.filterNot { it.id == item.id }
+                    root.announceForAccessibility("«${item.label}» حذف شد")
+                } else {
+                    learnedError = LearnedMerchants.SAVE_FAILED
+                }
+                render()
+            }
+        }
+    }
+
+    private fun learnedMerchantsSection(): View {
+        val s = section()
+        s.addView(tv(LearnedMerchants.TITLE, 15f, cText, bold = true).apply { accessibilityHeading() })
+        s.addView(tv(LearnedMerchants.DESC, 13.5f, muted))
+        if (learnedError != null) s.addView(alert(learnedError!!))
+        val items = learnedMerchants
+        if (items == null) {
+            s.addView(tv("در حال بارگذاری…", 13.5f, muted))
+            return s
+        }
+        if (items.isEmpty()) {
+            s.addView(tv(LearnedMerchants.EMPTY, 13.5f, muted))
+            return s
+        }
+        items.forEachIndexed { idx, item ->
+            if (idx > 0) {
+                s.addView(View(this).apply {
+                    setBackgroundColor(line)
+                    layoutParams = LinearLayout.LayoutParams(-1, dp(1))
+                })
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = dp(56)
+                setPadding(0, dp(6), 0, dp(6))
+            }
+            val txt = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            }
+            txt.addView(tv(item.label, 15f, cText, bold = true).apply { setPadding(0, 0, 0, dp(2)) })
+            txt.addView(tv(item.subtitle(), 13f, muted).apply { setPadding(0, 0, 0, 0) })
+            val delBtn = Button(this).apply {
+                text = "حذف"
+                isAllCaps = false
+                minHeight = dp(48)
+                minimumHeight = dp(48)
+                minWidth = dp(48)
+                setTextColor(danger)
+                setBackgroundColor(Color.TRANSPARENT)
+                face(true)?.let { typeface = it }
+                contentDescription = "حذف «${item.label}» از فروشگاه‌های یادگرفته"
+                setOnClickListener { deleteLearnedMerchant(item) }
+            }
+            row.addView(txt)
+            row.addView(delBtn)
+            s.addView(row)
+        }
+        return s
     }
 
     private fun header(): View = LinearLayout(this).apply {

@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.models import (
-    DailySpend, Debt, Holding, MonthlyExpense, PortfolioSnapshot, PushDeviceToken, User,
+    DailySpend, Debt, Holding, MonthlyExpense, PortfolioSnapshot, PushDeviceToken, SpendMerchantCategory, User,
 )
 
 USER_HAS_DATA_ERROR = "این کاربر داده دارد (دارایی، تاریخچه، بدهی یا خرج) و حذف نمی‌شود."
@@ -10,7 +10,7 @@ USER_HAS_DATA_ERROR = "این کاربر داده دارد (دارایی، تا�
 
 def user_has_data(db: Session, user: User) -> bool:
     uid = user.id
-    for model in (PortfolioSnapshot, Holding, Debt, MonthlyExpense, DailySpend, PushDeviceToken):
+    for model in (PortfolioSnapshot, Holding, Debt, MonthlyExpense, DailySpend, PushDeviceToken, SpendMerchantCategory):
         if db.query(model.id).filter(model.user_id == uid).first() is not None:
             return True
     return False

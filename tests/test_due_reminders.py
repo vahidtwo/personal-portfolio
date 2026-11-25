@@ -252,10 +252,10 @@ def test_migration_chain_0004_0005_0006_up_and_down(tmp_path):
     ok("upgrade", "0005_sanjeh_token_encrypt")
     assert version() == "0005_sanjeh_token_encrypt" and _tokens(db)[1].startswith("enc1:")
     assert "due_reminders" not in tables()
-    ok("upgrade", "head")
-    assert version() == "0012_monthly_expense_paid"
+    ok("upgrade", "0014_spend_category_memory")
+    assert version() == "0014_spend_category_memory"
     ok("stamp", "0005_sanjeh_token_encrypt")
-    ok("upgrade", "head")  # table already there: no-op
+    ok("upgrade", "0014_spend_category_memory")  # table already there: no-op
     after = _dump(db)
     assert after.pop("due_reminders") == (["id", "user_id", "debt_id", "kind", "due_date", "sent_at"], [])
     ok("downgrade", "0005_sanjeh_token_encrypt")
@@ -273,7 +273,7 @@ def test_single_alembic_head():
 
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parent.parent / "app" / "migrations"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["0012_monthly_expense_paid"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["0014_spend_category_memory"]
 
 
 def _hourly(monkeypatch, **kw):
@@ -349,7 +349,8 @@ def test_deleting_loan_deletes_its_reminders(client, no_network):
     t = _csrf(client, "/profile?tab=debts")
     client.post(f"/profile/debts/{gone_id}/delete", data={"csrf": t})
     s = SessionLocal()
-    assert s.get(Debt, gone_id) is None
+    assert s.get(Debt, gone_id).deleted_at is not None
+    assert s.get(Debt, keep_id).deleted_at is None
     assert s.query(DueReminder).filter(DueReminder.debt_id == gone_id).count() == 0
     assert s.query(DueReminder).filter(DueReminder.debt_id == keep_id).count() == 1
     s.close()

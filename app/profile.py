@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import PUBLIC_BASE_URL
 from app.db import get_db
 from app.debts import debt_rows, page_context_for_get
+from app.spends import learned_merchant_rows
 from app.expenses import expense_form_for_request
 from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
 from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car, snapshot_user_with_stored_prices
@@ -55,7 +56,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     if tab != "debts":
         tab = "settings"
     debts, debt_total, next_debt_label = debt_rows(
-        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
+        db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).order_by(Debt.id.asc()).all()
     )
     edit_raw = request.query_params.get("edit", "")
     editing = next((row for row in debts if edit_raw.isdigit() and row["id"] == int(edit_raw)), None)
@@ -116,6 +117,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
         account_error=None,
         account_errors={},
         has_salary=Decimal(user.salary_toman or 0) > 0,
+        learned_merchants=learned_merchant_rows(db, user),
         **expense_form_for_request(db, user, request),
     )
 

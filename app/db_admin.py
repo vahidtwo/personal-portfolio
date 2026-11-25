@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import FormData
 
 from app.db import get_db
-from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, User, utcnow
+from app.models import DailySpend, MarketPrice, PortfolioSnapshot, SpendCategory, SpendMerchantCategory, User, utcnow
 from app.portfolio import ASSET_LABEL_FA, ASSET_META, ASSET_ORDER
 from app.number_input import parse_int_text
 from app.security import (
@@ -517,6 +517,7 @@ def delete_record(db: Session, slug: str, obj, actor_id: int) -> str | None:
             return USER_HAS_DATA_ERROR
         db.query(PortfolioSnapshot).filter(PortfolioSnapshot.user_id == obj.id).delete(synchronize_session=False)
         db.query(DailySpend).filter(DailySpend.user_id == obj.id).delete(synchronize_session=False)
+        db.query(SpendMerchantCategory).filter(SpendMerchantCategory.user_id == obj.id).delete(synchronize_session=False)
     db.delete(obj)
     return None
 

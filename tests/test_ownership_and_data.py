@@ -57,12 +57,12 @@ def _counts():
 
     with SessionLocal() as db:
         return (
-            db.query(Debt).count(),
+            db.query(Debt).filter(Debt.deleted_at.is_(None)).count(),
             db.query(MonthlyExpense).count(),
-            db.query(DailySpend).count(),
-            [d.title for d in db.query(Debt)],
+            db.query(DailySpend).filter(DailySpend.deleted_at.is_(None)).count(),
+            [d.title for d in db.query(Debt).filter(Debt.deleted_at.is_(None))],
             [e.title for e in db.query(MonthlyExpense)],
-            [str(s.amount_toman) for s in db.query(DailySpend)],
+            [str(s.amount_toman) for s in db.query(DailySpend).filter(DailySpend.deleted_at.is_(None))],
         )
 
 

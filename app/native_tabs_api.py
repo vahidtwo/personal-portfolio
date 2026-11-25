@@ -177,6 +177,8 @@ async def api_spends(request: Request, db: Session = Depends(get_db)):
                 "amount_label": row["amount_label"],
                 "note": row["note_display"],
                 "from_sms": bool(row["from_sms"]),
+                "is_sms_bank": bool(row["is_sms_bank"]),
+                "category_source": row["category_source"],
             } for row in group["rows"]],
         })
     top = [{"name": s["label"], "parent_id": s["parent_id"], "color": s.get("color"), "share": s["share"], "share_label": s["share_label"],
@@ -266,7 +268,7 @@ async def api_debts(request: Request, db: Session = Depends(get_db)):
     if user is None:
         return _login_required()
     today = tehran_today()
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     items = db.query(MonthlyExpense).filter(MonthlyExpense.user_id == user.id).all()
     rows, total, _ = debt_rows(debts, today)
     installment, installment_overdue = ds.month_due(debts, today)

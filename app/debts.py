@@ -1,12 +1,13 @@
 """Debts v2 (/profile?tab=debts): instalment debts and monthly expenses.
 
 Backend for the v2 page: sorted rows, per-field errors (JSON 422 for fetch), and the manual
-«پرداخت شد» route with its undo. No schema change: months_left is decremented in place and
-(due_year, due_month) moves a month on; nothing is derived from the calendar.
+«پرداخت شد» route with its undo. months_left is decremented in place and (due_year, due_month)
+moves a month on; last_paid_on is set to today's Tehran date and restored on undo.
 """
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal
 
 import jdatetime
@@ -364,6 +365,22 @@ def _state(debt) -> list[int]:
     return [int(debt.months_left), int(debt.due_year), int(debt.due_month), int(debt.due_day)]
 
 
+def _iso_date(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def _parse_iso_date(value) -> date | None:
+    if not value:
+        return None
+    return date.fromisoformat(str(value)[:10])
+
+
 @router.post("/profile/debts/{debt_id}/paid")
 async def profile_debt_paid(
     debt_id: int,
@@ -392,12 +409,17 @@ async def profile_debt_paid(
         flash(request, message, error=True)
         return RedirectResponse(DEBTS_URL, status_code=303)
     before = _state(debt)
+    previous_paid = _iso_date(debt.last_paid_on)
     y, m = ds.after_payment(debt)  # the oldest unpaid one is paid: exactly one month on, never skipped
     debt.months_left = months - 1
     debt.due_year, debt.due_month = y, m  # due_day kept: a day-31 loan stays day 31 (readers clamp)
+    debt.last_paid_on = tehran_today().togregorian()
     db.commit()
     title = (debt.title or "").strip() or "قسط"
-    request.session["debt_undo"] = {"id": debt.id, "title": title, "before": before, "after": _state(debt), "show": True}
+    request.session["debt_undo"] = {
+        "id": debt.id, "title": title, "before": before, "after": _state(debt),
+        "last_paid_on": previous_paid, "show": True,
+    }
     if wants_json(request):
         return JSONResponse({"ok": True, "redirect": DEBTS_URL})
     return RedirectResponse(DEBTS_URL, status_code=303)
@@ -427,6 +449,8 @@ async def profile_debt_unpaid(
         flash(request, message, error=True)
         return RedirectResponse(DEBTS_URL, status_code=303)
     debt.months_left, debt.due_year, debt.due_month, debt.due_day = undo["before"]
+    if "last_paid_on" in undo:
+        debt.last_paid_on = _parse_iso_date(undo["last_paid_on"])
     db.commit()
     request.session.pop("debt_undo", None)
     return saved_response(request, f"پرداخت «{undo.get('title') or 'قسط'}» برگردانده شد.")

@@ -13,7 +13,7 @@ def _seed_loans(client):
     from app.models import Debt
 
     _register(client)
-    # unpaid this month 1_000_000 + paid this month 500_000 + finished (out) + overdue contributes 200_000 this month only
+    # unpaid this month 1_000_000 + next-month 500_000 (out) + finished earlier (out) + overdue contributes 200_000 this month only
     _seed([("عقب", 1000000, 5, 1405, 6, 1), ("پرداخت‌شده", 500000, 3, 1405, 8, 10),
            ("تمام", 9000000, 0, 1405, 7, 5), ("باز", 200000, 2, 1405, 7, 30),
            ("آخرین", 700000, 0, 1405, 8, 10)],
@@ -27,10 +27,10 @@ def _seed_loans(client):
 
 def test_api_month_total_matches_dashboard_calc(client, no_network, clock):  # noqa: F811
     _seed_loans(client)
-    # Same base as test_salary_left (۱٬۷۰۰٬۰۰۰ under the Mehr 28 clock) plus final-paid-this-month ۷۰۰٬۰۰۰.
+    # Same base as the debts page split (۱٬۲۰۰٬۰۰۰ under the Mehr 28 clock) plus final-paid-this-month ۷۰۰٬۰۰۰.
     from app.formatting import format_toman
 
-    expected = format_toman(Decimal("2400000"))
+    expected = format_toman(Decimal("1900000"))
     amounts = amounts_for(client, P)
     assert amounts["installments-month"] == expected
     dash = amounts_for(client, "/dashboard")
@@ -41,9 +41,9 @@ def test_debts_html_has_no_month_total_amount(client, no_network, clock):  # noq
     _seed_loans(client)
     html = client.get(P).text
     assert 'data-amt="installments-month"' in html
-    assert "۲٬۴۰۰٬۰۰۰" not in html
-    assert "2400000" not in html
-    assert "2,400,000" not in html
+    assert "۱٬۹۰۰٬۰۰۰" not in html
+    assert "1900000" not in html
+    assert "1,900,000" not in html
     assert re.search(
         r'<p class="dv-sumrow lead" data-month-total-row><span>جمع اقساط این ماه</span>'
         r'<b class="num"><bdi class="mask-sm" data-mask="portfolio" data-amount data-month-total>'

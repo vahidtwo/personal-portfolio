@@ -44,7 +44,7 @@ def test_welcome_only_for_users_without_assets_and_debts(client, no_network):
     html = client.get("/dashboard").text
     assert 'id="home-welcome"' in html and "خوش آمدید! بیایید شروع کنیم" in html
     assert 'href="/assets">افزودن دارایی</a>' in html
-    assert 'href="/profile?tab=debts">افزودن</a>' in html and 'href="/profile">تنظیم</a>' in html
+    assert 'href="/profile?tab=debts">افزودن</a>' in html and 'href="/profile#apk-download">تنظیم</a>' in html
     assert 'class="dash"' not in html
 
 

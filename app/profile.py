@@ -17,7 +17,7 @@ from app.debts import debt_rows, page_context_for_get
 from app.spends import learned_merchant_rows
 from app.expenses import expense_form_for_request
 from app.formatting import format_amount_input, format_qty_input, format_toman, format_when
-from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car
+from app.jobs import refresh_prices_and_snapshot_user, refresh_user_sanjeh_car, snapshot_user_with_stored_prices
 from app import rate_limit
 from app.firebase_push import firebase_admin_ready, send_push_to_user
 from app.mcp_http import hash_mcp_token
@@ -431,6 +431,8 @@ async def profile_save(
     # the Sanjeh token is no longer part of this form: car card v2 uses /assets/car/* (app/car_routes.py)
     sanjeh_warning = None
     db.commit()
+    # The chart gets its first point now, from stored prices; the background refresh adds a better-priced one.
+    snapshot_at = snapshot_user_with_stored_prices(db, user)
     # Don't hold the redirect on chande.net (up to 20s): the next page renders with stored prices
     # (home v2 shows the stale/waiting line) and the fetch + snapshot run after the response is sent.
     background_tasks.add_task(refresh_prices_and_snapshot_user, user.id)
@@ -438,7 +440,8 @@ async def profile_save(
     if next_url == "/assets":
         flash(request, sanjeh_warning or "ذخیره شد")
         if wants_json:
-            return JSONResponse({"ok": True, "redirect": "/assets"})
+            return JSONResponse({"ok": True, "redirect": "/assets",
+                                 "snapshot_at": snapshot_at.isoformat() if snapshot_at else None})
         return RedirectResponse("/assets", status_code=303)
     flash(request, sanjeh_warning or "موجودی ذخیره شد")
     return RedirectResponse("/dashboard", status_code=303)

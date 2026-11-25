@@ -47,7 +47,7 @@ def test_json_save_returns_field_map_with_422_and_saves_nothing(client, no_netwo
 def test_json_save_ok(client, no_network):
     _register(client)
     r = client.post("/profile", headers=JSON, data={"btc": "۰٫۵", "next": "/assets", "csrf": _csrf(client, "/assets")})
-    assert r.status_code == 200 and r.json() == {"ok": True, "redirect": "/assets"}
+    assert r.status_code == 200 and r.json() == {"ok": True, "redirect": "/assets", "snapshot_at": None}
     db, u = _user()
     assert u.btc == Decimal("0.5")
     db.close()

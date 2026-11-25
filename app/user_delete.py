@@ -1,4 +1,4 @@
-"""Admin batch delete of users with data (Vahid, Oct 13 2026).
+"""Admin batch delete of users with data.
 
 Safeguards:
 - the whole delete runs under ONE SQLite write lock (BEGIN IMMEDIATE): recount ->

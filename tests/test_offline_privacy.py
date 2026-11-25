@@ -1,4 +1,4 @@
-"""Batch 1: the offline dashboard copy is never shown without a valid session."""
+"""The offline dashboard copy is never shown without a valid session."""
 import json
 import shutil
 import subprocess

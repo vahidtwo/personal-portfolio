@@ -1,8 +1,12 @@
 # AGENTS.md
 
+Brand: دارایی‌تو (daraiito).
+
 ## Commands
 ```bash
-source ~/pp/my-inventory-speed/.venv/bin/activate   # or: pip install -r requirements-dev.txt
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
 PYTHONPATH=$PWD pytest -n auto                       # full suite, must finish in ≤ 1 min
 PYTHONPATH=$PWD pytest --testmon                     # only tests affected by your change
 PYTHONPATH=$PWD pytest tests/test_assets_v2.py -q    # one file
@@ -12,12 +16,18 @@ scripts/build-android-apk.sh                         # Android APK (Docker) -> a
 ## Stack
 - Python 3.12, FastAPI, SQLAlchemy, Jinja2, vanilla JS, Chart.js. SQLite + alembic (`app/migrations/versions/`, runs `upgrade head` on startup).
 - Single uvicorn worker (in-process hourly scheduler). Deploys automatically on merge to `main`.
-- Android WebView app in `android/` (Kotlin), package `app.myinventory`.
+- Android app in `android/` (Kotlin), package `app.myinventory`. Login and home are native Compose screens; other tabs use the WebView.
 
 ## Layout
 - `app/` routes and logic · `app/templates/` Jinja · `app/static/` JS/CSS, `sw.js`, `offline.html`
 - `app/config.py` settings, `STATIC_ASSET_VERSION` · `app/android_release.json` published APK version
 - `tests/` pytest (`tests/js/` JS tests) · `scripts/` build and seed tools
+- SMS parser: `android/app/src/main/java/app/myinventory/SmsDecision.kt`, `SmsKeywords.kt`
+
+## SMS rules
+- Path A: a minus amount plus «مانده» is recorded with no keyword.
+- Path W: «برداشت» next to an amount needs a keyword (default «برداشت», at least one required, stored on the phone only).
+- The saved-template path is cancelled. Do not add new template-path behaviour.
 
 ## Code style
 - Follow the surrounding code; small functions, no new dependencies without need.
@@ -46,5 +56,4 @@ scripts/build-android-apk.sh                         # Android APK (Docker) -> a
 - Use real user data in screenshots or fixtures (use `scripts/seed_demo.py`).
 - Enable navigation preload in `sw.js`.
 - Change the value of cookie `inventory_signed_in` (must stay `1`); use `inventory_page_key` for per-user caching; keep `inventory_session` as the session cookie.
-- Rename the localStorage key `privacy-portfolio`.
 - Change the package id `app.myinventory`, the APK filename or its URL, or publish a debug-signed APK.

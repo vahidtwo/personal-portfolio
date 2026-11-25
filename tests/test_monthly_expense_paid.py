@@ -224,7 +224,7 @@ def test_csrf_ownership_and_html_form_post(client, no_network, monkeypatch):
     assert _expense_ids()[0][2:] == (None, None)
 
 
-def test_migration_0011_upgrade_and_downgrade(tmp_path):
+def test_migration_0012_upgrade_and_downgrade(tmp_path):
     db_path = tmp_path / "copy.sqlite"
     url = f"sqlite:///{db_path}"
     cfg = Config()

@@ -9,7 +9,7 @@ def _rule(selector: str) -> str:
 
 
 def test_home_asset_quantity_line_is_never_truncated():
-    # Arabi spec: the name and quantity keep their full width, no «…» at 360px.
+    # The name and quantity keep their full width, no «…» at 360px.
     rule = _rule(".acard .nm > span")
     assert "text-overflow" not in rule and "nowrap" not in rule and "overflow: hidden" not in rule
     assert "overflow-wrap: anywhere" in rule

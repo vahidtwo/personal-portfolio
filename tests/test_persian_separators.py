@@ -1,4 +1,4 @@
-"""Arabi: thousands must be «٬» (U+066C) and the decimal point «٫» (U+066B), never ASCII «,» / «.» / «/».
+"""Thousands must be «٬» (U+066C) and the decimal point «٫» (U+066B), never ASCII «,» / «.» / «/».
 
 The shared display formatters (Python format_number / Jinja |num, JS NumberFa.format) already emit these
 code points. In Vazirmatn the U+066C glyph looks almost like a comma and U+066B like a short slash, so

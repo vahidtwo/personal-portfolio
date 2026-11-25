@@ -62,7 +62,7 @@ def _as_utc(value: datetime) -> datetime:
 def chart_snapshots(snaps: list, now: datetime, granularity: str = "day", since: timedelta | None = None,
                     keep_first_now: bool = False) -> list:
     """Chart points, oldest first: the last snapshot per Tehran day (``"day"``) or per ISO week
-    of the Tehran date (``"week"``). No hourly points (Arabi, batch 1).
+    of the Tehran date (``"week"``). No hourly points.
 
     The bucket that contains ``now`` is dropped, because the live portfolio value is appended as the
     final point for that bucket. With ``keep_first_now``, when that would leave no point at all (a
@@ -463,7 +463,7 @@ USD_EQUIV_KEYS = frozenset({"btc", "eth", "ada", "sol", "doge", "matic"})
 
 
 
-PRICE_STALE_AFTER = timedelta(hours=2)  # the scheduler runs hourly; 2h = at least one missed run (Arabi, home v2)
+PRICE_STALE_AFTER = timedelta(hours=2)  # the scheduler runs hourly; 2h = at least one missed run
 
 
 def age_label_fa(delta: timedelta) -> str:

@@ -35,7 +35,7 @@ class SmsSettingsActivity : Activity() {
     private var errorOnInput = false
     private var draft = ""
 
-    // Arabi's tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
+    // Design tokens: dark default, light from the spec (--text #11141c, --text-muted #5e6678, accent #08785c, danger #b42318).
     private val light by lazy {
         (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_NO

@@ -1,4 +1,4 @@
-"""Gzip only for static CSS and JS (batch 1, Gorg's call).
+"""Gzip only for static CSS and JS.
 
 HTML is never compressed here (it carries a CSRF token next to user input: BREACH), and the APK
 or any other file is passed through untouched so its size and sha256 never change.

@@ -3017,3 +3017,8 @@ html[data-show-portfolio="1"] .stat.stat-usd .mc{display:block}
 .move-notice p { margin: 0 0 10px; color: var(--text-muted); }
 .move-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 html .stat.stat-usd .mc[hidden],.mc[hidden]{display:none}
+.arow-price { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.arow-price bdi { white-space: nowrap; }
+.acard-price .up-v, .arow-price .up-v { white-space: nowrap; }
+.acard-price { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
+.acard-price bdi { white-space: nowrap; }

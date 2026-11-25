@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.formatting import format_toman
 from app.models import MarketPrice, PortfolioSnapshot, User, utcnow
 
 ASSET_ORDER = (
@@ -179,6 +180,18 @@ ASSET_META = {
 }
 
 MANUAL_TOman_KEYS = frozenset({"cash"})
+
+
+UNIT_PRICE_EXCLUDED = frozenset({"cash", "car"})
+_UNIT_PRICE_UNIT = {"usd": "دلار"}
+
+
+def unit_price_parts(key: str, unit_price: Decimal | None) -> dict | None:
+    """Today's price for one unit of a market-priced asset, for the muted «قیمت روز» line (not private)."""
+    if key in UNIT_PRICE_EXCLUDED or unit_price is None or unit_price <= 0:
+        return None
+    unit = _UNIT_PRICE_UNIT.get(key, ASSET_META[key]["unit_fa"])
+    return {"amount": format_toman(unit_price), "unit": unit, "unit_latin": unit.isascii()}
 
 
 @dataclass

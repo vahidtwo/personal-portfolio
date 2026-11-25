@@ -2861,6 +2861,38 @@ html[data-show-portfolio="1"] .dv-tile b[data-mask="portfolio"]{font-size:clamp(
 [data-theme=light] .dv-wrap :is(.dv-sub,.dv-cdesc,.dv-formula,.dv-hint,.dv-meta,.dv-row small,.dv-tile>span,.dv-tile small,.dv-empty p){color:#4f5868}
 .dv-summary a{min-width:44px;justify-content:center}
 .dv-skel-rows .dv-row{overflow:hidden}.dv-skel{max-width:100%}
+/* ---- Phase 6 item 8: monthly cost paid this month + contrast & 13-digit fit ---- */
+.p6-toast{position:fixed;z-index:95;inset-inline:16px;bottom:calc(var(--main-nav-h,56px) + env(safe-area-inset-bottom) + 12px);
+  display:flex;align-items:center;gap:8px;min-height:52px;padding:4px 6px 4px 6px;padding-inline-start:16px;border-radius:14px;
+  background:#f4f6fb;color:#0f1219;font-size:14.5px;font-weight:500;line-height:1.6;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.p6-toast[hidden]{display:none}
+[data-theme=light] .p6-toast{background:#1b1e27;color:#f4f6fb;box-shadow:0 10px 30px rgba(15,18,25,.25)}
+.p6-toast>span{flex:1;min-width:0}
+.p6-toast button{flex:none;min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:#08735a;font:700 14.5px/1 Vazirmatn,system-ui,sans-serif;cursor:pointer}
+[data-theme=light] .p6-toast button{color:#3ee0b8}
+.p6-toast .p6-timer{flex:none;width:28px;height:28px}
+.p6-toast.warn{background:#3a1d07;color:#ffd7a8}[data-theme=light] .p6-toast.warn{background:#fff3db;color:#7a3e03;box-shadow:0 10px 30px rgba(15,18,25,.15)}
+@media (min-width:900px){.p6-toast{inset-inline:auto;inset-inline-start:24px;bottom:24px;width:420px}}
+.dv-badge.unpaid{background:color-mix(in srgb,var(--text) 9%,transparent);color:var(--text)}
+.dv-badge.paid{gap:4px}
+[data-theme=light] .dv-badge.late{color:#b42318}
+.p6-pay{min-height:44px;padding:0 14px;gap:6px;margin-inline-start:auto;font-size:14px}
+.p6-pay,.dv-wrap .btn-ghost,.dv-wrap .dv-tile.dv-left .privacy-btn{border-color:rgba(244,246,251,.45)}
+[data-theme=light] .p6-pay,[data-theme=light] .dv-wrap .btn-ghost,[data-theme=light] .dv-wrap .dv-tile.dv-left .privacy-btn{border-color:rgba(15,18,25,.5)}
+.p6-unpaid{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:10px 2px 0;padding:10px 12px;border-radius:12px;
+  border:1px dashed rgba(244,246,251,.3);font-size:14px;line-height:1.7}
+[data-theme=light] .p6-unpaid{border-color:rgba(15,18,25,.3)}
+.p6-unpaid>span{color:var(--text-muted)}[data-theme=light] .p6-unpaid>span{color:#4f5868}
+.p6-unpaid b{white-space:nowrap;font-weight:700}
+.p6-unpaid.zero b{color:var(--accent-text)}
+.dv-row .dv-meta{row-gap:8px}
+.dv-row.is-paid .t b{color:var(--text)}
+.dv-row.is-paid .a b{color:var(--text-muted)}
+.dv-row .a{white-space:normal}.dv-row .a b{white-space:nowrap}
+.dv-tile.dv-left .privacy-btn{white-space:nowrap}
+@media (max-width:380px){.dv-tile.dv-left{grid-template-columns:minmax(0,1fr)}.dv-tile.dv-left .privacy-btn{grid-column:1;grid-row:auto;justify-self:start;margin-top:8px}}
+.dv-sumrow{flex-wrap:wrap}
+.dv-tile b{overflow-wrap:normal}
 /* ---- Home: 7-day mini chart per asset row (spec addendum 2026-10-21). Stroke = trend colour, not asset colour. */
 .mc{display:block;flex:none;overflow:visible;--mc-up:#3ee0b8;--mc-down:#ff8a80;--mc-flat:#9aa3b2}
 [data-theme=light] .mc{--mc-up:#08735a;--mc-down:#b42318;--mc-flat:#5b6475}

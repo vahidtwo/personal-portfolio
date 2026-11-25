@@ -1,0 +1,1 @@
+{% macro unit_price_line(p, cls) %}<span class="{{ cls }}">قیمت روز: <span class="up-v"><bdi dir="ltr">{{ p.amount }}</bdi> تومان/{% if p.unit_latin %}<bdi dir="ltr">{{ p.unit }}</bdi>{% else %}{{ p.unit }}{% endif %}</span></span>{% endmacro %}

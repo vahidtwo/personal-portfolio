@@ -1,16 +1,16 @@
 """Add spend_merchant_categories table and daily_spends.deleted_at + category_source.
 
-Idempotent migration on top of 0009_default_group_icons. No backfill: existing spends stay
+Idempotent migration on top of 0010_debt_last_paid_on. No backfill: existing spends stay
 visible (deleted_at IS NULL) with category_source NULL, and no merchant memories are invented.
 
-Revision ID: 0010_spend_category_memory
-Revises: 0009_default_group_icons
+Revision ID: 0011_spend_category_memory
+Revises: 0010_debt_last_paid_on
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
-revision = "0010_spend_category_memory"
-down_revision = "0009_default_group_icons"
+revision = "0011_spend_category_memory"
+down_revision = "0010_debt_last_paid_on"
 branch_labels = None
 depends_on = None
 

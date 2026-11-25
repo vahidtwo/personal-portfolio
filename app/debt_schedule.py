@@ -12,13 +12,13 @@ triple like 1405/08/31 is therefore allowed and every reader goes through `clamp
 
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import date, datetime
 from decimal import Decimal
 
 import jdatetime
 
 from app.daily_spend import JALALI_MONTHS
-from app.formatting import TEHRAN, format_toman, persian_digits, tehran_today
+from app.formatting import format_toman, persian_digits, tehran_today
 
 
 def month_length(year: int, month: int) -> int:
@@ -158,21 +158,13 @@ def month_due(debts, today: jdatetime.date | None = None) -> tuple[Decimal, Deci
     return total, overdue
 
 
-def _entered_on(debt) -> jdatetime.date | None:
-    created = getattr(debt, "created_at", None)
-    if created is None:
-        return None
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    return jdatetime.date.fromgregorian(date=created.astimezone(TEHRAN).date())
-
-
 def this_month_installments(debts, today: jdatetime.date | None = None) -> Decimal:
-    """Instalments dated in today's Jalali month, paid or not; older overdue months are left out.
+    """All of this month's instalments, paid or unpaid. Later months and older overdue months are left out.
 
-    An unpaid one is the stored month itself. A paid one shows as a stored month exactly one month ahead,
-    unless the loan was entered after this month's due date (its first instalment is then next month).
-    A finished loan counts only when its final instalment was this month's.
+    A loan whose next due is already next month counts only when last_paid_on falls in today's Jalali
+    month: that instalment was paid this month, so its due date has already moved on. A loan that
+    simply starts next month, or was last paid in another month, is not counted.
+    A finished loan still counts when its final instalment was this month's.
     """
     today = today or tehran_today()
     following = add_months(today.year, today.month, 1)
@@ -186,14 +178,39 @@ def this_month_installments(debts, today: jdatetime.date | None = None) -> Decim
         stored = (nxt.year, nxt.month)
         if stored <= (today.year, today.month):
             due_now = int(debt.months_left) > _months_between(stored, today)
-        elif stored == following:
-            entered = _entered_on(debt)
-            due_now = entered is None or entered <= clamp(today.year, today.month, debt.due_day)
         else:
-            due_now = False
+            due_now = stored == following and _paid_this_month(debt, today)
         if due_now:
             total += Decimal(debt.monthly_toman)
     return total
+
+
+def _paid_this_month(debt, today: jdatetime.date) -> bool:
+    """True when last_paid_on is a calendar date in today's Jalali month."""
+    jalali = _as_jalali(getattr(debt, "last_paid_on", None))
+    return jalali is not None and (jalali.year, jalali.month) == (today.year, today.month)
+
+
+def _as_jalali(value) -> jdatetime.date | None:
+    if value is None:
+        return None
+    if isinstance(value, jdatetime.datetime):
+        value = value.date()
+    if isinstance(value, jdatetime.date):
+        return value
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value[:10])
+        except ValueError:
+            return None
+    elif isinstance(value, datetime):
+        value = value.date()
+    if not isinstance(value, date):
+        return None
+    try:
+        return jdatetime.date.fromgregorian(date=value)
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 def _final_paid_this_month(debt, following: tuple[int, int]) -> bool:

@@ -235,6 +235,78 @@
     return fetch(form.action, { method: "POST", body: new FormData(form), credentials: "same-origin", headers: { Accept: accept || "application/json" } });
   }
 
+  var toastEl = null, toastTimer = null;
+  function clearToast() {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    if (toastEl && toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+    toastEl = null;
+  }
+  function focusExpenseRow(id, preferPay) {
+    var row = $('[data-dv-row="x' + id + '"]');
+    if (!row) return;
+    var target = (preferPay ? $(".p6-pay", row) : null) || $("[data-dv-dots]", row);
+    if (target) target.focus();
+  }
+  function showExpenseToast(id, text, unpaidUrl, csrfToken) {
+    clearToast();
+    var el = document.createElement("div");
+    el.className = "p6-toast";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.setAttribute("data-dv-expense-toast", String(id));
+    el.innerHTML = '<svg class="p6-timer" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="2.5"/><circle data-p6-ring cx="14" cy="14" r="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="69.12" stroke-dashoffset="0" transform="rotate(-90 14 14)" stroke-linecap="round"/></svg>';
+    var msg = document.createElement("span");
+    msg.textContent = text;
+    var undo = document.createElement("button");
+    undo.type = "button";
+    undo.setAttribute("data-p6-undo", "");
+    undo.textContent = "بازگرداندن";
+    el.appendChild(msg);
+    el.appendChild(undo);
+    document.body.appendChild(el);
+    toastEl = el;
+    var ring = $("[data-p6-ring]", el);
+    var reduced = W.matchMedia && W.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (ring && !reduced) {
+      ring.style.transition = "stroke-dashoffset 8s linear";
+      requestAnimationFrame(function () { ring.style.strokeDashoffset = "69.12"; });
+    }
+    undo.focus();
+    toastTimer = setTimeout(function () {
+      var returnFocus = el.contains(document.activeElement);
+      clearToast();
+      if (returnFocus) focusExpenseRow(id, false);
+    }, 8000);
+    undo.addEventListener("click", function () {
+      if (undo.getAttribute("aria-disabled") === "true") return;
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+      undo.setAttribute("aria-disabled", "true");
+      var body = new FormData();
+      body.append("csrf", csrfToken);
+      fetch(unpaidUrl, { method: "POST", body: body, credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("unpaid"); return r.json(); })
+        .then(function () { clearToast(); return refresh(); })
+        .then(function () { focusExpenseRow(id, true); })
+        .catch(function () { clearToast(); $("[data-dv-loadfail]").hidden = false; });
+    });
+  }
+
+  function fitTiles() {
+    var fs = parseFloat(document.documentElement.dataset.fs || "1") || 1;
+    $$(".dv-tile b", page).forEach(function (b) {
+      b.style.removeProperty("font-size");
+      var box = b.parentElement;
+      if (!box || !box.clientWidth) return;
+      var cs = getComputedStyle(box);
+      var avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      var f = parseFloat(getComputedStyle(b).fontSize);
+      while (b.scrollWidth > avail && f > 13 * fs) {
+        f -= 0.5;
+        b.style.setProperty("font-size", f + "px", "important");
+      }
+    });
+  }
+
   function onSubmit(ev) {
     var form = ev.target;
     if (form.matches("[data-dv-form]")) {
@@ -263,14 +335,39 @@
       });
       return;
     }
+    if (form.matches("[data-dv-expense-paid]")) {
+      ev.preventDefault();
+      var payBtn = $("button[type=submit]", form);
+      if (!payBtn || payBtn.getAttribute("aria-disabled") === "true") return;
+      payBtn.setAttribute("aria-disabled", "true");
+      var csrfInput = $('input[name="csrf"]', form);
+      var csrfVal = csrfInput ? csrfInput.value : "";
+      postForm(form).then(function (r) {
+        return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+      }).then(function (res) {
+        if (!res.ok || !res.body || !res.body.ok) throw new Error("paid");
+        return refresh().then(function () {
+          showExpenseToast(res.body.id, res.body.toast || form.getAttribute("data-toast"), res.body.unpaid_url || form.action.replace(/\/paid$/, "/unpaid"), csrfVal);
+        });
+      }).catch(function () {
+        payBtn.removeAttribute("aria-disabled");
+        $("[data-dv-loadfail]").hidden = false;
+      });
+      return;
+    }
     if (form.matches("[data-dv-action]")) {
       ev.preventDefault();
       var btn = $("button[type=submit]", form);
       if (btn) btn.setAttribute("aria-disabled", "true");
-      postForm(form).then(function () {
+      var unpaidId = form.getAttribute("data-dv-expense-unpaid");
+      postForm(form).then(function (r) {
+        if (!r.ok) throw new Error("action");
         if (openSheet) { openSheet.hidden = true; scrim.hidden = true; openSheet = null; document.documentElement.classList.remove("dv-locked"); }
         closeMenu();
-        return refresh();
+        if (unpaidId && toastEl && toastEl.getAttribute("data-dv-expense-toast") === unpaidId) clearToast();
+        return refresh().then(function () {
+          if (unpaidId) focusExpenseRow(unpaidId, true);
+        });
       }).catch(function () { $("[data-dv-loadfail]").hidden = false; })
         .then(function () { if (btn) btn.removeAttribute("aria-disabled"); });
     }
@@ -355,6 +452,9 @@
       form.addEventListener("input", function () { updatePreview(form); });
       updatePreview(form);
     });
+    document.addEventListener("amounts:filled", fitTiles);
+    W.addEventListener("resize", fitTiles);
+    fitTiles();
     var open = page.getAttribute("data-dv-open");
     if (open) {
       var sheet = $('[data-dv-sheet="' + open + '"]');

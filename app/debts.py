@@ -107,31 +107,51 @@ def debt_rows(debts: list[Debt], today: jdatetime.date | None = None) -> tuple[l
     return rows, ds.active_total(debts), format_jalali_date(nearest["date"]) if nearest else "—"
 
 
-def expense_next(day: int, today: jdatetime.date) -> jdatetime.date:
-    """Next date with that day of month; a short month counts its last day (form hint)."""
-    candidate = ds.clamp(today.year, today.month, day)
-    if candidate < today:
+def is_expense_paid(item: MonthlyExpense, today: jdatetime.date) -> bool:
+    """True only when marked paid for today's Jalali year and month."""
+    return (item.paid_jy, item.paid_jm) == (today.year, today.month)
+
+
+def expense_unpaid_total(items: list[MonthlyExpense], today: jdatetime.date | None = None) -> Decimal:
+    today = today or tehran_today()
+    return sum((Decimal(i.amount_toman) for i in items if not is_expense_paid(i, today)), Decimal("0"))
+
+
+def expense_next(day: int, today: jdatetime.date, *, paid_this_month: bool = False) -> jdatetime.date:
+    """Due date for the cost: next month when already paid this month, else this month's date."""
+    if paid_this_month:
         y, m = ds.add_months(today.year, today.month, 1)
-        candidate = ds.clamp(y, m, day)
-    return candidate
+        return ds.clamp(y, m, day)
+    return ds.clamp(today.year, today.month, day)
 
 
 def expense_rows(items: list[MonthlyExpense], today: jdatetime.date | None = None) -> list[dict]:
     today = today or tehran_today()
+    month_name = ds.JALALI_MONTHS[today.month - 1]
     rows = []
     for item in sorted(items, key=lambda e: (e.due_day, e.id)):
         amount = Decimal(item.amount_toman)
+        title = (item.title or "").strip()
+        display_title = title or "هزینه"
+        paid = is_expense_paid(item, today)
+        this_due = ds.clamp(today.year, today.month, item.due_day)
+        overdue = (not paid) and this_due < today
+        nxt = expense_next(item.due_day, today, paid_this_month=paid)
         rows.append(
             {
                 "id": item.id,
-                "title": (item.title or "").strip(),
-                "display_title": (item.title or "").strip() or "هزینه",
+                "title": title,
+                "display_title": display_title,
                 "amount_raw": format_amount_input(amount),
                 "amount_orig": format(amount.normalize(), "f"),
                 "due_day": str(item.due_day),
                 "amount_label": format_toman(amount),
                 "day_label": persian_digits(str(item.due_day)),
-                "next_label": ds.day_month(expense_next(item.due_day, today)),
+                "next_label": ds.day_month(nxt),
+                "paid_this_month": paid,
+                "overdue": overdue,
+                "month_name": month_name,
+                "paid_toast": f"{display_title} {month_name} پرداخت شد",
             }
         )
     return rows
@@ -157,6 +177,7 @@ def debts_page(
     exp_rows = expense_rows(items, today)
     installment, installment_overdue = ds.month_due(debts, today)
     expense_total = sum((Decimal(i.amount_toman) for i in items), Decimal("0"))
+    unpaid_total = expense_unpaid_total(items, today)
     sheet = None
     if debt_errors or editing_id:
         sheet = "debt"
@@ -181,6 +202,8 @@ def debts_page(
         "month_total_label": format_toman(ds.this_month_installments(debts, today)),
         "installment_overdue_label": format_toman(installment_overdue) if installment_overdue else None,
         "expense_label": format_toman(expense_total),
+        "unpaid_this_month_label": format_toman(unpaid_total),
+        "all_expenses_paid": bool(exp_rows) and all(r["paid_this_month"] for r in exp_rows),
         "next": nearest,
         "debt_form": debt_form or EMPTY_DEBT_FORM,
         "debt_errors": debt_errors or {},

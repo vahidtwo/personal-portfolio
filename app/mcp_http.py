@@ -93,7 +93,7 @@ def _debts(db: Session, user: User) -> dict:
     total = Decimal("0")
     from app import debt_schedule as ds
 
-    for debt in db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all():
+    for debt in db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).order_by(Debt.id.asc()).all():
         amount = ds.remaining(debt)
         if ds.is_active(debt):  # paid-off debts (0 left) stay listed but are out of the total
             total += amount
@@ -144,7 +144,7 @@ def _monthly_left(db: Session, user: User) -> dict:
     """Same figure as the dashboard مانده: salary − this month's instalments − monthly expenses."""
     from app.debt_schedule import this_month_installments
 
-    debts = db.query(Debt).filter(Debt.user_id == user.id).all()
+    debts = db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).all()
     installment = this_month_installments(debts)
     expense_total = sum(
         (

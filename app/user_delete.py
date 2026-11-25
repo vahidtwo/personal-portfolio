@@ -32,6 +32,7 @@ KNOWN_LABELS: dict[str, str] = {
     "portfolio_snapshots": "اسنپ‌شات",
     "holdings": "دارایی",
     "debts": "بدهی/قسط",
+    "debt_payments": "سابقهٔ پرداخت قسط",
     "monthly_expenses": "هزینه ماهانه",
     "daily_spends": "خرج روزانه",
     "spend_merchant_categories": "فروشگاه یادگرفته",

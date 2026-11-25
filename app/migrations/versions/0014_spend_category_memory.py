@@ -1,16 +1,16 @@
 """Add spend_merchant_categories table and daily_spends.deleted_at + category_source.
 
-Idempotent migration on top of 0012_monthly_expense_paid. No backfill: existing spends stay
+Idempotent migration on top of 0013_debt_payments. No backfill: existing spends stay
 visible (deleted_at IS NULL) with category_source NULL, and no merchant memories are invented.
 
 Revision ID: 0014_spend_category_memory
-Revises: 0012_monthly_expense_paid
+Revises: 0013_debt_payments
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "0014_spend_category_memory"
-down_revision = "0012_monthly_expense_paid"
+down_revision = "0013_debt_payments"
 branch_labels = None
 depends_on = None
 

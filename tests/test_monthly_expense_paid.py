@@ -230,6 +230,9 @@ def test_migration_0012_upgrade_and_downgrade(tmp_path):
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "app/migrations"))
 
+    heads = ScriptDirectory.from_config(cfg).get_heads()
+    assert len(heads) == 1
+
     engine = create_engine(url)
     with engine.begin() as conn:
         cfg.attributes["connection"] = conn

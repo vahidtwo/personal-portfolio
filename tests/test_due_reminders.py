@@ -349,7 +349,8 @@ def test_deleting_loan_deletes_its_reminders(client, no_network):
     t = _csrf(client, "/profile?tab=debts")
     client.post(f"/profile/debts/{gone_id}/delete", data={"csrf": t})
     s = SessionLocal()
-    assert s.get(Debt, gone_id) is None
+    assert s.get(Debt, gone_id).deleted_at is not None
+    assert s.get(Debt, keep_id).deleted_at is None
     assert s.query(DueReminder).filter(DueReminder.debt_id == gone_id).count() == 0
     assert s.query(DueReminder).filter(DueReminder.debt_id == keep_id).count() == 1
     s.close()

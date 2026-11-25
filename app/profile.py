@@ -56,7 +56,7 @@ async def profile_form(request: Request, db: Session = Depends(get_db)):
     if tab != "debts":
         tab = "settings"
     debts, debt_total, next_debt_label = debt_rows(
-        db.query(Debt).filter(Debt.user_id == user.id).order_by(Debt.id.asc()).all()
+        db.query(Debt).filter(Debt.user_id == user.id, Debt.deleted_at.is_(None)).order_by(Debt.id.asc()).all()
     )
     edit_raw = request.query_params.get("edit", "")
     editing = next((row for row in debts if edit_raw.isdigit() and row["id"] == int(edit_raw)), None)
